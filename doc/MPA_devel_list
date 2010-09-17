@@ -1,0 +1,114 @@
+---------------------------------------------------
+list of developments discusssed with Mark Payne:
+---------------------------------------------------
+
+emission box (autumn2009 + 08.mar.2010)
+  - provide arbitrary initialization data after space-time part of an emission box 
+    done
+  - mixed type reading via input parser is now possible
+  - dry release: fixed - now wet check
+  - generalized temporal release distribution: leave this one to you, Mark
+
+list new classes
+
+type spatial_attributes:   all generic (non-biological) spatial issues
+type state_attributes:     all particle issues that do not belong to spatial_attributes (mainly biology)
+
+type particle:             light class that mixes state_attributes and spatial_attributes
+type particle_ensemble
+
+
+
+coastal reshuffling problem (autumn2009) 
+  -> should be elegantly fixed with coast_line_intersection in physical_fields
+
+flexible boundary conditions: done (reflective/sticky BC can be set at state initialization for all boundaries (coast/domain/vertical/..?)
+- there is no delete_tracers anymore - it is the responsibility of 
+  update_state to handle particles that has set boundary violation flags  (jan 2009)
+
+------------ package setup (autumn2009) ---------------------------
+
+goal: out-of-the-box build experience
+
+.configure
+  -> develop protocol for defining a project/interface assembbly/interface implementation 
+
+polish makefile
+ 
+stable release (Phoenix)
+
+write manual (design concepts/installation/interfaces/API/FAQ/tutorial)
+
+code autodoc: 
+   which package?
+   mark/classify in-code doc
+   add entry to makefile: "make autodoc"
+
+move Phoenix to subversion
+
+transfer functionality of old IBMlib to Phoenix incl.
+biomodules + physical interfaces
+
+---------------------------------------
+
+Kristins weight dynamics to spatial_attributes class (08.mar.2010)
+
+  - Kristins weight dynamics will be handled by the spatial_attributes class
+    (it should not be mixed with biology)
+
+  - latest feedbacks from Uffe still indicated fundamental technical
+    problems in the alternative backtracking scheme - wait to hear
+    news from Uffe.
+
+  - consider whether we should have something like
+    real(KIND=POS_PRECISION) for position variables (cm motion problem)
+
+update doc
+
+vertical aggregation problem - should be solved with the grid free implementation
+
+sunrise/sunset: 
+  polar problem (transition to all light/all dark)  (17.sep.2009)
+  integrate sunrise/sunset into time_tools
+  POSIX bug (15.Jul.2009)
+
+check w sign in DMI physical interface
+---------------------------------------------------
+segregate our the generic parts of physical_fields in the new interface (08.mar.2010)
+
+standard writers (standard output format, e.g. trajectory file)
+
+------------------------------------ 
+      package robustness 
+---------------------------------
+
+basic test suite that can be invoke from make like "make test"
+  - well mixed condition under std forward random walk
+  - check portability to other compilers/platforms/OS
+  
+
+---------------------------------------------------
+   outreach
+---------------------------------------------------
+license decision (GPL/CCL/... ?)
+
+open source commitment: let's set a some milestones and a target date
+setup a webpage
+
+peer-reviewed publication of IBMlib package that can be 
+used as reference for further work
+
+maybe some workshop
+
+
+---------------------------------------------------
+   long term goals
+---------------------------------------------------
+parallelization
+- we should be able to cover alternative parallelization axes
+  (list_number/space/species/...)
+
+multiple state classes (beyond mutable state classes 
+- this requires dealing with the strongly typed heritance problem in F90
+  maybe a template/preprocsssing construction as in input_parser)
+

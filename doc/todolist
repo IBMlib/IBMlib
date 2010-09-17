@@ -1,0 +1,30 @@
+MPA contract - goal: toward a stable version
+
+netcdf4 update
+
+compile test 
+link test
+test with a simplified physical + bio setup
+
+MOMME physical interface build
+transfer sandeel setup
+
+write_* uniformization: beeyond debugging
+
+write doc
+
+RNG ??
+
+Kristins back tracking kit
+
+isolate generic parts of physical_fields into generic module
+
+a consistent definition and fast and robust implementation of 
+add_finite_step(xy, dR) ... (paper note written Mar 29 2010)
+
+---------------------------------------------
+portability: 
+  test suite
+  other compilers
+  other platforms
+---------------------------------------------

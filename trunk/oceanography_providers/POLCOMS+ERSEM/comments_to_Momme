@@ -1,0 +1,38 @@
+Assumes all fields are cell centered - if other staggering apply, please
+let me know
+
+Assumes lat(lat) and lon(lon) applies to cell centers
+
+depth/pdepthM apparently describes the same. Assertion not checked.
+I have picked pdepthM
+
+bathymetry(lat, lon)
+
+found no horizontal diffusivity. 
+Set to zero for now, may later apply a Smagorinsky type scheme. 
+
+assume nuvM is the diffusivity that applies to a passive tracers
+
+assume attribute "vcurM:long_name" is not up to date
+
+-------------------------------------------------------------------------
+
+z = 40 ;
+n_zfaces = 2 ;
+time = UNLIMITED ; // (1 currently)
+lon = 198 ;
+lat = 224 ;
+
+float ucurM(time, z, lat, lon) ; "m/s" 
+float vcurM(time, z, lat, lon) ; "m/s" 
+float wcurM(time, z, lat, lon) ; "m/s" downward component
+float ETWM(time, z, lat, lon)  ; "degrees Celsius" ;
+
+zbnd(time, z, lat, lon, n_zfaces) cell bounds (upper,lower) below surface m
+depth(time, z, lat, lon)          depth of cell center below surface      m
+
+
+
+
+bathymetry(lat, lon)              reference level ??      m
+pdepthM(time, z, lat, lon)        nominel cell width ?            m

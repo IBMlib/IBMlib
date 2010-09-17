@@ -1,0 +1,21 @@
+####################################################################
+#   source MEECEexport
+###################################################################3
+mkdir -p ../MEECEexport
+mkdir -p ../MEECEexport/doc
+mkdir -p ../MEECEexport/libtime
+mkdir -p ../MEECEexport/input
+#
+cp makefile_tmp ../MEECEexport/Makefile
+cp constants.f input_parser.f  particle_state.f  \
+          physical_fields.f  runtime_tools.f  time_tools.f \
+          particles.f  particle_tracking.f  \
+          run_context.f  string_tools.f random_numbers.f \
+          grid_interpolations.f geometry.f \
+          main_program.f ../MEECEexport
+cp doc/SLAM_ug.pdf ../MEECEexport/doc
+cp grid_desc.txt  test_input.txt ../MEECEexport/input
+cp ../wrk7/code/libtime/libtime.tar.gz ../MEECEexport/libtime
+cp ../wrk7/code/libtime/Makefile_adapted_asc ../MEECEexport/libtime/
+cd ../MEECEexport; tar cvfz ../SLAM4MEECE.tgz *; mv ../SLAM4MEECE.tgz .
+#

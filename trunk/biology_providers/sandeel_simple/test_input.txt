@@ -1,0 +1,43 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+start_time  = 2005 03 01 0    !  year  month  day  second_of_day
+end_time    = 2005 03 18 0    !  year  month  day  second_of_day
+
+hydroDBpath = hydroDB         !  file path to POLCOMS+ERSEM data set
+grid_desc   = grid_desc.txt   !  sub grid descriptor
+
+advec_intg_method  = euler    !  advection scheme: euler/rk27rk4
+particle_time_step = 1800     !  in seconds for time integration of motion
+
+! --------------- biology spatial control ---------------
+! r(1:4) start:  year month day sec_of_day
+! r(5:8) end:    year month day sec_of_day
+! r(9:11)        lon_min lat_min z_min  (z=0 -> surface)
+! r(12:14)       lon_max lat_max z_max  (z=1 -> bottom)
+! r(15)          max_number_of_tracers
+! r(16:)         other input item to particle state
+
+emitbox = 2005 03 02 0     2005 03 02 3600  2 54 1   3 55 1  100 e 
+emitbox = 2005 03 02 3600  2005 03 02 7200  4 54 1   5 56 1  100 l 9.66
+
+
+! --------------- biology growth ---------------
+! parameters corresponds to Can. J. Fish. Aquat. Sci. 65: 1498-1511 (2008)
+
+egg_hatch_begin = 78.484  0.10984 ! days since fertilization (A,k0 > 0)
+egg_hatch_mid   = 108.75  0.12488 ! days since fertilization (B,k1 > 0)
+egg_hatch_end   = 176.14  0.11358 ! days since fertilization (C,k2 > 0
+
+
+larvae_temp_coeff    = -1.725   0.136142  0.00   ! mm/day/Celcius^n 
+larvae_temp_func     = 1        ! 0: func=polynomial  1: func=exp(polynomial)
+larvae_hatch_len     = 7.7253   ! mm
+larvae_length_expo   = 0.315544 ! beta (small larvae growth exponent) 
+larvae_metamorph_len = 40.0     ! mm
+
+
+
+
+  

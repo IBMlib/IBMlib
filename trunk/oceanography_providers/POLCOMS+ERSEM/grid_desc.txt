@@ -1,0 +1,23 @@
+! ----------------------------------------
+! --------- full grid definition ---------
+! ----------------------------------------
+
+lambda_start_fullgrid = -19.833333333
+lambda_end_fullgrid   =  13.000000000
+dlambda_fullgrid      =  0.1666666667
+
+phi_start_fullgrid    =  40.111111111
+phi_end_fullgrid      =  64.888888889
+dphi_fullgrid         =  0.111111111
+
+nz                    =  40 
+
+! ----------------------------------------
+! ---------- subgrid definition ----------
+! ----------------------------------------
+
+lambda_start_subgrid  = -3.0
+lambda_end_subgrid    = 10.0
+phi_start_subgrid     = 52.0
+phi_end_subgrid       = 59.0
+

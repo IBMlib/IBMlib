@@ -1,0 +1,29 @@
+vortex + no diffusion:
+   exact horizontal integration (dt -> 0)
+  
+constant vertical diffusion profile:
+   sqrt(t) vertical dispersal
+   even distribution of particles
+ 
+non constant vertical diffusion profile + reflective BC:
+   even vertical distribution test
+   
+constant horizontal diffusion profile + box domain + reflective BC:
+   sqrt(t) horizontal dispersal
+   even horizontal distribution test
+
+
+
+-------------------------------------------------------
+BC:  box domain : particles stick to boundary??
+        single trajectory plot                    OK
+
+     coast reflections: 
+        even horizontal distribution test         OK
+        horizontal single trajectory plot        (OK)
+
+     vertical reflections:                        
+        vertical single trajectory plot          (OK)
+
+     sticky vertical BC: 
+        vertical single trajectory plot

@@ -1,0 +1,23 @@
+Should we do
+
+ 1) interpolate_X(buffer,status)
+
+or 
+
+ 2) interpolate("X",buffer,status)
+ 
+====================================================
+advantages of 1 over 2:
+  
+ speed: redelegation to internal interpolate_X
+        is done at compile time. Option 2) needs to do a string comparison
+        with a property lookup table for each call 
+        (i.e. for each particle each time step)
+        Alternatively, interpolate(ix,buffer,status)
+        where ix is a named integer constant defined in a 
+        symbol module (less elegant)
+ 
+features: if interpolation of X is requested without
+          a matching provider, in case of 1) it is a 
+          compile time error and in case of 2) it is a 
+	  run time error.

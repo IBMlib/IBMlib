@@ -271,17 +271,22 @@ c
       
 c
 c     --- init bio states and assemble particle from space + state
+c         If there is a significant overhead in paremit_box%initialization_data
 c         as a blocked call (handle all npar particles in one short
 c         to minimize parsing overhead of initialization information
 c         emit_box%initialization_data)
 c
       call get_initialization_data(emit_box, strdat)
       call get_emission_boxID(emit_box, boxID)  ! enable state to trace its origin
-      call init_state_attributes(par_ens%state_stack, 
-     +                           par_ens%space_stack,
-     +                           time_dir,             
-     +                           par_ens%last+1, npar, strdat, boxID) 
-
+c     
+c     loop over new particle and init state attributes (possibly also space attributes
+c     like boundary conditions and mobility)
+c 
+      do ip = par_ens%last+1, par_ens%last+npar 
+         call init_state_attributes(par_ens%state_stack(ip), 
+     +                              par_ens%space_stack(ip),
+     +                              time_dir, strdat, boxID) 
+      enddo
       par_ens%last =  par_ens%last + npar
 
       if (verbose>0) then

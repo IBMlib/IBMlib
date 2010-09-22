@@ -13,7 +13,7 @@ c     spatial aspects
 c     -----------------------------------------------
       type state_attributes
       private
-      logical :: dummy ! derived types can not be completely empty
+      logical :: dummy ! derived types can not be completely empty ...
       end type
       public :: state_attributes
 
@@ -22,46 +22,50 @@ c     -----------------------------------------------
          
  
       subroutine init_particle_state()  ! module operator
+c     ----------------------------------------------------
       end subroutine 
 
 
       subroutine close_particle_state() ! module operator
+c     ----------------------------------------------------
       end subroutine 
       
 
-      subroutine init_state_attributes(state_stack, space_stack,
-     +                                 time_dir,             
-     +                                 nstart, npar,
-     +                                 initdata,emitboxID)
-c     ----------------------------------------------------      
-      type(state_attributes),intent(out)  :: state_stack(:) 
-      type(spatial_attributes),intent(in) :: space_stack(:)  
-      real,intent(in)                     :: time_dir            
-      integer,intent(in)                  :: nstart 
-      integer,intent(in)                  :: npar
-      character*(*),intent(in)            :: initdata
-      integer,intent(in)                  :: emitboxID
+      subroutine init_state_attributes(state, space, time_dir,             
+     +                                 initdata, emitboxID)
+c     ----------------------------------------------------
+      type(state_attributes),intent(out)     :: state
+      type(spatial_attributes),intent(inout) :: space
+      real,intent(in)                        :: time_dir            
+      character*(*),intent(in)               :: initdata
+      integer,intent(in)                     :: emitboxID
       end subroutine 
 
+
       subroutine get_active_velocity(state, space, v_active)
+c     ----------------------------------------------------
       type(state_attributes), intent(in)   :: state
       type(spatial_attributes), intent(in) :: space      
       real, intent(out)                    :: v_active(:)  
       end subroutine 
 
 
-      subroutine update_particle_state(state, time_step)
-      type(state_attributes), intent(inout) :: state 
+      subroutine update_particle_state(state, space, time_step)
+c     ----------------------------------------------------
+      type(state_attributes), intent(inout) :: state
+      type(spatial_attributes), intent(in)  :: space
       real,intent(in)                       :: time_step
       end subroutine 
 
 
-      subroutine delete_state_attributes(state) 
+      subroutine delete_state_attributes(state)
+c     ----------------------------------------------------
       type(state_attributes), intent(inout) :: state 
       end subroutine 
 
 
       subroutine write_state_attributes(state)
+c     ----------------------------------------------------
       type(state_attributes), intent(in) :: state 
       end subroutine 
 

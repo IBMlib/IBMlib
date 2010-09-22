@@ -94,54 +94,35 @@ c     ---------------------------------------------------------------
       
 
 
-
-      subroutine init_state_attributes(state_stack, space_stack,
-     +                                 time_dir,             
-     +                                 nstart, npar,
-     +                                 initdata,emitboxID)
+      subroutine init_state_attributes(state, space, time_dir,             
+     +                                 initdata, emitboxID)
 c     ---------------------------------------------------------------
-c     This subroutine should initialize state_stack(nstart:nstart+npar-1)
+c     This subroutine should initialize state attributes (and 
+c     possibly also space attributes like boundary conditions and mobility)
 c
-c     This subroutine will be called once new particles (npar in total) 
-c     has been released. Their space part space_stack(nstart:nstart+npar-1) 
-c     has already been initialized so that e.g. local physical conditions
-c     can be assessed using their position.
+c     Their space part shas already been initialized so that e.g. 
+c     local physical conditions
+c     can be assessed using their position. 
 c    
 c     Currently initdata is unused
 c     --------------------------------------------------------------- 
-      type(state_attributes),intent(out)     :: state_stack(:) 
-      type(spatial_attributes),intent(inout) :: space_stack(:)  
-      real,intent(in)                     :: time_dir            
-      integer,intent(in)                  :: nstart 
-      integer,intent(in)                  :: npar
-      character*(*),intent(in)            :: initdata
-      integer,intent(in)                  :: emitboxID
-c
-c     ------------------- local variables ---------------------------
-      integer   :: ip
+      type(state_attributes),intent(out)     :: state
+      type(spatial_attributes),intent(inout) :: space
+      real,intent(in)                        :: time_dir            
+      character*(*),intent(in)               :: initdata
+      integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------------
       if (time_dir<0) then
          write(*,*) "init_state_attributes: time_dir<0 not implemented" 
          stop
       endif
-      write(*,*) "init_state_attributes: from particle number",nstart,
-     +           "to", nstart+npar-1
       
-c     parse initdata string, if needed
+c     parse initdata string here, if needed
 
-c      
-c     ---- initialization loop over individual particles ----
-c
-      do ip = nstart, nstart+npar-1
-         
-         state_stack(ip)%orig_boxID = emitboxID   ! store releasing box
-         state_stack(ip)%larvID     = larv_counter    
-         larv_counter               = larv_counter + 1 ! module data
-
-         call set_state_hatched(state_stack(ip), space_stack(ip))
-
-      enddo  ! do ip = ...
-
+      state%orig_boxID = emitboxID   ! store releasing box
+      state%larvID     = larv_counter    
+      larv_counter     = larv_counter + 1 ! module data
+      call set_state_hatched(state, space)
 c     ----------------------------------------------------
       end subroutine 
 

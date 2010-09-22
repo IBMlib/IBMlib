@@ -148,20 +148,15 @@ c     ---------------------------------------------------------------
       
 
 
-      subroutine init_state_attributes(state_stack, space_stack,
-     +                                 time_dir,             
-     +                                 nstart, npar,
-     +                                 initdata,emitboxID)
-c     ---------------------------------------------------- 
-      type(state_attributes),intent(out)     :: state_stack(:) 
-      type(spatial_attributes),intent(inout) :: space_stack(:)  
-      real,intent(in)                     :: time_dir            
-      integer,intent(in)                  :: nstart 
-      integer,intent(in)                  :: npar
-      character*(*),intent(in)            :: initdata
-      integer,intent(in)                  :: emitboxID
-c 
-      integer   :: ip
+      subroutine init_state_attributes(state, space, time_dir,             
+     +                                 initdata, emitboxID)
+c     ----------------------------------------------------
+      type(state_attributes),intent(out)     :: state
+      type(spatial_attributes),intent(inout) :: space
+      real,intent(in)                        :: time_dir            
+      character*(*),intent(in)               :: initdata
+      integer,intent(in)                     :: emitboxID
+c     --------- local variables ---------
       character :: particle_type
       real      :: initsize
       integer   :: start(256), nwords ! assume less than 256 words
@@ -172,29 +167,26 @@ c     parse initdata string
       read(initdata(start(1):),*) particle_type 
       if (nwords>1) read(initdata(start(2):),*) initsize
 
-      do ip = nstart, nstart+npar-1
-         
-         call set_state_new(state_stack(ip), emitboxID)
+      
+      call set_state_new(state, emitboxID)
 
-         if (particle_type=="e") then
-            call set_state_egg(state_stack(ip), space_stack(ip), .true.) 
+      if (particle_type=="e") then
+         call set_state_egg(state, space, .true.) 
      
-         elseif (particle_type=="l") then
-            if (nwords<2) stop "init_state_attributes: initsize missing"
-            call set_state_larv(state_stack(ip), space_stack(ip), 
-     +                          initsize, .true.)
+      elseif (particle_type=="l") then
+         if (nwords<2) stop "init_state_attributes: initsize missing"
+         call set_state_larv(state, space, initsize, .true.)
 
-         elseif (particle_type=="j") then
-            if (nwords<2) stop "init_state_attributes: initsize missing"
-            call set_state_juvenile(state_stack(ip), space_stack(ip), 
-     +                              initsize, .true.)
-         else
-            write(*,*) "init_state_attributes:unknown particle type:"//
+      elseif (particle_type=="j") then
+         if (nwords<2) stop "init_state_attributes: initsize missing"
+         call set_state_juvenile(state, space, initsize, .true.)
+      else
+         write(*,*) "init_state_attributes:unknown particle type:"//
      +                  particle_type
-            stop
-         endif
+         stop
+      endif
          
-      enddo
+      
 c     ----------------------------------------------------
       end subroutine 
 

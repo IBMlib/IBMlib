@@ -18,7 +18,7 @@ c     add a dummy variable
 c     -----------------------------------------------
       type state_attributes
       private
-      character*1 :: dummy
+      character*1 :: dummy  ! F90 classes can not be empty ...
       end type
       public :: state_attributes
 
@@ -43,25 +43,19 @@ c     --------
       end subroutine 
       
 
-      subroutine init_state_attributes(state_stack, space_stack,
-     +                                 time_dir,             
-     +                                 nstart, npar,
-     +                                 initdata,emitboxID)
-c     ----------------------------------------------------      
-      type(state_attributes),intent(out)     :: state_stack(:) 
-      type(spatial_attributes),intent(inout) :: space_stack(:) 
-      real,intent(in)                     :: time_dir            
-      integer,intent(in)                  :: nstart 
-      integer,intent(in)                  :: npar
-      character*(*),intent(in)            :: initdata
-      integer,intent(in)                  :: emitboxID
-      integer :: ip
-c     -----------------
-      do ip = nstart, nstart+npar-1
-         state_stack(ip)%dummy = "i"
-         call set_tracer_mobility_free(space_stack(ip))       
-      enddo
 
+      subroutine init_state_attributes(state, space, time_dir,             
+     +                                 initdata, emitboxID)
+c     ----------------------------------------------------
+      type(state_attributes),intent(out)     :: state
+      type(spatial_attributes),intent(inout) :: space
+      real,intent(in)                        :: time_dir            
+      character*(*),intent(in)               :: initdata
+      integer,intent(in)                     :: emitboxID
+c     ----------------------------------------------------
+      state%dummy = "i"
+      call set_tracer_mobility_free(space)  
+c     
       end subroutine 
 
 

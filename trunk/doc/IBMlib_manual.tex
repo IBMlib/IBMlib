@@ -1,3 +1,7 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%    latex  IBMlib_manual.tex 
+%    dvipdf IBMlib_manual.dvi
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentstyle[12pt,epsfig]{book}
 \title{IBMlib concept description}
 
@@ -541,14 +545,12 @@ Module start-up method
 Civilized module close down. Remember to deallocate 
 pointers and allocatable arrays.
 
-\item {\tt  init\_state\_attributes(state\_stack, space\_stack,
-                                      time\_dir,             
-                                      nstart, npar,
-                                      initdata, emitboxID)} 
+\item {\tt  subroutine init\_state\_attributes(state, space, time\_dir,             
+      initdata, emitboxID)} 
 
-Initialize a subarray state\_stack(nstart:nstart+npar-1) of
-particle\_state instances (associated with space attributes
-space\_attr(nstart:nstart+npar-1). time\_dir is a signed real;
+Initialize an instances of particle\_state instances 
+(associated with space attributes space) possibly also space attributes
+(like boundary conditions and mobility). time\_dir is a signed real;
 time\_dir > 0 is forward simulation, time\_dir < 0 is reverse time
 simulation (initialization generally depends on time direction).
 If reverse time simulation is not implemented for this state type,
@@ -557,6 +559,8 @@ initdata is all paramemers after mandatory spatio-temporal parameters
 specifying an emission box. initdata is a plain unparsed string.
 emitboxID is an integer (associated with a release box) that the
 state type may choose to store (intended for history analysis)
+
+
 
 \item {\tt  get\_active\_velocity(state, space, v\_active)} 
 

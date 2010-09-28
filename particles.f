@@ -102,6 +102,7 @@ c     .............................................................
       public :: get_last_particle_number
       public :: get_particle        ! Checkout a particle
       public :: get_particle_position ! delegate to particle_tracking
+      public :: set_particle_position ! delegate to particle_tracking
 
       public :: insert_particle     ! no copy
       public :: delete_particle
@@ -383,6 +384,13 @@ c     ---------------------------------------------------
       call get_tracer_position(part%space, xyz)
       end subroutine get_particle_position
 
+
+      subroutine set_particle_position(part, xyz)
+c     ---------------------------------------------------
+      type(particle), intent(inout) :: part
+      real, intent(in)          :: xyz(:)
+      call set_tracer_position(part%space, xyz)   !Delegate to particle_tracking
+      end subroutine set_particle_position
 
 
       subroutine insert_particle(par_ens, part, pnum) 

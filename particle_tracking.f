@@ -135,6 +135,7 @@ c.... Define public operator set  ..............................
       public :: set_tracer_mobility_free
       public :: set_tracer_mobility_stop
       public :: get_tracer_position
+      public :: set_tracer_position
 c     .... currently domainBC can only be sticky
       public :: set_shore_BC  
       public :: set_bottom_BC 
@@ -755,7 +756,13 @@ c------------------------------------------------------------
       end subroutine get_tracer_position
 
 
-
+      subroutine set_tracer_position(tracattr,xyz)
+c------------------------------------------------------------ 
+      type(spatial_attributes),intent(inout) :: tracattr
+      real, intent(in)                   :: xyz(:)
+      tracattr%position(1:3) = xyz(1:3)
+      end subroutine set_tracer_position
+      
 
       subroutine set_shore_BC(tracattr, BChandler)
 c------------------------------------------------------------ 

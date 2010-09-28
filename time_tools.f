@@ -357,6 +357,199 @@ c result = 1   for   date1 > date2
       end subroutine write_time_period
 
 
+      function is_light(aclock,pos,zenith)
+c     -------------------------------------------------------------------------
+c     A wrapper to day_bounds subroutine that takes a date/time in the form of a
+c     clock type together with a lat/long and returns a logical 
+c     indicating if its light (true is light/day, false is night).
+c     This function defaults to civil sunrise and sunset, which is a zenith 
+c     angle of 96 degrees. However, other values can be specified if desired
+c     All clocks are assuming to be running on GMT
+c     -------------------------------------------------------------------------
+      type(clock), intent(in) :: aclock
+      real, intent(in) :: pos(:)
+      logical :: is_light
+      real, optional :: zenith
+c     ----- locals -----
+      integer :: day, month, year, secs, localOffset
+      real    :: lat, lon
+      real    :: sunrise, sunset 
+      logical :: neverrise, neverset
+c     -------------------------------------------------------------------------
+      !Zenith angle defaults to civil sunrise,sunset, ie 96.0 degrees
+      if(.NOT. present(zenith)) zenith= 96.0
+      !Get the day bounds for the given day and position
+      call get_date_from_clock(aclock,year,month,day)
+      call get_second_in_day(aclock,secs)
+      lon=pos(1)
+      lat=pos(2)
+      call day_bounds(day,month,year,0,lat,lon,zenith,
+     &            sunrise,sunset,neverrise,neverset)
+      if(neverset) then
+        !its light all the time
+        is_light = .TRUE.
+      elseif(neverrise) then
+        !its dark all the time
+        is_light = .FALSE.
+      else if(sunrise*3600<secs .AND. sunset*3600>secs) then  
+        !its light
+        is_light = .TRUE.
+      else  !its dark
+        is_light = .FALSE.
+      endif
+
+      end function
+      
+      
+
+      subroutine day_bounds(day, month, year, localOffset,
+     +                      latitude, longitude, zenith, 
+     +                      sunrise, sunset, neverrise, neverset)
+c -------------------------------------------------------------------------
+c                        Sunrise/Sunset Algorithm
+c  
+c Direct source = http://williams.best.vwh.net/sunrise_sunset_algorithm.htm (Ed Williams)
+c Transcribed to fortran 90 by Asbjorn Christensen, DIFRES, Oct. 5 2005.
+c 
+c
+c Open questions: Summer time ??
+c
+c Source:
+c        Almanac for Computers, 1990
+c        published by Nautical Almanac Office
+c        United States Naval Observatory
+c        Washington, DC 20392
+c
+c Inputs:
+c        day, month, year:      date of sunrise/sunset
+c        localOffset:           local hour offset wrt. UTC
+c        latitude, longitude:   location for sunrise/sunset
+c        zenith:                Sun's zenith for sunrise/sunset
+c          offical      = 90 degrees 50'
+c          civil        = 96 degrees
+c          nautical     = 102 degrees
+c          astronomical = 108 degrees
+c        
+c        NOTE: longitude is positive for East and negative for West
+c
+c Outputs:
+c        sunrise, sunset     : local time for event (after decimal as TIME FRACTION)
+c        neverrise, neverset : true, if sun never rises/sets
+c                              if true, returns: sunrise, sunset = -9.0d10
+c Tests:
+c        1) reproduces test example
+c        
+c        2) Central North Sea, Oct 5 2005: 
+c            echo $day $month $year $localOffset $latitude $longitude $zenith     |sunrise
+c            echo  5    10    2005      1          55.0         4.0    90.8333    |sunrise
+c
+c           http://aa.usno.navy.mil/data/docs/RS_OneDay.html: (assume $zenith = 90.8333)
+c            Sunrise                  06:54                                
+c            Sunset                   18:10   
+c -------------------------------------------------------------------------
+      integer, intent(in)  :: day, month, year, localOffset
+      real,    intent(in)  :: latitude, longitude, zenith
+      real,    intent(out) :: sunrise, sunset 
+      logical, intent(out) :: neverrise, neverset
+c     --- locals ---
+c         index = 1 for sunrise
+c         index = 2 for sunset
+      real, parameter :: deg2rad = 1.7453292519943295d-2
+      real, parameter :: rad2deg = 5.7295779513082323d1
+      integer         :: N1, N2, N3, N, Lquadrant(2), RAquadrant(2)
+      real            :: lngHour, tim(2), M(2), L(2), RA(2)
+      real            :: sinDec(2),cosDec(2),cosH(2),H(2),T(2),UT(2)
+c
+c     1. first calculate the day of the year
+c
+      N1 = 275 * month / 9                              ! integer cast (floor)
+      N2 = (month + 9) / 12                             ! integer cast (floor)
+      N3 = 1 + (year - 4 * floor(year / 4.0d0) + 2) / 3 ! integer cast (floor)
+      N  = N1 - (N2 * N3) + day - 30
+c
+c     2. convert the longitude to hour value and calculate an approximate time
+c        
+      lngHour = longitude / 15
+      tim(1)    = N + (6  - lngHour) / 24.  ! index = 1 for rising time after here
+      tim(2)    = N + (18 - lngHour) / 24.  ! index = 2 for setting time after here
+c
+c     3. calculate the Sun's mean anomaly
+c        
+      M = (0.9856 * tim) - 3.289
+c
+c     4. calculate the Sun's true longitude, confined to [0,360) 
+c
+      L = M + (1.916 * sin(deg2rad * M)) 
+     +      + (0.020 * sin(2 * deg2rad * M)) + 282.634
+      L = modulo(L, 360.0) 
+c
+c     5a. calculate the Sun's right ascension, confined to [0,360) 
+c        
+      RA = rad2deg * atan(0.91764 * tan(L*deg2rad))
+      RA = modulo(RA, 360.0)  
+c
+c     5b. right ascension value needs to be in the same quadrant as L
+c
+      Lquadrant  = floor(L/90) * 90
+      RAquadrant = floor(RA/90) * 90
+      RA = RA + (Lquadrant - RAquadrant)
+c
+c     5c. right ascension value needs to be converted into hours
+c
+      RA = RA / 15
+c
+c     6. calculate the Sun's declination
+c
+      sinDec = 0.39782 * sin(L*deg2rad)
+      cosDec = cos(asin(sinDec))    ! no deg/rad conversion
+c
+c     7a. calculate the Sun's local hour angle
+c        
+      cosH = (cos(zenith*deg2rad) - (sinDec * sin(latitude*deg2rad))) / 
+     +                              (cosDec * cos(latitude*deg2rad))
+
+c     never(1): the sun never rises on this location (on the specified date)
+c     never(2): the sun never sets on this location  (on the specified date)
+      
+      !MPA 20090917: Fails on day when there is a sunrise, but no sunset, or
+      !viceversa. Edited so that this is a neverset/neverrise 
+      neverrise = ((cosH(1) >  1) .or. (cosH(2) >  1)) 
+      neverset  = ((cosH(1) < -1) .or. (cosH(2) < -1)) 
+c      if ((cosH(1) >  1) .and. (cosH(2) <  1)) stop  ! unexpected
+c      if ((cosH(1) < -1) .and. (cosH(2) > -1)) stop  ! unexpected
+c      if ((cosH(2) >  1) .and. (cosH(1) <  1)) stop  ! unexpected
+c      if ((cosH(2) < -1) .and. (cosH(1) > -1)) stop  ! unexpected
+
+      if (neverrise .or. neverset) then
+         sunrise = -9.0d10
+         sunset  = -9.0d10
+         return
+      endif
+c
+c     7b. finish calculating H and convert into hours 
+c         (at this point, we know -1 < cosH < 1)
+      H(1) = 360.0d0 - rad2deg*acos(cosH(1))   ! sunrise
+      H(2) = rad2deg*acos(cosH(2))             ! sunset
+      H    = H / 15
+c
+c     8. calculate local mean time of rising/setting
+c        
+      T = H + RA - (0.06571 * tim) - 6.622
+c
+c     9. adjust back to UTC adjusted into the range [0,24) 
+c        
+      UT = T - lngHour
+      UT = modulo(UT, 24.0) 
+c
+c     10. convert UT value to local time zone of latitude/longitude
+c         modulo 24h
+c
+      sunrise = modulo(UT(1) + localOffset, 24.0)
+      sunset  = modulo(UT(2) + localOffset, 24.0)
+      
+      end subroutine day_bounds
+
+
 
       end module
 
@@ -514,4 +707,39 @@ c         write(*,*)
 c      enddo
 c 333  format (i4, 2x, a1, 2x, 12(i4))
 c      end program
+
+!       program test_sunrise
+! c -------------------------------------------------------------------------------------------
+! c     test wrapper to subroutine day_bounds
+! c     compilation: ifort -o sunrise sunrise.f
+! c     usage      : echo $day $month $year $localOffset $latitude $longitude $zenith     |sunrise
+! c     example    : echo  25    6    1990     -4         40.9       -74.3   90.8333333   |./sunrise
+! c -------------------------------------------------------------------------------------------
+!       implicit none
+!       integer :: day, month, year, localOffset
+!       real    :: latitude, longitude, zenith
+!       real    :: sunrise, sunset 
+!       logical :: neverrise, neverset
+!       read(5,*) day, month, year, localOffset,
+!      +         latitude, longitude, zenith
+! 
+!       write(*,200) day, month, year,localOffset
+!  200  format("day = ",i2,"    month = ",i2,"    year = ", i4,
+!      +        "    UT offset(h) = ",i2)
+!       write(*,205) latitude, longitude
+!  205  format("latitude(deg) = ",f6.2,"    longitude(deg) = ",f6.2)
+!       write(*,210) zenith
+!  210  format("zenith(deg) for sun rise/setting = ",f8.4)
+!  
+!       call day_bounds(day, month, year, localOffset,
+!      +                latitude, longitude, zenith, 
+!      +                sunrise, sunset, neverrise, neverset)
+! 
+!       if (neverrise) write(*,*) "sun never rises at this day and place"
+!       if (neverset)  write(*,*) "sun never sets at this day and place"
+!       if (.not.(neverset.or.neverrise)) write(*,250) sunrise, sunset
+!  250  format("sunrise(h) = ",f6.2,"    sunset(h) = ",f6.2)
+! 
+!       end program
+
       

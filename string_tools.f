@@ -44,3 +44,39 @@ c
          endif
       enddo
       end subroutine tokenize
+
+
+
+      subroutine toupper(string)
+c     -------------------------------------------------
+c     Converts an input string to be all in upper case
+c     Useful for string comparisons.
+c     Modified from :
+c     http://www.star.le.ac.uk/~cgp/fortran.html
+c     -------------------------------------------------
+      character(len=*), intent(inout) :: string
+      integer :: j
+c     -------------------------------------------------
+      do j = 1,len(string)
+        if(string(j:j) >= "a" .and. string(j:j) <= "z") then
+            string(j:j) = achar(iachar(string(j:j)) - 32)
+        end if
+      end do
+      end subroutine toupper
+
+
+
+      subroutine tolower(string) 
+c     -------------------------------------------------
+c     Converts an input string to be all in lower case
+c     Useful for string comparisons. Modified from toupper() above
+c     -------------------------------------------------
+      character(len=*), intent(inout) :: string
+      integer :: j
+c     -------------------------------------------------
+      do j = 1,len(string)
+        if(string(j:j) >= "A" .and. string(j:j) <= "Z") then
+            string(j:j) = achar(iachar(string(j:j)) + 32)
+        end if
+      end do
+      end subroutine tolower

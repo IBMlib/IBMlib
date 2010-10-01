@@ -61,8 +61,66 @@ c-----------------------------------------------------------
      *                     (/31,28,31,30,31,30,31,31,30,31,30,31/)
 
 
+c-----------------------------------------------------------
+c     Basic performance profiling tools
+c     
+c     Provides a timer class and associated functions, based around
+c     the Fortran 90 function system_clock(). Timing precision is
+c     system and compiler dependent, but is sufficient for most
+c     simple tasks
+c     Timing of a routine is achieved through two simple function calls
+c        tic(timer)                        : Starts a timer
+c        toc(timer,desc string,out_timer)  : Displays time elapsed
+c     Inspiration for this style of timer comes from MATLAB
+c-----------------------------------------------------------
+      type timer
+        integer counts
+        integer count_rate
+      end type
+      
+      public :: tic
+      public :: toc
+
+
       contains
 
+
+      subroutine tic(timer_out)
+c     ------------------------------------------------------------
+c     Starts a timer
+c     The name is easy to remember - remember that a clock goes "tic, toc"
+c     ------------------------------------------------------------
+      type(timer),intent(out) :: timer_out
+c     ------------------------------------------------------------
+      call system_clock(timer_out%counts,timer_out%count_rate)
+      end subroutine tic
+
+      subroutine toc(timer_in,message,timer_out)
+c     ------------------------------------------------------------
+c     Calculates the time elapsed since the timer_in was initialised
+c     Displays a message with that time elapsed. Optionally returns
+c     the time at which the function was call.
+c     The name is easy to remember - remember that a clock goes "tic, toc"
+c     ------------------------------------------------------------
+      type(timer),intent(in) :: timer_in
+      type(timer),intent(out),optional :: timer_out
+      type(timer) timer_now
+      character (len=*), intent(in) :: message
+      integer:: elapsed_counts
+      real :: elapsed_time
+      character*20 outstr
+c     ------------------------------------------------------------
+      !Calculate elapsed time
+      call system_clock(timer_now%counts,timer_now%count_rate)
+      elapsed_counts =timer_now%counts-timer_in%counts
+      elapsed_time =real(elapsed_counts)/real(timer_now%count_rate)
+      !Write output
+      write(outstr,'(F12.4)') elapsed_time
+      write(*,42) trim(message),trim(adjustl(outstr))
+42    format ("toc : ",a," = ",a," s")
+      !Return current time if requested
+      if(present(timer_out)) timer_out=timer_now
+      end subroutine toc
       
       subroutine set_clock_4i(aclock, year, month, day, second_of_day)
 c     ------------------------------------------------------------

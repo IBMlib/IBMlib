@@ -206,6 +206,24 @@ c     ------------------------------------------------
       end subroutine add_seconds_to_clock
 
 
+      integer function get_POSIXtime(aclock)
+c     ------------------------------------------------
+c     Converts a clock to POSIX (UNIX) time by doing 
+c     a simple subtraction. The UNIX epoch is defined
+c     as midnigth on 1st Jan 1970, so we simply set that
+c     as a concstant and then subtract from the supplied
+c     time.
+c     ------------------------------------------------
+      type(clock),intent(in) :: aclock
+      type(clock) UNIX_epoch
+      integer           :: secs
+c     ------------------------------------------------
+      call set_clock(UNIX_epoch,1970,1,1,0)
+      call get_period_length_sec(UNIX_epoch, aclock, secs)
+      get_POSIXtime=secs
+      end function
+
+
 c     TODO: removed julday - update interface
 
       subroutine get_date_from_clock(aclock, year, month, day)
@@ -801,3 +819,24 @@ c      end program
 !       end program
 
       
+!      program test_POSIX_time
+!c -------------------------------------------------------------------------------------------
+!c     test wrapper to subroutine calculating POSIX time 
+!c     compilation: ifort -e90 -o POSIX time_tools.f -Llibtime -ltime77
+!c     usage      : echo $year $month $day $hour $min $sec   |POSIX
+!c     example    : echo 2009  2      13    23   31   30     |./POSIX
+!c     answer     : 1234567890
+!c -------------------------------------------------------------------------------------------
+!      use time_tools      
+!      implicit none
+!      integer :: year, month, day, hour, min, sec 
+!      integer :: secs
+!      type(clock) :: clockin
+!      
+!      read(5,*) year, month, day, hour, min, sec
+!      secs = hour*3600 + min*60 + sec
+!      call set_clock(clockin,year,month, day, secs)
+!      write(*,*) "Input clock : ", get_datetime(clockin)
+!      write(*,*) "POSIX time  : ", get_POSIXtime(clockin)      
+!      end program
+

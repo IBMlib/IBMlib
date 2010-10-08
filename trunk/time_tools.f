@@ -52,6 +52,13 @@ c-----------------------------------------------------------
         module procedure get_period_length_sec_clocks
       end interface
 
+      interface get_period_length_hour
+        module procedure get_period_length_hour_cc_i
+        ! module procedure get_period_length_hour_cc_r 
+        ! module procedure get_period_length_hour_p_i
+        ! module procedure get_period_length_hour_p_r
+      end interface
+
       interface get_relative_position
         module procedure get_relative_position_period
         module procedure get_relative_position_clocks
@@ -343,6 +350,20 @@ c     -----------------------------------------------------
      +         60*reldiff(4) + reldiff(5)
       end subroutine get_period_length_sec_clocks
 
+
+      subroutine get_period_length_hour_cc_i(clock_start, clock_end, 
+     +                                        numhours)
+c     -----------------------------------------------------
+c     For non integral hours, round to nearest hour
+c     -----------------------------------------------------      
+      type(clock)       :: clock_start, clock_end   
+      integer           :: numhours
+      integer           :: reldiff(7)   
+c     -----------------------------------------------------
+      call time_sub(clock_start%date, clock_end%date, reldiff)
+      numhours = 24*reldiff(2) + reldiff(3) + 
+     +         nint(reldiff(4)/60.0 + reldiff(5)/3600.0)
+      end subroutine get_period_length_hour_cc_i
 
 
 

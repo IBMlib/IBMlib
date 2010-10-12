@@ -54,7 +54,7 @@ c-----------------------------------------------------------
 
       interface get_period_length_hour
         module procedure get_period_length_hour_cc_i
-        ! module procedure get_period_length_hour_cc_r 
+        module procedure get_period_length_hour_cc_r 
         ! module procedure get_period_length_hour_p_i
         ! module procedure get_period_length_hour_p_r
       end interface
@@ -364,6 +364,22 @@ c     -----------------------------------------------------
       numhours = 24*reldiff(2) + reldiff(3) + 
      +         nint(reldiff(4)/60.0 + reldiff(5)/3600.0)
       end subroutine get_period_length_hour_cc_i
+
+
+
+      subroutine get_period_length_hour_cc_r(clock_start, clock_end, 
+     +                                        hours)
+c     -----------------------------------------------------
+c     Return period length in hours as real
+c     -----------------------------------------------------      
+      type(clock)       :: clock_start, clock_end   
+      real              :: hours
+      integer           :: reldiff(7)   
+c     -----------------------------------------------------
+      call time_sub(clock_start%date, clock_end%date, reldiff)
+      hours = 24.0*reldiff(2) + reldiff(3) + 
+     +             reldiff(4)/60.0 + reldiff(5)/3600.0
+      end subroutine get_period_length_hour_cc_r
 
 
 

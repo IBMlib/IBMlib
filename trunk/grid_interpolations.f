@@ -38,7 +38,7 @@ c     ------------------------------------------------------------
 
 
 
-      subroutine interp_irregbox_data(sx,sy,z,zc,vc,deriv,result)
+      subroutine interp_irregbox_data(sx,sy,z,zc,vc,deriv,result,istat)
 c     ------------------------------------------------------------
 c     Interpolate between 8 corner (zc) value points (vc) of an 
 c     irregular box at coordinate (sx,sy,z), where all pillars 
@@ -50,23 +50,26 @@ c
 c     Use generalized trilinear interpolation
 c     (sx,sy) are rhomb coordinates on vertical projection,
 c     0 < sx,sy < 1, and z is the vertical coordinate
-c     It is a runtime error to attempt extrapolation, i.e. 
-c     if (sx,sy,z) is outside box
 c
 c     deriv = 0 gives value, deriv = (1,2,3) gives derivative (wrt. sx,sy,z) along (x,y,z)
 c     Currently, only deriv = (0,3) is implemented, until other derivatives 
 c     are needed.
+c
+c     istat = 0: regular interpolation performed
+c     istat = 1: singular vertical - performed mid point interpolation
 c     ------------------------------------------------------------
       implicit none
-      real,intent(in)    :: sx,sy,z
-      real,intent(in)    :: zc(*) ! 8 corners:         (z000,z001, ... z111)
-      real,intent(in)    :: vc(*) ! 8 corners values : (v000,v001, ... v111)
-      integer,intent(in) :: deriv
-      real,intent(out)   :: result
+      real,intent(in)     :: sx,sy,z
+      real,intent(in)     :: zc(*) ! 8 corners:         (z000,z001, ... z111)
+      real,intent(in)     :: vc(*) ! 8 corners values : (v000,v001, ... v111)
+      integer,intent(in)  :: deriv
+      real,intent(out)    :: result
+      integer,intent(out) :: istat
 
-      real             :: zl,zu,vl,vu,sz
+      real             :: zl,zu,vl,vu,sz,dz
       real             :: z000,z001,z010,z011,z100,z101,z110,z111
       real             :: v000,v001,v010,v011,v100,v101,v110,v111
+      real, parameter  :: very_small = 1.e-12
 c     ------------------------------------------------------------
       z000 = zc(1)
       z001 = zc(2)
@@ -98,7 +101,14 @@ c
       vu = (1.0-sy)*((1-sx)*v001 + sx*v101) +
      +          sy *((1-sx)*v011 + sx*v111) 
 c     ------- vertical interpolation at z 
-      sz = (z-zl)/(zu-zl)
+      dz = zu-zl
+      if (abs(dz) < very_small) then
+         sz    = 0.5
+         istat = 1
+      else ! normal case
+         sz = (z-zl)/(zu-zl)
+         istat = 0
+      endif
 
 c$$$      if ((sz<0.).or.(sz>1.)) then
 c$$$         write(*,*) "zc=",zc(1:8)  
@@ -111,7 +121,11 @@ c$$$      endif
       if     (deriv == 0) then
          result = vl + sz*(vu-vl)
       elseif (deriv == 3) then
-         result = (vu-vl)/(zu-zl)
+         if (istat == 0) then
+            result = (vu-vl)/dz ! normal case
+         else
+            result = 0  ! zero derivative in this case
+         endif   
       else
          stop "interp_irregbox_data: unhandled deriv request"
       endif

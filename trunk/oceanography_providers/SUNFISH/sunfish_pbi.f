@@ -1019,10 +1019,10 @@ c     ------------------------------------------
 c     ------------------------------------------ 
 c     ------------------------------------------ 
       real, intent(in)     :: xyz(:)
-      real, intent(out)    :: r
+      real, intent(out)    :: r(:)
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(xyz,zoo,0,r,status)
+      call interpolate_cc_3Dgrid_data(xyz,zoo,0,r(1),status)
 c     ------------------------------------------ 
       end subroutine 
 

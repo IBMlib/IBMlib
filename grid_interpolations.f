@@ -36,8 +36,6 @@ c     ------------------------------------------------------------
       end subroutine interp_2Dbox_data
 
 
-
-
       subroutine interp_irregbox_data(sx,sy,z,zc,vc,deriv,result,istat)
 c     ------------------------------------------------------------
 c     Interpolate between 8 corner (zc) value points (vc) of an 

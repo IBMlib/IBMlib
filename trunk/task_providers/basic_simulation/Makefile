@@ -6,7 +6,7 @@
 task.a: basic_simulation.o
 	ar rcs task.a basic_simulation.o
 
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
+include $(COMMON_RULES)
 
 clean: FORCE
 	rm -f  *.o  *.a  *.mod  dependences.mk

@@ -9,9 +9,7 @@ particle_state.mod particle_state.o: empty.f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o
 
 
-
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
-
+include $(COMMON_RULES)
 
 clean: FORCE
 	rm -f  *.o  *.a  *.mod  dependences.mk

@@ -28,7 +28,7 @@
 #  Each makefile of  may PHYSICAL_FIELDS/PARTICLE_STATE/TASK - or may not - include common.mk
 #
 #  Update responsibilities:
-#  	$(IBMLIB_DIR)/Makefile:          IBMLIB_OBJECTS   EXECUTABLE 
+#  	$(IBMLIB_DIR)/Makefile:          IBMLIB_OBJS   EXECUTABLE 
 #       $(PHYSICAL_FIELDS_DIR)/Makefile: PHYSICAL_FIELDS
 #       $(PARTICLE_STATE_DIR)/Makefile:  PARTICLE_STATE
 #       $(TASK_DIR)/Makefile:            TASK
@@ -85,26 +85,32 @@
 #
 #  ifort note: apparently this problem with ifort can just be handled
 #  by duplicating link objects once ...
-
-
-##################################################################
-#              M a i n   c o n f i g u r a t i o n               #
-##################################################################
-EXECUTABLE          = ibmrun   # name of the executable to build
-PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/vortex1
-PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/passive
-TASK_DIR            = $(IBMLIB_DIR)/task_providers/test
 ##################################################################
 
-export IBMLIB_DIR  = $(shell pwd)
+.PHONY: clean force remake variables $(OUTPUT_WRITER_DIRS)
+	
+# Set parameters for external files
+export IBMLIB_DIR   = $(shell pwd)
+export BUILD_TOOLS  = $(IBMLIB_DIR)/BuildTools
+export VPATH        = $(IBMLIB_DIR)  # make search path for src/obj    
+export COMMON_RULES = $(BUILD_TOOLS)/common_rules.mk   #implicit rules shared between makefiles
+ 
+# Import external configuration files
+include  config.mk
+-include $(PHYSICAL_FIELDS_DIR)/link_opt.mk   # optional include 
+-include $(PARTICLE_STATE_DIR)/link_opt.mk    # optional include 
+-include $(TASK_DIR)/link_opt.mk              # optional include 
+-include $(addsuffix /link_opt.mk,$(OUTPUT_WRITER_DIRS))  #output writer link options
 
-
-IBMLIB_EXTERNAL =  libtime/libtime77.a
-IBMLIB_BASEOBJ  =  constants.o  grid_interpolations.o  input_parser.o  random_numbers.o  runtime_tools.o\
-                   time_tools.o geometry.o   run_context.o  string_tools.o  $(IBMLIB_EXTERNAL)
-IBMLIB_BASEMOD  =  constants.mod  input_parser.mod  random_numbers.o  time_tools.mod    run_context.mod 
-IBMLIB_OBJECTS  = $(IBMLIB_BASEOBJ)  physical_fields.a  particle_tracking.o particle_state.a particles.o  task.a 
-
+#Define Objects and their grouping
+EXT_LIBS     = libtime/libtime77.a
+BASELIBS     = grid_interpolations.o  runtime_tools.o  geometry.o  string_tools.o 
+BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
+               run_context.mod  output.mod
+BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
+OUTPUT_ARCS  = $(patsubst %.mod,%.a,$(OUTPUT_MODS))
+IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
+               particles.o $(OUTPUT_ARCS) task.a 
 
 #     Main task of this Makefile: EXECUTABLE - should be first target, to appear as default
 # --- currently TASK appears as task.a - at some point we may homogenize 
@@ -114,23 +120,15 @@ IBMLIB_OBJECTS  = $(IBMLIB_BASEOBJ)  physical_fields.a  particle_tracking.o part
 #     object files in the order they are specified, you should specify 
 #     providing functions AFTER the last object file it applies. This is 
 #     exactly opposite the make order. 
-#     Therefore hack: dublicate IBMLIB_OBJECTS to ensure a provider is also after using function ...
+#     Therefore hack: dublicate IBMLIB_OBJS to ensure a provider is also after using function ...
 
-$(EXECUTABLE): $(IBMLIB_OBJECTS)
-	$(FC)  $(IBMLIB_OBJECTS) $(IBMLIB_OBJECTS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
-
-
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
+$(EXECUTABLE): $(IBMLIB_OBJS)
+	@echo ""
+	$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
 
 # 
 # --- collect additional optional linkflags / link options from PHYSICAL_FIELDS/PARTICLE_STATE/TASK 
 #
-
-LINKFLAGS = -i4 
-LINKLIBS  = 
--include $(PHYSICAL_FIELDS_DIR)/link_opt.mk   # optional include 
--include $(PARTICLE_STATE_DIR)/link_opt.mk    # optional include 
--include $(TASK_DIR)/link_opt.mk              # optional include 
 LINKFLAGS += $(LINKFLAGS_PHYSICAL)  $(LINKFLAGS_STATE)  $(LINKFLAGS_TASK)
 LINKLIBS  += $(LINKLIBS_PHYSICAL)   $(LINKLIBS_STATE)   $(LINKLIBS_TASK)
 
@@ -138,18 +136,29 @@ LINKLIBS  += $(LINKLIBS_PHYSICAL)   $(LINKLIBS_STATE)   $(LINKLIBS_TASK)
 # --- and here below goes other targets of this makefile ---
 #
 
-physical_fields.a: FORCE  $(IBMLIB_BASEMOD) 
-	cd $(PHYSICAL_FIELDS_DIR); make physical_fields.mod physical_fields.a
-	ln -sf $(PHYSICAL_FIELDS_DIR)/physical_fields.a
-	ln -sf $(PHYSICAL_FIELDS_DIR)/physical_fields.mod
+physical_fields.a: FORCE  $(BASEMODS) 
+	@echo ""
+	make -C $(PHYSICAL_FIELDS_DIR) physical_fields.mod physical_fields.a
+	@ln -sf $(PHYSICAL_FIELDS_DIR)/physical_fields.a
+	@ln -sf $(PHYSICAL_FIELDS_DIR)/physical_fields.mod
 
-particle_state.a:  FORCE  $(IBMLIB_BASEMOD)  physical_fields.a  particle_tracking.o
-	cd $(PARTICLE_STATE_DIR);  make particle_state.mod  particle_state.a
-	ln -sf $(PARTICLE_STATE_DIR)/particle_state.a
-	ln -sf $(PARTICLE_STATE_DIR)/particle_state.mod
+particle_state.a:  FORCE  $(BASEMODS)  physical_fields.a  particle_tracking.o
+	@echo ""
+	make -C $(PARTICLE_STATE_DIR) particle_state.mod  particle_state.a
+	@ln -sf $(PARTICLE_STATE_DIR)/particle_state.a
+	@ln -sf $(PARTICLE_STATE_DIR)/particle_state.mod
 
-task.a: FORCE  $(IBMLIB_BASEMOD)  physical_fields.a  particle_tracking.mod particle_state.a particles.mod 
-	cd $(TASK_DIR);  make task.a 
+$(OUTPUT_ARCS) $(OUTPUT_MODS): $(OUTPUT_WRITER_DIRS)
+
+$(OUTPUT_WRITER_DIRS): particles.mod 
+	@echo ""
+	$(MAKE) -C $@  archive module #Run make in the individual subdirectories
+	@ln -sf $@/*.a 
+	@ln -sf $@/*.mod
+	
+task.a: FORCE $(BASEMODS) physical_fields.a particle_tracking.mod particle_state.a particles.mod $(OUTPUT_MODS) 
+	@echo ""
+	make -C $(TASK_DIR) task.a 
 	ln -sf $(TASK_DIR)/task.a 
 
 
@@ -157,22 +166,49 @@ task.a: FORCE  $(IBMLIB_BASEMOD)  physical_fields.a  particle_tracking.mod parti
 
 
 libtime/libtime77.a: FORCE  libtime/Makefile  
+	@echo ""
 	cd libtime;  make libtime77.a
 
 libtime/Makefile:
+	@echo ""
 	cd libtime; tar xvfz libtime.tar.gz; rm -f Makefile; \
         ln -s Makefile_adapted_asc Makefile
 
 
 clean: FORCE
-	/bin/rm -f *.o *.a *.mod dependences.mk $(EXECUTABLE)
-	cd libtime; make cleanall
-	cd $(PHYSICAL_FIELDS_DIR); make clean
-	cd $(PARTICLE_STATE_DIR);  make clean
-	cd $(TASK_DIR);            make clean
+	-/bin/rm -f *.o *.a *.mod dependences.mk $(EXECUTABLE)
+	-make -C libtime cleanall
+	-make -C $(PHYSICAL_FIELDS_DIR) clean
+	-make -C $(PARTICLE_STATE_DIR) clean
+	-make -C $(TASK_DIR) clean
+	-@for outdir in $(OUTPUT_WRITER_DIRS);\
+		do \
+		  make -C $$outdir clean ; \
+		done
 
+remake:
+	make clean; make
 
 FORCE:
 
+variables:
+	clear
+	@echo "############Compiler options###########"
+	@echo "FC       :" $(FC)
+	@echo "FCFLAGS  :" $(FCFLAGS)
+	@echo "FPPFLAGS :" $(FPPFLAGS)
+	@echo "############Linker options#############"
+	@echo "LINKFLAGS:" $(LINKFLAGS)
+	@echo "LINKLIBS :" $(LINKLIBS)
+	@echo "############Config dirs################"
+	@echo "PHYSICAL_FIELDS_DIR :"  $(PHYSICAL_FIELDS_DIR)
+	@echo "PARTICLE_STATE_DIR  :"  $(PARTICLE_STATE_DIR)
+	@echo "OUTPUT_WRITER_DIRS  :"  $(OUTPUT_WRITER_DIRS)
+	@echo "TASK_DIR            :"  $(TASK_DIR)
+	@echo "IBMLIB_DIR          :"  $(IBMLIB_DIR)
+	@echo "############Objects####################"
+	@echo "IBMLIB_OBJS :" $(IBMLIB_OBJS)
+	@echo "EXECUTABLE  :" $(EXECUTABLE)
 
-include $(IBMLIB_DIR)/common.mk   # gmake settings
+include $(COMMON_RULES)
+

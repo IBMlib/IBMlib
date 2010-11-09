@@ -11,7 +11,7 @@ physical_fields.mod physical_fields.o: ztest.f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o
 
 
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
+include $(COMMON_RULES)
 #FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 
 clean: FORCE

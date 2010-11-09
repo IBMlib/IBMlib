@@ -1,0 +1,24 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+start_time  = 2005 01 01 3600    !  year  month  day  second_of_day
+end_time    = 2005 01 10 0    !  year  month  day  second_of_day
+
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+! ----------------Position for interpolating -----------
+xyz = 6.0 55.0 500       !lon, lat, depth
+
+! --------------- Flow Fields ---------------
+! Define the velocities, with direction, at the top and bottom of 
+! the water column. Velocities are defined as a speed and direction
+surface_vel = 1 90    ! speed (m/s), angle degrees clockwise from North
+bottom_vel  = 1 0    ! 
+depth       = 1000    ! m
+temp        = 15  ! deg C - uniform throughout 
+salin       = 35  ! psu   - uniform throughout
+hdiffus     = 10  ! horizontal diffusivity m^2/s
+vdiffus     = 0.01 ! horizontal diffusivity m^2/s
+

@@ -34,12 +34,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: is_wet    
       public :: is_land
       public :: horizontal_range_check
-      public :: get_horizontal_distance
-      public :: get_local_distance
       public :: coast_line_intersection
-      public :: d_cart2d_xy
-      public :: d_xy2d_cart 
-      public :: add_finite_step
 
 c     -------------------- module data --------------------  
      

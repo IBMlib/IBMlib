@@ -92,22 +92,6 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(in)     :: xy(:)
       end function
 
-      subroutine get_horizontal_distance(xy1, xy2, r)
-      real, intent(in)     :: xy1(:), xy2(:)
-      real, intent(out)    :: r
-      end subroutine 
-
-
-      subroutine get_local_distance_scalar(xyz1, xyz2, r)
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: r
-      end subroutine 
-      subroutine get_local_distance_vector(xyz1, xyz2, v)
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: v(:)
-      end subroutine 
-
-      
       subroutine coast_line_intersection(xyz1, xyz2, anycross, xyzref, 
      +                                   xyzhit) 
       real, intent(in)     :: xyz1(:),xyz2(:)
@@ -115,19 +99,5 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(out)    :: xyzref(:), xyzhit(:)
       end subroutine 
 
-      subroutine d_cart2d_xy(xy, r2)
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      end subroutine 
-
-      subroutine d_xy2d_cart(xy, r2) 
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      end subroutine 
-
-      subroutine add_finite_step(xy, dR)
-      real, intent(inout) :: xy(:)
-      real, intent(in)    :: dR(:)
-      end subroutine 
       
       end module

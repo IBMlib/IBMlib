@@ -33,6 +33,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use run_context, only: simulation_file
       use input_parser
       use time_tools
+      use constants
       use random_numbers
       
       implicit none
@@ -304,7 +305,7 @@ c     -----------------------------------------
 
          dpos = 0.5*k1*h
          pos  = tracattr%position
-         call d_cart2d_xy(pos, dpos) ! tangent space arithmics
+         call dcart2dxy(pos, dpos) ! tangent space arithmics
          pos = pos + dpos
          call interpolate_currents(pos, k2, istat)
          call checkstat(istat,"add_advection_step:interpolate_currents")
@@ -323,21 +324,21 @@ c     -----------------------------------------
          
          dpos = 0.5*k1*h
          pos  = tracattr%position
-         call d_cart2d_xy(pos, dpos) ! tangent space arithmics
+         call dcart2dxy(pos, dpos) ! tangent space arithmics
          pos = pos + dpos
          call interpolate_currents(pos, k2, istat) 
          call checkstat(istat,"add_advection_step:interpolate_currents")
 
          dpos = 0.5*k2*h
          pos  = tracattr%position
-         call d_cart2d_xy(pos, dpos) ! tangent space arithmics
+         call dcart2dxy(pos, dpos) ! tangent space arithmics
          pos = pos + dpos
          call interpolate_currents(pos, k3, istat) 
          call checkstat(istat,"add_advection_step:interpolate_currents")
          
          dpos = k3*h
          pos  = tracattr%position
-         call d_cart2d_xy(pos, dpos) ! tangent space arithmics
+         call dcart2dxy(pos, dpos) ! tangent space arithmics
          pos = pos + dpos
          call interpolate_currents(pos, k4, istat) 
          call checkstat(istat,"add_advection_step:interpolate_currents") 
@@ -397,7 +398,7 @@ c     evaluate diffusivity (gives higher order deviation)
 
       uphill = 0.5d0*dk*abs_h   ! step where to evaluate k
       pos    = tracattr%position 
-      call d_cart2d_xy(pos, uphill) ! transform uphill to (lon,lat,z)
+      call dcart2dxy(pos, uphill) ! transform uphill to (lon,lat,z)
       pos    = pos + uphill
       call interpolate_turbulence(pos + uphill, k, istat) 
       call checkstat(istat, "add_diffusion_step:interpolate_turbulence")  
@@ -501,7 +502,7 @@ c---------------------------------------------------
       real    :: pos(3), virpos(3), curpos(3), xyzref(3), xyzhit(3)
       integer :: ipos, istat
       integer :: ixc,iyc,izc, ixv,iyv,izv, dimOK(3), ibot,i
-      real    :: rnum(3),r1,zv,znew, depth
+      real    :: rnum(3),r1,zv,znew, depth,dxy(3)
       logical :: isOK, anycross, pingpong
 c---------------------------------------------------
 
@@ -516,7 +517,9 @@ c              At exit, virpos is assigned to tracattr%position.
 c
       curpos = tracattr%position ! current position - assumed valid
       virpos = curpos
-      call add_finite_step(virpos, dR) 
+      dxy=dR
+      call dcart2dxy(virpos,dxy)
+      virpos = virpos + dxy
 
 c.....reset motion status flags 
       tracattr%ashore      = .FALSE. 
@@ -1280,5 +1283,22 @@ c-------------------------------------------------------------
       xy_sw = emit_box%SW
       xy_ne = emit_box%NE
       END Subroutine get_xyboxes_emissions
+      
+
+      subroutine dcart2dxy(xy, r2)
+c     ------------------------------------------ 
+c     Convert inplace a Cartesian displacement 
+c     vector r2 (meters) at xy  to a displacement 
+c     vector in (longitude,latitude,depth)
+c     ------------------------------------------ 
+      real, intent(in)     :: xy(:)  !dimension 2+
+      real, intent(inout)  :: r2(:)  !dimension 2+
+      real                 :: jac(2)
+c     ------------------------------------------ 
+      jac(1) = earth_radius*cos(xy(2)*deg2rad)*deg2rad
+      jac(2) = earth_radius*deg2rad
+      r2(1:2) = r2(1:2)/jac(1:2) !element-by-element
+      end subroutine 
+
       end module 
       

@@ -36,6 +36,72 @@ c     ------------------------------------------------------------
       end subroutine interp_2Dbox_data
 
 
+      subroutine interp_3Dbox_data(sx,sy,sz,vc,deriv,result)
+c     -------------------------------------------------------------------------------------
+c     Performs basic trilinear interpolation based on a regularly spaced
+c     data grid.
+c     deriv = 0 gives value, deriv = (1,2) gives derivative (wrt. sx,sy) along (x,y)
+c     Currently, only deriv = 0 is implemented, until other derivatives 
+c     are needed.
+c     -------------------------------------------------------------------------------------
+      implicit none
+      real,intent(in)  :: sx,sy,sz
+      real,intent(in)  :: vc(*) ! 8 corners values : (v000,v001,v010,v011...)
+      integer,intent(in) :: deriv
+      real,intent(out) :: result
+      real              :: k000,k001,k010,k011,k100,k101,k110,k111
+c     -----------------------------------
+c     retrieve data points at corners      
+      k000  = vc(1)
+      k001  = vc(2)
+      k010  = vc(3)
+      k011  = vc(4)
+      k100  = vc(5)
+      k101  = vc(6)
+      k110  = vc(7)
+      k111  = vc(8)
+
+c     Now calculate the interpolated values /derivatives
+      if     (deriv == 0) then
+          result  = (1-sz)*((1-sy)*(k000*(1-sx) + sx*k100)  + 
+     &                          sy *(k010*(1-sx) + sx*k110)) + 
+     &                  sz *((1-sy)*(k001*(1-sx) + sx*k101)  + 
+     &                          sy *(k011*(1-sx) + sx*k111))
+      else if(deriv ==1) then
+          result=  ((-k000 + k100)*(1 - sy) +
+     &                 (-k010 + k110)*sy)*(1 - sz) +
+     &                ((-k001 + k101)*(1 - sy)     + 
+     &                 (-k011 + k111)*sy)*sz
+
+      else if(deriv ==2) then
+          result = (-(k000*(1 - sx)) + k010*(1 - sx) - 
+     &                   k100*sx + k110*sx)*(1 - sz) +
+     &                (-(k001*(1 - sx)) + k011*(1 - sx) - 
+     &                   k101*sx + k111*sx)*sz
+      else if(deriv ==3) then
+          result = -((k000*(1 - sx) + k100*sx)*(1 - sy)) +
+     &                  (k001*(1 - sx) + k101*sx)*(1 - sy) - 
+     &                  (k010*(1 - sx) + k110*sx)*sy +
+     &                  (k011*(1 - sx) + k111*sx)*sy
+      else
+         call abort("interp_3Dbox_data","unhandled deriv request")
+      endif
+
+c     Check results 
+c      write(*,*) "s    : ",sx,sy,sz
+c      write(*,*) "d000 : ", d000
+c      write(*,*) "d010 : ", d010
+c      write(*,*) "d100 : ", d100
+c      write(*,*) "d110 : ", d110
+c      write(*,*) "d001 : ", d001
+c      write(*,*) "d011 : ", d011
+c      write(*,*) "d101 : ", d101
+c      write(*,*) "d111 : ", d111
+c      write(*,*) "res  : ",result
+c      stop "3D CC interpolation"
+      end subroutine interp_3Dbox_data
+
+
       subroutine interp_irregbox_data(sx,sy,z,zc,vc,deriv,result,istat)
 c     ------------------------------------------------------------
 c     Interpolate between 8 corner (zc) value points (vc) of an 

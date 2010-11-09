@@ -1,0 +1,16 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+nsteps  = 100 ! number of time steps to run for
+
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+forward_filename    = disperse_forwards.txt
+backward_filename   = disperse_backwards.txt
+
+emitbox = 2005 01 15 0     2005 01 15  0   4 55 0.5   4 55 0.5  100
+
+! ------------ Configure flow fields --------------
+surface_vel = 0.1 45

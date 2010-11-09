@@ -17,3 +17,9 @@ c========================================================
          if (.not.is_opened) return
       enddo
       end subroutine find_free_IO_unit
+
+      subroutine abort_run(proc,message)
+        character(len=*) proc, message
+        write(*,* ) "HALT: "//trim(proc)//": "//trim(message)
+        stop 
+      end subroutine

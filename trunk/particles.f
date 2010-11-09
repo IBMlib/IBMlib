@@ -28,7 +28,10 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       module particles
       use particle_tracking
+      use physical_fields    !Need to get access to the master_clock
+      use time_tools
       use particle_state
+      use output
 c      use time_tools
 
       implicit none
@@ -100,6 +103,7 @@ c     .............................................................
       public :: generate_particles  ! using an emission_box (overloaded subroutine)
         
       public :: get_last_particle_number
+      public :: get_ensemble_size   !Returns the size of an ensemble
       public :: get_particle        ! Checkout a particle
       public :: get_particle_position ! delegate to particle_tracking
       public :: set_particle_position ! delegate to particle_tracking
@@ -109,8 +113,21 @@ c     .............................................................
       public :: update_particles ! spatial/biological, no emit - incl respond to BC
 
 
-      public :: write_ensemble 
-
+!      public :: write_ensemble !TODO : Move all write functionality to output system
+      interface get_property
+        module procedure get_prop_particle_single
+        module procedure get_prop_par_ens_single
+        module procedure get_prop_system
+      end interface
+      public :: get_property
+      
+      interface get_metadata
+        module procedure get_metadata_par
+        module procedure get_metadata_par_ens
+        module procedure get_metadata_system
+      end interface
+      public :: get_metadata
+      
 c     .................................................   
 c     .................   reexports   .................
 c     .................................................
@@ -338,6 +355,14 @@ c     ---------------------------------------------------
          stop
       endif
       end subroutine set_last_particle
+      
+      function get_ensemble_size(par_ens)
+c     ---------------------------------------------------
+      type(particle_ensemble), intent(in) :: par_ens
+      integer :: get_ensemble_size
+c     ---------------------------------------------------
+      get_ensemble_size = size(par_ens%allpart)
+      end function get_ensemble_size
 
       
       subroutine get_last_particle_number(par_ens, last)   
@@ -521,6 +546,150 @@ c     ---------------------------------------------------
          call write_state_attributes(this%state) 
       enddo
       end subroutine write_ensemble 
+      
+      
 
+      subroutine get_prop_particle_single(par,var,status)
+c     ---------------------------------------------------
+      type(particle),intent(in)   :: par
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+c     ---------------------------------------------------
+      !Search for the variable systematically, stopping at first instance
+      call get_property(par%space,var,status)
+      if(status==0) return
+      call get_property(par%state,var,status)
+      if(status==0) return
+      call get_property(var,status)
+      status=1 !Cannot find parameter
+      end subroutine
+      
+      subroutine get_metadata_par(par,var,status)
+c     ---------------------------------------------------
+      type(particle),intent(in)   :: par
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+c     ---------------------------------------------------
+      !Search for the variable systematically, stopping at first instance
+      call get_metadata(par%space,var,status)
+      if(status==0) return
+      call get_metadata(par%state,var,status)
+      if(status==0) return
+      call get_metadata(var, status)
+      end subroutine
+      
+      
+      subroutine get_prop_par_ens_single(par_ens,var,status)
+c     ---------------------------------------------------
+      type(particle_ensemble),intent(in)   :: par_ens
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+c     ------- locals ---------
+      integer :: last
+      type(polytype) :: bucket
+c     ---------------------------------------------------
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("npars")
+        call get_last_particle_number(par_ens,last)
+        call construct(bucket,"npars",last)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      ! Put the data into the variable if found
+      if(status==0) call store(var,bucket)
+      end subroutine
+      
+      subroutine get_metadata_par_ens(par_ens,var,status)
+c     ---------------------------------------------------
+      type(particle_ensemble),intent(in) :: par_ens
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+      type(metadata) :: meta
+c     ---------------------------------------------------
+      status=0 !Defaults to variable found
+      select case (get_name(var))
+      case ("npars")
+        call construct(meta,"npars","Number of particles",
+     +         units="particles",fmt="(i6)",type="int")
+      case default
+        status=1  !Cannot find variable
+      end select
+      ! Put the metadata into the variable if found
+      if(status==0) call store(var, meta)
+      end subroutine
+
+
+      subroutine get_prop_system(var,status)
+c------------------------------------------------------------  
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+c----------locals-------
+      type(polytype):: bucket
+      type(clock), pointer:: clock
+      integer :: year, month, day, secs, jday
+c------------------------------------------------------------  
+      status=0  !Variable is present
+      clock => get_master_clock()
+      select case (get_name(var))
+      case ("POSIX")
+        call construct(bucket,"POSIX",get_POSIXtime(clock))
+      case ("datetime")
+        call construct(bucket,"datetime",get_datetime(clock))
+      case ("year")
+        call get_date_from_clock(clock, year, month, day)
+        call construct(bucket,"year",year)
+      case ("month")
+        call get_date_from_clock(clock, year, month, day)
+        call construct(bucket,"month",month)
+      case ("day")
+        call get_date_from_clock(clock, year, month, day)
+        call construct(bucket,"day",day)
+      case ("jday")
+        call get_julian_day(clock, jday)
+        call construct(bucket,"jday",jday)
+      case ("secs")
+        call get_second_in_day(clock, secs)
+        call construct(bucket,"secs",secs)
+      case default
+        status=1   !Cannot find variable name
+      end select
+      ! Put the metadata into the variable if found
+      if(status==0) call store(var,bucket)
+      end subroutine
+
+
+      subroutine get_metadata_system(var,status)
+c------------------------------------------------------------  
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+      type(metadata) :: meta
+c------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (get_name(var))
+      case ("POSIX")
+        call construct(meta,"POSIX","POSIX (UNIX) time",
+     +    "seconds since 1 Jan 1970, 00:00:00","(i10)","int")
+      case ("datetime")
+        call construct(meta,"datetime","Date and Time",
+     +             units="YYYY.MM.DD__HH.mm.ss",fmt="(a20)",type="str")
+      case ("year")
+        call construct(meta,"year","Year","CE","(i4)","int")
+      case ("month")
+        call construct(meta,"month","Month","-","(i2)","int")
+      case ("day")
+        call construct(meta,"day","Day","-","(i2)","int")
+      case ("jday")
+        call construct(meta,"jday","Julian day","days since 1 Jan (=1)",
+     +                   fmt="(i3)",type="int")
+      case ("secs")
+        call construct(meta,"secs","Seconds",
+     +       "seconds since midnight","(i5)","int")
+      case default
+        status=1  !Cannot find variable
+      end select
+      ! Put the metadata into the variable if found
+      if(status==0) call store(var, meta)
+      end subroutine get_metadata_system
 
       end module

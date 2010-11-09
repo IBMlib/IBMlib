@@ -5,6 +5,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       use time_tools           ! import clock type
       use particle_tracking    ! space types/methods
+      use output
 
       implicit none
       private     
@@ -18,7 +19,7 @@ c     add a dummy variable
 c     -----------------------------------------------
       type state_attributes
       private
-      character*1 :: dummy  ! F90 classes can not be empty ...
+        integer :: tracerID
       end type
       public :: state_attributes
 
@@ -30,12 +31,28 @@ c     -----------------------------------------------
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+      
+      interface get_property
+        module procedure get_prop_state
+      end interface
+      public :: get_property
 
+      interface get_metadata
+        module procedure get_metadata_state
+      end interface
+      public :: get_metadata
+
+c     -----------------
+c     Module parameters
+c     -----------------
+      integer :: tracerID
+      
 c     --------
       contains
 c     --------
      
       subroutine init_particle_state()  ! module operator
+      tracerID=1
       end subroutine 
 
 
@@ -53,7 +70,8 @@ c     ----------------------------------------------------
       character*(*),intent(in)               :: initdata
       integer,intent(in)                     :: emitboxID
 c     ----------------------------------------------------
-      state%dummy = "i"
+      state%tracerID = tracerID
+      tracerID = tracerID +1
       call set_tracer_mobility_free(space)  
 c     
       end subroutine 
@@ -83,6 +101,44 @@ c     -----------------
       subroutine write_state_attributes(state)
       type(state_attributes), intent(in) :: state 
       end subroutine 
+
+      subroutine get_prop_state(state,var,status)
+c------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(output_var),intent(inout) :: var
+      integer, intent(out) :: status
+      type(polytype):: bucket
+c------------------------------------------------------------  
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("tracerID")
+        call construct(bucket,"tracerID",state%tracerID)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      !Attach data if it is present
+      if(status==0) call store(var,bucket)
+      end subroutine
+
+      subroutine get_metadata_state(state,var,status)
+c------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(output_var),intent(inout) :: var
+      integer, intent(out) :: status
+      type(metadata):: meta
+c------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (get_name(var))
+       case ("tracerID")
+         call construct(meta,"tracerID","tracer ID number",
+     +     units="-",fmt="(i6)",type="int")
+      case default
+        status=1  !Cannot find variable
+      end select
+      !Attach data if it is present
+      if(status==0) call store(var, meta)
+      end subroutine get_metadata_state
+
 
 
       end module

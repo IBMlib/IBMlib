@@ -35,6 +35,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use time_tools
       use constants
       use random_numbers
+      use output    !Provides data handling classes
       
       implicit none
       private          ! default visibility
@@ -129,8 +130,18 @@ c.... Define public operator set  ..............................
       public :: add_diffusion_step
       public :: add_constrained_step
 
-      public :: write_tracer_position
-      public :: write_spatial_attributes
+      public :: write_tracer_position !TODO: Move all write functionality to output system
+      public :: write_spatial_attributes   !TODO: Move all write functionality to output system
+      interface get_property
+        module procedure get_prop_space
+      end interface
+      public :: get_property
+      
+      interface get_metadata
+        module procedure get_metadata_space
+      end interface
+      public :: get_metadata
+
       public :: delete_spatial_attributes
       public :: set_tracer_mobility
       public :: set_tracer_mobility_free
@@ -1284,7 +1295,6 @@ c-------------------------------------------------------------
       xy_ne = emit_box%NE
       END Subroutine get_xyboxes_emissions
       
-
       subroutine dcart2dxy(xy, r2)
 c     ------------------------------------------ 
 c     Convert inplace a Cartesian displacement 
@@ -1300,5 +1310,104 @@ c     ------------------------------------------
       r2(1:2) = r2(1:2)/jac(1:2) !element-by-element
       end subroutine 
 
+      
+      subroutine get_prop_space(space,var,status)
+c------------------------------------------------------------  
+      type(spatial_attributes),intent(in) :: space
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+      type(polytype):: bucket
+c------------------------------------------------------------  
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("lon")
+        call construct(bucket,"lon",space%position(1))
+      case ("lat")
+        call construct(bucket,"lat",space%position(2))
+      case("depth")
+        call construct(bucket,"depth",space%position(3))
+      case ("mobx")
+        call construct(bucket,"mobx",space%mobility(1))
+      case("moby")
+        call construct(bucket,"moby",space%mobility(2))
+      case("mobz")
+        call construct(bucket,"mobz",space%mobility(3))
+      case("ashore")
+        call construct(bucket,"ashore",space%ashore)
+      case("outofdomain")
+        call construct(bucket,"outofdomain",space%outofdomain)
+      case("atbottom")
+        call construct(bucket,"atbottom",space%atbottom)
+      case("atsurface")
+        call construct(bucket,"atsurface",space%atsurface)
+      case("shoreBC")
+        call construct(bucket,"shoreBC",space%shoreBC)
+      case("domainBC")
+        call construct(bucket,"domainBC",space%domainBC)
+      case("bottomBC")
+        call construct(bucket,"bottomBC",space%bottomBC)
+      case("surfaceBC")
+        call construct(bucket,"surfaceBC",space%surfaceBC)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      !Assign data to variable if it is present
+      if(status==0) call store(var,bucket)
+      end subroutine
+
+      subroutine get_metadata_space(space,var,status)
+c------------------------------------------------------------  
+      type(spatial_attributes),intent(in) :: space
+      type(output_var), intent(inout) :: var
+      integer, intent(out) :: status
+      type(metadata):: meta
+c------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (get_name(var))
+      case ("lon")
+        call construct(meta,"lat","Latitude","deg N","(f6.2)","real")
+      case ("lat")
+        call construct(meta,"lon","Longitude","deg E","(f6.2)","real")
+      case ("depth")
+        call construct(meta,"depth","Depth positive downwards",
+     +                  units="m",fmt="(f6.2)",type="real")
+      case ("mobx")
+        call construct(meta,"mobx","Meridonal mobility",
+     +                  units="T/F",fmt="(l1)",type="log")
+      case ("moby")
+        call construct(meta,"moby","Zonal mobility",
+     +                  units="T/F",fmt="(l1)",type="log")
+      case ("mobz")
+        call construct(meta,"mobz","Vertical mobility",
+     +                  units="T/F",fmt="(l1)",type="log")
+      case ("ashore")
+        call construct(meta,"ashore","Is particle ashore?",
+     +                  units="T/F",fmt="(l1)",type="log")
+      case("outofdomain")
+        call construct(meta,"outofdomain","Is particle out of "
+     +       // "the domain?", units="T/F",fmt="(l1)",type="log")
+      case ("atbottom")
+        call construct(meta,"atbottom","Is the particle at bottom?",
+     +                  units="T/F",fmt="(l1)",type="log")
+      case ("atsurface")
+        call construct(meta,"atsurface","Is particle at the "
+     +       //"surface?",units="T/F",fmt="(l1)",type="log")
+      case ("shoreBC")
+        call construct(meta,"shoreBC","shoreBC","-","(i2)","int")
+      case ("domainBC")
+        call construct(meta,"domainBC","domainBC","-","(i2)","int")
+      case ("bottomBC")
+        call construct(meta,"bottomBC","bottomBC","-","(i2)","int")
+      case ("surfaceBC")
+        call construct(meta,"surfaceBC","surfaceBC","-","(i2)","int")
+      case default
+        status=1  !Cannot find variable
+      end select
+      !Assign data to variable if it is present
+      if(status==0) call store(var,meta)
+      end subroutine
+      
+      
+ 
       end module 
       

@@ -106,7 +106,7 @@ include  config.mk
 EXT_LIBS     = libtime/libtime77.a
 BASELIBS     = grid_interpolations.o  runtime_tools.o  geometry.o  string_tools.o 
 BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
-               run_context.mod  #output.mod
+               run_context.mod  output.mod
 BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
 OUTPUT_ARCS  = $(patsubst %.mod,%.a,$(OUTPUT_MODS))
 IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
@@ -150,7 +150,7 @@ particle_state.a:  FORCE  $(BASEMODS)  physical_fields.a  particle_tracking.o
 
 $(OUTPUT_ARCS) $(OUTPUT_MODS): $(OUTPUT_WRITER_DIRS)
 
-$(OUTPUT_WRITER_DIRS): particles.mod 
+$(OUTPUT_WRITER_DIRS): FORCE particles.mod 
 	@echo ""
 	$(MAKE) -C $@  archive module #Run make in the individual subdirectories
 	@ln -sf $@/*.a 

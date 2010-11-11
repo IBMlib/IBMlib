@@ -36,11 +36,7 @@ c     -----------------------------------------------
         module procedure get_prop_state
       end interface
       public :: get_property
-
-      interface get_metadata
-        module procedure get_metadata_state
-      end interface
-      public :: get_metadata
+      public :: get_metadata_state
 
 c     -----------------
 c     Module parameters
@@ -102,12 +98,13 @@ c     -----------------
       type(state_attributes), intent(in) :: state 
       end subroutine 
 
-      subroutine get_prop_state(state,var,status)
+
+      subroutine get_prop_state(state,var,bucket,status)
 c------------------------------------------------------------  
       type(state_attributes),intent(in) :: state
-      type(output_var),intent(inout) :: var
+      type(variable),intent(in) :: var
+      type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
-      type(polytype):: bucket
 c------------------------------------------------------------  
       status=0  !Variable is present
       select case (get_name(var))
@@ -116,27 +113,23 @@ c------------------------------------------------------------
       case default
         status=1   !Cannont find variable name
       end select
-      !Attach data if it is present
-      if(status==0) call store(var,bucket)
       end subroutine
 
-      subroutine get_metadata_state(state,var,status)
+
+      subroutine get_metadata_state(var_name,var,status)
 c------------------------------------------------------------  
-      type(state_attributes),intent(in) :: state
-      type(output_var),intent(inout) :: var
+      character(*), intent(in) :: var_name
+      type(variable),intent(out) :: var
       integer, intent(out) :: status
-      type(metadata):: meta
 c------------------------------------------------------------  
       status=0 !Defaults to variable found
-      select case (get_name(var))
+      select case (var_name)
        case ("tracerID")
-         call construct(meta,"tracerID","tracer ID number",
+         call construct(var,"tracerID","tracer ID number",
      +     units="-",fmt="(i6)",type="int")
       case default
         status=1  !Cannot find variable
       end select
-      !Attach data if it is present
-      if(status==0) call store(var, meta)
       end subroutine get_metadata_state
 
 

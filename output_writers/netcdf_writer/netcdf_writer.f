@@ -2,9 +2,9 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     NetCDF output writer module
 c     ---------------------------------------------------
-c     $Rev: 42 $
-c     $LastChangedDate: 2010-09-28 14:18:09 +0200 (ti, 28 sep 2010) $
-c     $LastChangedBy: mpay $ 
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 c     Allows configuration and writing of data to NetCDF files
 C     As an initial framework, this module works on the 
@@ -32,11 +32,17 @@ c------------------------------------------------------------
       private
       
       type netcdf_output_file
+        private
         character (len=999) filename
-        type(output_var),pointer  :: time_var
-        integer :: n_particles
-        type(output_var),pointer  :: par_var
-        type(output_var),pointer  :: vars(:)
+        integer :: ncid
+        integer, pointer :: varids(:)
+        integer :: time_varid
+        integer :: par_varid
+        type(variable),pointer  :: par_var
+        type(variable),pointer  :: time_var
+        type(variable),pointer  :: vars(:)
+        integer :: npars
+        integer :: nvars
       end type netcdf_output_file
       public :: netcdf_output_file
       
@@ -44,208 +50,216 @@ c------------------------------------------------------------
         module procedure init_output_netcdf
       end interface
       public :: init_output
+      public :: set_var_range
 
       interface write_frame
          module procedure write_frame_netcdf   
       end interface
       public :: write_frame
 
-      interface write_particles
-         module procedure write_par_netcdf   
-      end interface
-      public :: write_particles
+      integer, parameter :: NF90_SHORT_highlim = (2**15)-1
+      integer, parameter :: NF90_SHORT_lowlim  = -NF90_SHORT_highlim+1
+      integer, parameter :: NF90_SHORT_missval = NF90_FILL_SHORT
 
-      interface construct
-        module procedure construct_outvar_ncdf
-      end interface
-      public :: construct
+      integer, parameter :: NF90_INT_highlim = (2**31)-1
+      integer, parameter :: NF90_INT_lowlim  = -NF90_INT_highlim+1
+      integer, parameter :: NF90_INT_missval = NF90_FILL_INT
+ 
       
       contains
       
       
-      subroutine init_output_netcdf(of)
+      subroutine init_output_netcdf(of,filename,
+     +              par_var,time_var,vars,npars)
 c------------------------------------------------------------  
-      type(netcdf_output_file),intent(inout) :: of
+      type(netcdf_output_file),intent(out) :: of
+      character(*), intent(in) :: filename
+      type(variable), intent(in) :: par_var,time_var,vars(:)
+      integer, intent(in)    :: npars
+      !----locals----
       type(particle) :: par
-      integer i, ncid, ok, time_dimid, par_dimid,varid,dimids(2)
+      integer i, ncid, ok, time_dimid, par_dimid,dimids(2)
 c------------------------------------------------------------        
-      !Get metadata and insert into variable slot
-      write(*,*) "Initialising netcdf outputfile : ",trim(of%filename)
-      do i=1,size(of%vars)
-          !Get the metadata
-          call get_metadata(par,of%vars(i),ok)
-          if(ok/=0) then
-            call abort("init_output_netcdf","Variable '"
-     +       //trim(of%vars(i)%name)// "' is not available.")
-          endif
-          !Write a description of the file
-          write(*,380) i, trim(of%vars(i)%metadata%name),
-     +       trim(of%vars(i)%metadata%desc)
-          !If no format information supplied, then default to that from the metadata
-          if(len_trim(of%vars(i)%fmt)==0) then
-            of%vars(i)%fmt=of%vars(i)%metadata%default_fmt
-          endif
+      !Initialise file object
+      write(*,*) "Initialising netcdf outputfile : ",trim(filename)
+      of%filename =filename
+      of%nvars = size(vars)
+      of%npars = npars
+      allocate(of%vars(of%nvars))
+      allocate(of%par_var)
+      allocate(of%time_var)
+      allocate(of%varids(of%nvars))
+      of%par_var = par_var
+      of%time_var = time_var
+      of%vars = vars
+      !Write a description of the file
+      write(*,380) 000, trim(get_name(of%par_var)),
+     +       trim(get_desc(of%par_var)) 
+      write(*,380) 000, trim(get_name(of%time_var)),
+     +       trim(get_desc(of%time_var)) 
+      do i=1,of%nvars
+          write(*,380) i, trim(get_name(of%vars(i))),
+     +       trim(get_desc(of%vars(i))) 
       enddo
 380   format("  Variable ",i2, ": ",a," (",a,")")      
-
       !Test to see what type of variable the particle counter is - must be integer
-      call get_metadata(par,of%par_var,ok)
-      if(ok/=0) then 
-        call abort("init_output_netcdf","Cannot find variable "// 
-     +           of%par_var%name)
-      end if
-      if(of%par_var%metadata%type/="int") then
-        call abort("init_output_netcdf","Particle variable, '" 
-     +       //trim(of%par_var%name) //"' must be integer but is '"
-     +       //of%par_var%metadata%type//"'")
+      if(get_type(of%par_var)/="int") then
+        call abort_run("init_output_netcdf","Particle variable, '" 
+     +       //trim(get_name(of%par_var)) //"' must be integer but is '"
+     +       //get_type(of%par_var)//"'")
       end if
 
       ! Create the file. 
       call check( nf90_create(trim(of%filename), nf90_clobber, ncid))
       ! Define the dimensions - a particle dimension and an unlimted datetime dimension
-      call check( nf90_def_dim(ncid, of%time_var%name, 
+      call check( nf90_def_dim(ncid, get_name(of%par_var),
+     +        of%npars,par_dimid))
+      call check( nf90_def_dim(ncid, get_name(of%time_var), 
      +                          NF90_UNLIMITED, time_dimid) )
-      call check( nf90_def_dim(ncid, of%par_var%name,
-     +        of%n_particles,par_dimid))
       ! Define the coordinate variables    
-      call check( nf90_def_var(ncid,of%par_var%name, 
-     +           of%par_var%var_type,par_dimid, of%par_var%varid))
-      call check( nf90_def_var(ncid,of%time_var%name,
-     +           of%time_var%var_type, time_dimid, of%time_var%varid))
+      call check( nf90_def_var(ncid,get_name(of%par_var), 
+     +     get_nf90_type(of%par_var),par_dimid, of%par_varid))
+      call check( nf90_def_var(ncid,get_name(of%time_var),
+     +     get_nf90_type(of%time_var),time_dimid,of%time_varid))
 
-      ! Now define the other variables
+c      ! Now define the other variables
       dimids = (/ par_dimid,time_dimid /)
-      do i=1,size(of%vars)
-       call check(nf90_def_var(ncid,of%vars(i)%name,of%vars(i)%var_type,
-     +        dimids,of%vars(i)%varid))
+      do i=1,of%nvars
+       call check(nf90_def_var(ncid,get_name(of%vars(i)),
+     +        get_nf90_type(of%vars(i)),dimids,of%varids(i)))
       enddo
       ! Now define the variable attributes (metadata)
-      do i=1,size(of%vars)
-        call netcdf_define_attributes(ncid,of%vars(i))
+      do i=1,of%nvars
+        call netcdf_define_attributes(ncid,of%vars(i),of%varids(i))
       enddo
-      call netcdf_define_attributes(ncid,of%par_var)
-      call netcdf_define_attributes(ncid,of%time_var)
+      call netcdf_define_attributes(ncid,
+     +          of%par_var,of%par_varid)
+      call netcdf_define_attributes(ncid,
+     +          of%time_var,of%time_varid)
 
       ! End define mode.
       call check( nf90_enddef(ncid) )
       ! Write the particle coordinate variable data. 
-      call check( nf90_put_var(ncid, of%par_var%varid, 
-     +     (/(i,i=1,of%n_particles)/)))
+      call check( nf90_put_var(ncid, of%par_varid,(/(i,i=1,of%npars)/)))
       ! Close the file. 
-      call check( nf90_close(ncid) )
+      call check( nf90_close(ncid))
 
       end subroutine
       
 
       subroutine write_frame_netcdf(of,par_ens)
-c------------------------------------------------------------  
+c     ------------------------------------------------------------  
       type(netcdf_output_file),intent(inout) :: of
       type(particle_ensemble), intent(in) :: par_ens
 c     ------locals ------
       type(particle),pointer :: par
-      integer last, ipar, time_dimid, time_recs, ncid,i
+      type(polytype) :: bucket
+      integer last, ipar, time_dimid, time_recs, i
       integer par_ID,ok
-c------------------------------------          
+c     ------------------------------------          
       !Find the last particle in the ensemble
       call get_last_particle_number(par_ens,last)
 
       !Open NetCDF file for writing
-      call check( nf90_open(of%filename, NF90_WRITE, ncid) )
+      call check( nf90_open(of%filename, NF90_WRITE, of%ncid) )
       !Figure out how many time records there are already
-      call check( nf90_inq_dimid(ncid, of%time_var%name, time_dimid) )
-      call check( nf90_inquire_dimension(ncid,time_dimid,len=time_recs))
+      call check( nf90_inq_dimid(of%ncid,
+     +          get_name(of%time_var),time_dimid))
+      call check( nf90_inquire_dimension(of%ncid,
+     +          time_dimid,len=time_recs))
       !Get the variable ids for each variable
-      !I'm not sure if this is strictly necessary, but it seems wise
+      !This is a precautionary approach, incase the varids have changed
       do i=1,size(of%vars)
-        call check( nf90_inq_varid(ncid,
-     +     of%vars(i)%name, of%vars(i)%varid)) 
+        call check( nf90_inq_varid(of%ncid,
+     +       get_name(of%vars(i)),of%varids(i)))
       enddo 
-      call check( nf90_inq_varid(ncid,of%time_var%name,
-     +      of%time_var%varid)) 
+      call check( nf90_inq_varid(of%ncid,
+     +       get_name(of%time_var),of%time_varid))
       !Scan by particles
       do ipar=1,last
         !Get the particle object
         par=> get_particle(par_ens,ipar)
         !Write the particle in the new record, according to particle number
-        call write_par_netcdf(ncid,par,of,time_recs+1)
+        call write_par_netcdf(of,par,time_recs+1)
       enddo
-
+c
       !Finally, write the unlimited (time) variable data
-      call get_property(of%time_var,ok)
-      call prepare_variable_netcdf(of%time_var)
-      call write_point_netcdf(ncid,of%time_var,time_start=time_recs+1)
+      call get_property(of%time_var,bucket,ok)
+      call prepare_variable_netcdf(of%time_var,bucket)
+      call write_point_netcdf(of%ncid,of%time_varid,bucket,
+     +          t_start=time_recs+1)
 
       !Close netcdf file    
-      call check( nf90_close(ncid) )
+      call check( nf90_close(of%ncid) )
 
       end subroutine
       
 
-      subroutine write_par_netcdf(ncid,par,of,time_idx)
+      subroutine write_par_netcdf(of,par,time_idx)
 c------------------------------------------------------------  
 c     Writes the parameters in a netcdf file that correspond
 c     to a single particle. Parameters to write are specified 
 c     in the output file object
-      integer, intent(in) :: ncid,time_idx
-      type(particle),intent(in) :: par
       type(netcdf_output_file),intent(inout) :: of
+      integer, intent(in) :: time_idx
+      type(particle),intent(in) :: par
 c     ------locals ------
-      integer i, ok
+      integer i, ok,p_idx
+      type(polytype) :: bucket
 c------------------------------------------------------------        
       !Figure out where to write the data
-      call get_property(par,of%par_var,ok)
+      call get_property(par,of%par_var,bucket,ok)
+      p_idx = get_data_int(bucket)
       !Loop over supplied variables
       do i=1,size(of%vars)
          !Get the data
-         call get_property(par,of%vars(i),ok)
+         call get_property(par,of%vars(i),bucket,ok)
          !Prepare the variable for output
-         call prepare_variable_netcdf(of%vars(i)) 
+         call prepare_variable_netcdf(of%vars(i),bucket) 
          !Now write the result
-         call write_point_netcdf(ncid,of%vars(i),
-     +           time_start=time_idx,par_start=of%par_var%dat%i)
+         call write_point_netcdf(of%ncid,of%varids(i),bucket,
+     +           t_start=time_idx,p_start=p_idx)
       enddo
       end subroutine
 
 
-      subroutine write_point_netcdf(ncid,var,time_start,par_start)
+      subroutine write_point_netcdf(ncid,varid,bucket,t_start,p_start)
 c------------------------------------------------------------  
-c     Writes the formatted data contained in a single variable to a single
-c     variable object to a single point in a netcdf file
-      integer, intent(in) :: ncid
-      type(output_var), intent(in) :: var
-      integer, intent(in),optional :: time_start,par_start
+c     Writes the data contained in bucket to a single point in a netcdf file
+      integer, intent(in) ::  varid, ncid
+      type(polytype), intent(in) :: bucket
+      integer, intent(in),optional :: t_start,p_start
 c     ------locals ------
       integer, allocatable :: start(:),cnt(:)
 c------------------------------------------------------------        
       !Decide whether we are writing 1D or 2D data
-      if(present(time_start) .and. present(par_start)) then
+      if(present(t_start) .and. present(p_start)) then
          allocate(start(2),cnt(2))
-         start = (/par_start,time_start/)
+         start = (/p_start,t_start/)
          cnt=(/1,1/)
-      else if (present(time_start)) then
+      else if (present(t_start)) then
          allocate(start(1),cnt(1))
-         start = (/time_start/)
+         start = (/t_start/)
          cnt=(/1/)
-      else if (present(par_start)) then
+      else if (present(p_start)) then
          allocate(start(1),cnt(1))
-         start = (/par_start/)
+         start = (/p_start/)
          cnt=(/1/)
       else
-         call abort("write_point_netcdf()","At least one of "
+         call abort_run("write_point_netcdf()","At least one of "
      +    // "par_start and time_start need to be specified.")
       endif
-      !Writing depends in the first instance on the variable type
-      select case(var%dat%type)
+      !Writing depends in the first instance on the data type
+      select case(get_type(bucket))
       case ("real")
-         call check( nf90_put_var(ncid, var%varid,(/var%dat%r/),
-     +     start=start,count=cnt))
+         call check( nf90_put_var(ncid, varid,
+     +     (/get_data_real(bucket)/), start=start,count=cnt))
       case ("int")
-         call check( nf90_put_var(ncid, var%varid,(/var%dat%i/),
-     +     start=start,count=(/1,1/)))
+         call check( nf90_put_var(ncid, varid,
+     +     (/get_data_int(bucket)/),  start=start,count=cnt))
       case default
-        call abort("write_point_netcdf()"," Variable '"//
-     +   trim(var%name) // "' is of type '" //trim(var%dat%type)//
-     +   "' and is not currently handled.")
+        call abort_run("write_point_netcdf()","Data of type '" //
+     +   trim(get_type(bucket))// "' is not currently handled.")
       end select
       !Tidy up to finish with
       deallocate(start)
@@ -253,84 +267,115 @@ c------------------------------------------------------------
       end subroutine write_point_netcdf
 
 
-      subroutine prepare_variable_netcdf(var)
+      subroutine prepare_variable_netcdf(var,bucket)
 c------------------------------------------------------------  
 c     Prepares an output variable for writing to NETCDF by taking
 c     care of type conversions and the like
-      type(output_var),intent(inout) :: var
+      type(variable),intent(in) :: var
+      type(polytype),intent(inout) :: bucket
 c     ------locals ------
-      integer i, write_int,ok
-      real write_real, scaled,ulim,llim
+      integer i, write_int,ok,missval
+      real write_real, scaled,ulim,llim, offset,scalar
       logical write_byte
-      type(polytype) :: bucket
+      character(len=999) bucket_name
 c------------------------------------------------------------  
+      offset = get_offset(var)
+      scalar = get_scalar(var)
+      bucket_name = get_name(bucket)
 c     !We have to split the processing up according to the 
 c     !type that will be stored in the netcdf file
-      select case( var%var_type)
+      select case( get_nf90_type(var))
       case (NF90_SHORT, NF90_INT) !-------------------------------------
          !Avoid writing ints that are too large 
-         if (var%var_type==NF90_SHORT) then
-           ulim=2**15-1
-           llim =-ulim+1  !-32767 is a missing value for NF90_SHORT 
-         elseif (var%var_type==NF90_INT) then
-           ulim=2**31-1
-           llim =-ulim+1 
+         if (get_nf90_type(var)==NF90_SHORT) then
+           ulim = NF90_SHORT_highlim
+           llim = NF90_SHORT_lowlim 
+           missval = NF90_SHORT_missval
+         elseif (get_nf90_type(var)==NF90_INT) then
+           ulim = NF90_INT_highlim
+           llim = NF90_INT_lowlim
+           missval = NF90_INT_missval
          endif
         !Cast into (scaled) integer format
-        select case(var%dat%type)
+        select case(get_type(bucket))
         case ("real")
-          scaled =(var%dat%r-var%offset)/var%scalar
-          write_int=nint(min(ulim,max(llim,scaled)))
+          scaled=(get_data_real(bucket)-offset)/scalar
         case ("int")
-          scaled =(real(var%dat%i)-var%offset)/var%scalar
-          write_int=nint(min(ulim,max(llim,scaled)))
+          scaled =(real(get_data_int(bucket))-offset)/scalar
         case default
-          call abort("prepare_variable_netcdf()","Variable '"// 
-     +    trim(var%name) // "' is of"
-     +     //" type '" //trim(var%dat%type)//"' and cannot "
+          call abort_run("prepare_variable_netcdf()","Variable '"// 
+     +    trim(get_name(var)) // "' is of"
+     +     //" type '" //trim(get_type(bucket))//"' and cannot "
      +     //"be cast as NF90_SHORT or NF90_INT")
          end select
-         !Now construct the bucket
-         call construct(bucket,var%dat%name,write_int)
+         !Check for out of bounds - set to missing value if so
+         if(scaled >ulim .OR. scaled < llim) then
+            write_int = missval 
+         else
+            write_int=nint(scaled)
+         endif
+         !Now reconstruct the bucket
+         call construct(bucket,bucket_name,write_int)
       case (NF90_FLOAT, NF90_DOUBLE) !-------------------------------------
-        !Cast into real format
-         select case(var%dat%type)
+        !Cast into (scaled) real format
+         select case(get_type(bucket))
          case ("real")
-           write_real = real((var%dat%r-var%offset)/var%scalar)
+           write_real = (get_data_real(bucket)-offset)/scalar
          case ("int")
-           write_real = real((var%dat%i-var%offset)/var%scalar)
+           write_real = (real(get_data_int(bucket))-offset)/scalar
          case default
-           call abort("prepare_variable_netcdf()"," Variable '"// 
-     +      trim(var%name) // "' is of"
-     +      //" type '" //trim(var%dat%type)//"' and cannot "
+           call abort_run("prepare_variable_netcdf()"," Variable '"// 
+     +      trim(get_name(var)) // "' is of"
+     +      //" type '" //trim(get_name(bucket))//"' and cannot "
      +      //"be cast as NF90_FLOAT or NF90_DOUBLE")
          end select
          !Now construct the bucket
-         call construct(bucket,var%dat%name,write_real)
+         call construct(bucket,bucket_name,write_real)
       case default!----------------------------------------------------------
-         call abort("prepare_variable_netcdf()","Variable '"
-     +       //var%name // "' is of unknown type ")
+         call abort_run("prepare_variable_netcdf()","Variable '"
+     +       //trim(get_name(var)) // "' is of unknown type ")
       end select
-      !Replace the data in the variable with the corresponding bucket
-      var%dat = bucket
       end subroutine prepare_variable_netcdf
 
 
-      subroutine netcdf_define_attributes(ncid,var)
+      subroutine netcdf_define_attributes(ncid,var,varid)
 c------------------------------------------------------------  
-      integer, intent(in) :: ncid
-      type(output_var),intent(in) :: var
+      integer, intent(in) :: ncid,varid
+      type(variable),intent(in) :: var
 c------------------------------------------------------------        
-      call check(nf90_put_att(ncid,var%varid,
-     +           "long_name",var%metadata%desc))
-      call check(nf90_put_att(ncid,var%varid,
-     +           "units",var%metadata%units))
-      call check(nf90_put_att(ncid,var%varid,
-     +           "scale_factor",var%scalar))
-      call check(nf90_put_att(ncid,var%varid,
-     +           "add_offset",var%offset))
-      end subroutine
+      call check(nf90_put_att(ncid,varid,
+     +           "long_name",get_desc(var)))
+      call check(nf90_put_att(ncid,varid,
+     +           "units",get_units(var)))
+      call check(nf90_put_att(ncid,varid,
+     +           "scale_factor",get_scalar(var)))
+      call check(nf90_put_att(ncid,varid,
+     +           "add_offset",get_offset(var)))
+      !Define missing value, if appropriate
+      select case(get_nf90_type(var))
+      case (NF90_SHORT)
+         call check(nf90_put_att(ncid,varid,
+     +           "_FillValue",NF90_FILL_SHORT))
+         call check(nf90_put_att(ncid,varid,
+     +           "missing_value",NF90_SHORT_missval))
+      case (NF90_INT)
+         call check(nf90_put_att(ncid,varid,
+     +           "_FillValue",NF90_FILL_INT))
+         call check(nf90_put_att(ncid,varid,
+     +           "missing_value",NF90_INT_missval))
+      case (NF90_FLOAT)
+         call check(nf90_put_att(ncid,varid,
+     +           "_FillValue",NF90_FILL_FLOAT))
+         call check(nf90_put_att(ncid,varid,
+     +           "missing_value",NF90_FILL_FLOAT))
+      case (NF90_DOUBLE)
+         call check(nf90_put_att(ncid,varid,
+     +           "_FillValue",NF90_FILL_DOUBLE))
+         call check(nf90_put_att(ncid,varid,
+     +           "missing_value",NF90_FILL_DOUBLE))
+      end select
 
+      end subroutine
 
 
       subroutine check(status)
@@ -346,49 +391,60 @@ c     --------------------------
       end subroutine check 
 
 
-      subroutine construct_outvar_ncdf(this,name,fmt,var_type,
-     +    scalar,offset,range)
+      integer function get_nf90_type(var)
+c     -------------------------------------------------------
+c     Converts the type, text string of an output variable to
+c     an integer constant definted by the NetCDF module. Some
+c     default values for other types (real, int) are also 
+c     accepted as a default mapping
+c     -------------------------------------------------------
+      type(variable), intent(in) :: var
+      select case (get_type(var))
+      case("NF90_FLOAT","real") 
+         get_nf90_type=NF90_FLOAT
+      case("NF90_INT","int") 
+         get_nf90_type=NF90_INT
+      case("NF90_DOUBLE") 
+         get_nf90_type=NF90_DOUBLE
+      case("NF90_SHORT") 
+         get_nf90_type=NF90_SHORT
+      case default
+         call abort_run("get_nf90_type","Type '" //
+     +    trim(get_type(var)) // "' ('" //
+     +    trim(get_name(var))//"' variable) is not recognised by NF90")
+      end select
+
+      end function
+
+
+      subroutine set_var_range(this,rng)
 c     -------------------------------------------------------
 c     Sets up output variable parameters that are specific 
 c     to NetCDF operations worked
 c     Specifying a range and a var_type overrules any offset and
 c     scalar specification
 c     -------------------------------------------------------
-      type(output_var), intent(inout) :: this
-      character(len=*), intent(in) :: name
-      character(len=*), intent(in),optional :: fmt
-      integer, intent(in) :: var_type
-      real, optional, intent(in) :: scalar, offset, range(2)
-      real lowx,highx
+      type(variable), intent(inout) :: this
+      real, intent(in) :: rng(2)
+      real :: highx, lowx,scalar,offset
 c     -------------------------------------------------------
-      this%name=name
-      this%var_type=var_type
-      this%scalar =1.0
-      this%offset=0.0
-      this%fmt=""
-      if(present(fmt)) this%fmt=fmt
-      if(present(scalar)) this%scalar= scalar
-      if(present(offset)) this%offset= offset
-      !If a range is specified override the scalar and offset
-      if(present(range)) then
-        select case(var_type)
-        case (NF90_SHORT)
-          highx=(2**15)-1
-          lowx=-highx 
-        case (NF90_INT)
-          highx=(2**31)-1
-          lowx=-highx 
-        case default
-          call abort("construct_outvar_ncdf","Supplying a range "
+      select case(get_nf90_type(this))
+      case (NF90_SHORT)
+         highx=NF90_SHORT_highlim
+         lowx= NF90_SHORT_lowlim
+      case (NF90_INT)
+         highx=NF90_INT_highlim
+         lowx= NF90_INT_lowlim
+      case default
+         call abort_run("set_var_range","Setting a range "
      +      // "does not have a meaning for variables that are "
      +      // "not NF90_SHORT or NF90_INT. Specify a scalar and "
-     +      // "offset instead.")
-        end select
-        this%scalar=(maxval(range)-minval(range))/(highx-lowx)
-        this%offset=minval(range)-this%scalar*lowx
-      endif
-      end subroutine construct_outvar_ncdf
-
-
+     +      // "offset directly instead.")
+      end select
+      scalar = (maxval(rng)-minval(rng))/(highx-lowx)
+      offset = minval(rng)-scalar*lowx
+      call set_scalar(this,scalar)
+      call set_offset(this,offset)
+      end subroutine
   
       end module

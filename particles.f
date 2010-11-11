@@ -120,11 +120,9 @@ c     .............................................................
         module procedure get_prop_system
       end interface
       public :: get_property
-      
       interface get_metadata
-        module procedure get_metadata_par
-        module procedure get_metadata_par_ens
-        module procedure get_metadata_system
+        module procedure get_metadata_single
+        module procedure get_metadata_vec
       end interface
       public :: get_metadata
       
@@ -549,44 +547,30 @@ c     ---------------------------------------------------
       
       
 
-      subroutine get_prop_particle_single(par,var,status)
+      subroutine get_prop_particle_single(par,var,bucket,status)
 c     ---------------------------------------------------
       type(particle),intent(in)   :: par
-      type(output_var), intent(inout) :: var
+      type(variable), intent(inout) :: var
+      type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
 c     ---------------------------------------------------
       !Search for the variable systematically, stopping at first instance
-      call get_property(par%space,var,status)
+      call get_property(par%space,var,bucket,status)
       if(status==0) return
-      call get_property(par%state,var,status)
+      call get_property(par%state,var,bucket,status)
       if(status==0) return
-      call get_property(var,status)
+      call get_prop_system(var,bucket,status)
       status=1 !Cannot find parameter
       end subroutine
       
-      subroutine get_metadata_par(par,var,status)
-c     ---------------------------------------------------
-      type(particle),intent(in)   :: par
-      type(output_var), intent(inout) :: var
-      integer, intent(out) :: status
-c     ---------------------------------------------------
-      !Search for the variable systematically, stopping at first instance
-      call get_metadata(par%space,var,status)
-      if(status==0) return
-      call get_metadata(par%state,var,status)
-      if(status==0) return
-      call get_metadata(var, status)
-      end subroutine
-      
-      
-      subroutine get_prop_par_ens_single(par_ens,var,status)
+      subroutine get_prop_par_ens_single(par_ens,var,bucket,status)
 c     ---------------------------------------------------
       type(particle_ensemble),intent(in)   :: par_ens
-      type(output_var), intent(inout) :: var
+      type(variable), intent(in) :: var
+      type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
 c     ------- locals ---------
       integer :: last
-      type(polytype) :: bucket
 c     ---------------------------------------------------
       status=0  !Variable is present
       select case (get_name(var))
@@ -596,36 +580,15 @@ c     ---------------------------------------------------
       case default
         status=1   !Cannont find variable name
       end select
-      ! Put the data into the variable if found
-      if(status==0) call store(var,bucket)
-      end subroutine
-      
-      subroutine get_metadata_par_ens(par_ens,var,status)
-c     ---------------------------------------------------
-      type(particle_ensemble),intent(in) :: par_ens
-      type(output_var), intent(inout) :: var
-      integer, intent(out) :: status
-      type(metadata) :: meta
-c     ---------------------------------------------------
-      status=0 !Defaults to variable found
-      select case (get_name(var))
-      case ("npars")
-        call construct(meta,"npars","Number of particles",
-     +         units="particles",fmt="(i6)",type="int")
-      case default
-        status=1  !Cannot find variable
-      end select
-      ! Put the metadata into the variable if found
-      if(status==0) call store(var, meta)
       end subroutine
 
 
-      subroutine get_prop_system(var,status)
+      subroutine get_prop_system(var,bucket,status)
 c------------------------------------------------------------  
-      type(output_var), intent(inout) :: var
+      type(variable), intent(inout) :: var
+      type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
 c----------locals-------
-      type(polytype):: bucket
       type(clock), pointer:: clock
       integer :: year, month, day, secs, jday
 c------------------------------------------------------------  
@@ -654,42 +617,90 @@ c------------------------------------------------------------
       case default
         status=1   !Cannot find variable name
       end select
-      ! Put the metadata into the variable if found
-      if(status==0) call store(var,bucket)
       end subroutine
 
 
-      subroutine get_metadata_system(var,status)
-c------------------------------------------------------------  
-      type(output_var), intent(inout) :: var
+      subroutine get_metadata_single(var_name,var,status)
+c     ---------------------------------------------------
+      character(*), intent(in) :: var_name
+      type(variable), intent(out) :: var
       integer, intent(out) :: status
-      type(metadata) :: meta
+c     ---------------------------------------------------
+      !Search for the variable systematically, stopping at first instance
+      call get_metadata_space(var_name,var,status)
+      if(status==0) return
+      call get_metadata_state(var_name,var,status)
+      if(status==0) return
+      call get_metadata_system(var_name,var, status)
+      if(status==0) return
+      call get_metadata_par_ens(var_name,var,status)
+      end subroutine
+      
+
+      subroutine get_metadata_vec(var_names,vars)
+c     ---------------------------------------------------
+      character(*), intent(in) :: var_names(:)
+      type(variable), intent(out) :: vars(size(var_names))
+      integer i, ok
+c     ---------------------------------------------------
+      !Get metadata and insert into variable slot
+      do i=1,size(var_names)
+          !Get the metadata
+          call get_metadata(var_names(i),vars(i),ok)
+          if(ok/=0) then
+            write(*,*) "ERROR: Variable "//trim(var_names(i))// 
+     +       " is not available."
+            stop
+          endif
+      enddo
+      end subroutine
+
+      subroutine get_metadata_system(var_name,var,status)
+c------------------------------------------------------------  
+      type(variable), intent(inout) :: var
+      character(*), intent(in) :: var_name
+      integer, intent(out) :: status
 c------------------------------------------------------------  
       status=0 !Defaults to variable found
-      select case (get_name(var))
+      select case (var_name)
       case ("POSIX")
-        call construct(meta,"POSIX","POSIX (UNIX) time",
+        call construct(var,"POSIX","POSIX (UNIX) time",
      +    "seconds since 1 Jan 1970, 00:00:00","(i10)","int")
       case ("datetime")
-        call construct(meta,"datetime","Date and Time",
+        call construct(var,"datetime","Date and Time",
      +             units="YYYY.MM.DD__HH.mm.ss",fmt="(a20)",type="str")
       case ("year")
-        call construct(meta,"year","Year","CE","(i4)","int")
+        call construct(var,"year","Year","CE","(i4)","int")
       case ("month")
-        call construct(meta,"month","Month","-","(i2)","int")
+        call construct(var,"month","Month","-","(i2)","int")
       case ("day")
-        call construct(meta,"day","Day","-","(i2)","int")
+        call construct(var,"day","Day","-","(i2)","int")
       case ("jday")
-        call construct(meta,"jday","Julian day","days since 1 Jan (=1)",
+        call construct(var,"jday","Julian day","days since 1 Jan (=1)",
      +                   fmt="(i3)",type="int")
       case ("secs")
-        call construct(meta,"secs","Seconds",
+        call construct(var,"secs","Seconds",
      +       "seconds since midnight","(i5)","int")
       case default
         status=1  !Cannot find variable
       end select
-      ! Put the metadata into the variable if found
-      if(status==0) call store(var, meta)
       end subroutine get_metadata_system
+
+      
+      subroutine get_metadata_par_ens(var_name,var,status)
+c     ---------------------------------------------------
+      character(*), intent(in) :: var_name
+      type(variable), intent(out) :: var
+      integer, intent(out) :: status
+c     ---------------------------------------------------
+      status=0 !Defaults to variable found
+      select case (var_name)
+      case ("npars")
+        call construct(var,"npars","Number of particles",
+     +         units="particles",fmt="(i6)",type="int")
+      case default
+        status=1  !Cannot find variable
+      end select
+      end subroutine
 
       end module

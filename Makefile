@@ -198,8 +198,14 @@ variables:
 	@echo "FCFLAGS  :" $(FCFLAGS)
 	@echo "FPPFLAGS :" $(FPPFLAGS)
 	@echo "############Linker options#############"
-	@echo "LINKFLAGS:" $(LINKFLAGS)
-	@echo "LINKLIBS :" $(LINKLIBS)
+	@echo "LINKFLAGS_PHYSICAL  : " $(LINKFLAGS_PHYSICAL)
+	@echo "LINKFLAGS_STATE     : " $(LINKFLAGS_STATE)
+	@echo "LINKFLAGS_TASK      : " $(LINKFLAGS_TASK)
+	@echo "LINKFLAGS           : " $(LINKFLAGS)
+	@echo "LINKLIBS_PHYSICAL   : " $(LINKLIBS_PHYSICAL)
+	@echo "LINKLIBS_STATE      : " $(LINKLIBS_STATE)
+	@echo "LINKLIBS_TASK       : " $(LINKLIBS_TASK)
+	@echo "LINKLIBS            : " $(LINKLIBS)
 	@echo "############Config dirs################"
 	@echo "PHYSICAL_FIELDS_DIR :"  $(PHYSICAL_FIELDS_DIR)
 	@echo "PARTICLE_STATE_DIR  :"  $(PARTICLE_STATE_DIR)

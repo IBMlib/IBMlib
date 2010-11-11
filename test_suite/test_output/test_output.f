@@ -1,9 +1,15 @@
       program tracker
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c     Standard particle tracking simulation
+c     Test_output
 c
-c     make tracker
-c     tracker task_providers/basic_simulation_test_input.txt
+c     Demonstrates how the output modules can be used to write the
+c     results of a simulation. Two output files are generated
+c     1. "release_data.txt" - An ASCII file containing the points in
+c        time and space where each particle was released. This file is
+c        generated using the "ascii_writer" module
+c     2. "trajectories.nc" - A NetCDF file containing the lat and lot
+c        of each particle at each time step. This file is generated
+c        using the "netcdf_writer" module
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
       use time_tools
@@ -13,30 +19,22 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use netcdf_writer
       use ascii_writer
       use output
-      use netcdf
     
       implicit none
 c     ------------ declarations ------------      
-      integer      :: idum4(4)
       type(clock),target  :: start_time, end_time
       type(clock),pointer :: current_time
       type(particle_ensemble)     :: par_ens
       type(emission_box), pointer :: emitboxes(:)
-      integer :: year, month, day, julday,last
-      integer :: i,ix,iy,iz,dum(79),ilast,iunit
-      integer :: idum(4), timeout, istep, old_last
-      real    :: time_step, now,xyz(3)
-      real    :: amp,xcen,ycen,vdiff,hdiff
-      character*256 :: filename
-
       type(ascii_output_file) :: birth_certs
-      type(output_var),target,allocatable :: out_vars(:)
-      type(netcdf_output_file) :: ncdf_trajs
+      type(netcdf_output_file) :: trajs
+      character*999 , allocatable :: out_vars(:)
+      type(variable), allocatable :: vars(:)
+      integer :: i, idum4(4), istep, last,old_last
+      real    :: time_step
 
-      type(timer) :: start_timer
 c     ------------   show time starts  ------------
       call init_run_context()
-
 
 c     ------------   set clocks  ------------   
       call read_control_data(simulation_file, "start_time", idum4)
@@ -48,31 +46,27 @@ c     ------------   set clocks  ------------
 
 c     ------------   init system  ------------   
       call init_physical_fields(start_time)
+      current_time => get_master_clock()
       call init_particles()
       call update_physical_fields()  ! need topology to verify emission boxes
-
       call setup_ensemble_from_file(par_ens, "emitbox", emitboxes)
       
 c     ------------   setup output files  ------------   
-      allocate(out_vars(7))   
-      call construct(out_vars(1),"lat",var_type=NF90_SHORT,
-     +      range=(/114.0,115.0/))
-      call construct(out_vars(2),"lon",var_type=NF90_SHORT,  !Override default formatting
-     +      range=(/0.0,2.0/))
-      call construct(out_vars(3),"POSIX",var_type=NF90_INT)
-      call construct(out_vars(4),"lat",fmt="(f7.4)")   !Override default formatting
-      call construct(out_vars(5),"lon",fmt="(f7.4)")  !Override default formatting
-      call construct(out_vars(6),"tracerID",var_type=NF90_INT)
-      call construct(out_vars(7),"depth")
-      birth_certs = ascii_output_file("bcs.txt",
-     +    out_vars(3:7),char(9))   !Birth certificates
-      ncdf_trajs = netcdf_output_file("trajs.nc",out_vars(3),
-     +     get_ensemble_size(par_ens),
-     +    out_vars(6),out_vars(1:2)) !Netcdf trajectory
-      call init_output(birth_certs)
-      call init_output(ncdf_trajs)
+      allocate(out_vars(5))
+      allocate(vars(size(out_vars)))
+      out_vars(1)  = "tracerID"
+      out_vars(2)  = "POSIX"
+      out_vars(3:4)=(/"lat","lon"/)
+      out_vars(5)  = "depth"
+      call get_metadata(out_vars,vars)
+      call init_output(birth_certs,"release_data.txt",",",vars)
+      call set_type(vars(3:4),"NF90_SHORT")
+      call set_type(vars(5),"NF90_FLOAT")
+      call set_var_range(vars(3),(/45.0,65.0/))
+      call set_var_range(vars(4),(/-15.0,15.0/))
+      call init_output(trajs,"trajectories.nc",
+     +       vars(1),vars(2),vars(3:5),get_ensemble_size(par_ens))
 
-      current_time => get_master_clock()
 c     =====================  main time loop =====================
       istep   = 0
       do while (compare_clocks(current_time, end_time) <= 0)
@@ -83,28 +77,20 @@ c        -------- release new tracers and record new tracers  --------
          call generate_particles(par_ens, emitboxes, time_step)
          call get_last_particle_number(par_ens, last) 
          if(last/=old_last) then !new tracers released!
-            write(*,*) "Number of particles = ", last-old_last     
-            call tic(start_timer)
-!               call write_particles(birth_certs,par_ens,
-!     +             (/(I,I=old_last+1,last)/))           !Implied do loop from old_last+1 to last
-            call toc(start_timer,"Write particles")
+            call write_particles(birth_certs,par_ens,
+     +             (/(I,I=old_last+1,last)/))           !Implied do loop from old_last+1 to last
          endif
 c        -------- propagate tracers  --------
          call update_particles(par_ens, time_step)
-c        -------- write tracer state -------- 
-         call tic(start_timer)
-         call write_frame(ncdf_trajs,par_ens)  
-         call toc(start_timer,"Write frame")
+c        -------- write trajectories -------- 
+         call write_frame(trajs,par_ens)  
 c        -------- loop control       --------
          call add_seconds_to_clock(current_time, nint(time_step))
          istep = istep + 1
-       
       enddo
  372  format(25("*"), " main time loop step ",i5.5, " ", 25("*"))
 
-
 c     ----------------- close down ---------------------------
-     
       call close_physical_fields()
       call close_particles()
 

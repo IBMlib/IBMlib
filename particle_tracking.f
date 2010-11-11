@@ -136,11 +136,7 @@ c.... Define public operator set  ..............................
         module procedure get_prop_space
       end interface
       public :: get_property
-      
-      interface get_metadata
-        module procedure get_metadata_space
-      end interface
-      public :: get_metadata
+      public :: get_metadata_space
 
       public :: delete_spatial_attributes
       public :: set_tracer_mobility
@@ -1311,12 +1307,12 @@ c     ------------------------------------------
       end subroutine 
 
       
-      subroutine get_prop_space(space,var,status)
+      subroutine get_prop_space(space,var,bucket,status)
 c------------------------------------------------------------  
       type(spatial_attributes),intent(in) :: space
-      type(output_var), intent(inout) :: var
+      type(variable), intent(inout) :: var
+      type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
-      type(polytype):: bucket
 c------------------------------------------------------------  
       status=0  !Variable is present
       select case (get_name(var))
@@ -1351,60 +1347,55 @@ c------------------------------------------------------------
       case default
         status=1   !Cannont find variable name
       end select
-      !Assign data to variable if it is present
-      if(status==0) call store(var,bucket)
       end subroutine
 
-      subroutine get_metadata_space(space,var,status)
+      subroutine get_metadata_space(var_name,var,status)
 c------------------------------------------------------------  
-      type(spatial_attributes),intent(in) :: space
-      type(output_var), intent(inout) :: var
+      character(*), intent(in) :: var_name
+      type(variable), intent(out) :: var
       integer, intent(out) :: status
-      type(metadata):: meta
 c------------------------------------------------------------  
       status=0 !Defaults to variable found
-      select case (get_name(var))
-      case ("lon")
-        call construct(meta,"lat","Latitude","deg N","(f6.2)","real")
+      select case (var_name)
       case ("lat")
-        call construct(meta,"lon","Longitude","deg E","(f6.2)","real")
+        call construct(var,"lat","Latitude","deg N","(f6.2)","real")
+      case ("lon")
+        call construct(var,"lon","Longitude","deg E","(f6.2)","real")
       case ("depth")
-        call construct(meta,"depth","Depth positive downwards",
+        call construct(var,"depth","Depth positive downwards",
      +                  units="m",fmt="(f6.2)",type="real")
       case ("mobx")
-        call construct(meta,"mobx","Meridonal mobility",
+        call construct(var,"mobx","Meridonal mobility",
      +                  units="T/F",fmt="(l1)",type="log")
       case ("moby")
-        call construct(meta,"moby","Zonal mobility",
+        call construct(var,"moby","Zonal mobility",
      +                  units="T/F",fmt="(l1)",type="log")
       case ("mobz")
-        call construct(meta,"mobz","Vertical mobility",
+        call construct(var,"mobz","Vertical mobility",
      +                  units="T/F",fmt="(l1)",type="log")
       case ("ashore")
-        call construct(meta,"ashore","Is particle ashore?",
+        call construct(var,"ashore","Is particle ashore?",
      +                  units="T/F",fmt="(l1)",type="log")
       case("outofdomain")
-        call construct(meta,"outofdomain","Is particle out of "
+        call construct(var,"outofdomain","Is particle out of "
      +       // "the domain?", units="T/F",fmt="(l1)",type="log")
       case ("atbottom")
-        call construct(meta,"atbottom","Is the particle at bottom?",
+        call construct(var,"atbottom","Is the particle at bottom?",
      +                  units="T/F",fmt="(l1)",type="log")
       case ("atsurface")
-        call construct(meta,"atsurface","Is particle at the "
+        call construct(var,"atsurface","Is particle at the "
      +       //"surface?",units="T/F",fmt="(l1)",type="log")
       case ("shoreBC")
-        call construct(meta,"shoreBC","shoreBC","-","(i2)","int")
+        call construct(var,"shoreBC","shoreBC","-","(i2)","int")
       case ("domainBC")
-        call construct(meta,"domainBC","domainBC","-","(i2)","int")
+        call construct(var,"domainBC","domainBC","-","(i2)","int")
       case ("bottomBC")
-        call construct(meta,"bottomBC","bottomBC","-","(i2)","int")
+        call construct(var,"bottomBC","bottomBC","-","(i2)","int")
       case ("surfaceBC")
-        call construct(meta,"surfaceBC","surfaceBC","-","(i2)","int")
+        call construct(var,"surfaceBC","surfaceBC","-","(i2)","int")
       case default
         status=1  !Cannot find variable
       end select
-      !Assign data to variable if it is present
-      if(status==0) call store(var,meta)
       end subroutine
       
       

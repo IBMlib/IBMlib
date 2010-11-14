@@ -72,7 +72,8 @@ c     --------
 c     ---------------------------------------------------------------
       integer :: start(256), nwords
 c     ---------------------------------------------------------------
-      write(*,*) "init_particle_state():"
+c     Display version
+      write (*,*) "Herring biology provider : $Rev$"
       tracerID = 1  ! set counter for next particle instance
     
 c --- Read growth parameters 

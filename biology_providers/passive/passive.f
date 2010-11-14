@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Passive particle biology provider 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Particle_state interface of elementary passive tracer
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module particle_state
@@ -48,6 +55,8 @@ c     --------
 c     --------
      
       subroutine init_particle_state()  ! module operator
+c     Display version
+      write (*,*) "Passive particle biology provider : $Rev$"
       tracerID=1
       end subroutine 
 

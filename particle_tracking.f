@@ -34,6 +34,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
       use time_tools
       use constants
+      use geometry
       use random_numbers
       use output    !Provides data handling classes
       
@@ -1291,21 +1292,6 @@ c-------------------------------------------------------------
       xy_ne = emit_box%NE
       END Subroutine get_xyboxes_emissions
       
-      subroutine dcart2dxy(xy, r2)
-c     ------------------------------------------ 
-c     Convert inplace a Cartesian displacement 
-c     vector r2 (meters) at xy  to a displacement 
-c     vector in (longitude,latitude,depth)
-c     ------------------------------------------ 
-      real, intent(in)     :: xy(:)  !dimension 2+
-      real, intent(inout)  :: r2(:)  !dimension 2+
-      real                 :: jac(2)
-c     ------------------------------------------ 
-      jac(1) = earth_radius*cos(xy(2)*deg2rad)*deg2rad
-      jac(2) = earth_radius*deg2rad
-      r2(1:2) = r2(1:2)/jac(1:2) !element-by-element
-      end subroutine 
-
       
       subroutine get_prop_space(space,var,bucket,status)
 c------------------------------------------------------------  

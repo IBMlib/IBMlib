@@ -104,9 +104,9 @@ include  config.mk
 
 #Define Objects and their grouping
 EXT_LIBS     = libtime/libtime77.a
-BASELIBS     = grid_interpolations.o  runtime_tools.o  geometry.o  string_tools.o 
+BASELIBS     = grid_interpolations.o  runtime_tools.o  string_tools.o 
 BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
-               run_context.mod  output.mod
+               run_context.mod  output.mod  geometry.mod
 BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
 OUTPUT_ARCS  = $(patsubst %.mod,%.a,$(OUTPUT_MODS))
 IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\

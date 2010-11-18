@@ -1,3 +1,28 @@
+c     ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Geometry module
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
+c     Provides basic geography functions and transformations
+c     ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+      module geometry
+      use constants
+
+      implicit none
+      private
+
+      public ::  cross_2Dline_segments
+      public ::  dcart2dxy
+      public ::  get_horizontal_distance
+
+c     ============================================================
+                          contains
+c     ============================================================
+
       subroutine cross_2Dline_segments(x0,x1,y0,y1,s,cross)
 c     ----------------------------------------------------------
 c     Calculate whether the line from x0 to x1 crosses
@@ -66,14 +91,50 @@ c     ----------------------------------------------------------
       end subroutine cross_2Dline_segments
 
 
-c$$$      program jj
-c$$$      implicit none
-c$$$      real     :: x0(2) = (/0.,  0./)
-c$$$      real     :: x1(2) = (/1.,  1./3./)
-c$$$      real     :: y0(2) = (/0.,  1./)
-c$$$      real     :: y1(2) = (/0.5, 0./) 
-c$$$      real     :: s      ! correct answer = 3/7
-c$$$      logical  :: cross
-c$$$      call cross_2dline_segments(x0,x1,y0,y1,s,cross)
-c$$$      write(*,*) cross, s 
-c$$$      end program
+      subroutine dcart2dxy(xy, r2)
+c     ------------------------------------------ 
+c     Convert inplace a Cartesian displacement 
+c     vector r2 (meters) at xy  to a displacement 
+c     vector in (longitude,latitude,depth)
+c     ------------------------------------------ 
+      real, intent(in)     :: xy(:)  !dimension 2+
+      real, intent(inout)  :: r2(:)  !dimension 2+
+      real                 :: jac(2)
+c     ------------------------------------------ 
+      jac(1) = earth_radius*cos(xy(2)*deg2rad)*deg2rad
+      jac(2) = earth_radius*deg2rad
+      r2(1:2) = r2(1:2)/jac(1:2) !element-by-element
+      end subroutine 
+
+
+      subroutine get_horizontal_distance(geo1,geo2,d)
+c-------------------------------------------------------
+c     Calculate distance between two points on the surface 
+c     of earth using the great circle approximation.
+c     Input is lon/lat positions (possibly depth, but is not required)
+c     Return value, d, is distance in metres
+c     Earths radius used here is from constants.f
+c     Note that as the distances involved are relatively
+c     small, and therefore only a fraction of a radian of
+c     the earths circumference, a high degree of accuracy is
+c     required for dealing with the cosines. Hence, the
+c     variables used here are real(16), as opposed to the
+c     bog standard real(4) variables
+c-------------------------------------------------------
+      real, intent(in)     :: geo1(:),geo2(:)
+      real, intent(out)    :: d
+      real(16)             :: cosdR1,cosdR2,lat1,lat2,lon1,lon2
+c     --------------------------------------------------
+c     Extract values and convert to radians
+      lon1=geo1(1)*deg2Rad
+      lat1=geo1(2)*deg2Rad
+      lon2=geo2(1)*deg2Rad
+      lat2=geo2(2)*deg2Rad
+c     Calculate distance      
+      cosdR1 =sin(lat1)*sin(lat2)
+      cosdR2 =cos(lat1)*cos(lat2)*cos(lon1-lon2)
+      d=earth_radius*acos(cosdR1+cosdR2)
+      end subroutine get_horizontal_distance
+
+
+      end module

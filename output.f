@@ -1,7 +1,16 @@
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Ouput module
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     TODO: At the moment, all classes are publicly visible. Scoping
 c           should really be private. However, this is a major job
 c           to change, and requires a possible rethinking of the
 c           structure. Deferred to later dates
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       module output
       implicit none

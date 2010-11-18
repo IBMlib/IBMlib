@@ -1,11 +1,17 @@
-      module constants
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
 c     Physical/mathematical constants
-c       The Earth's equatorial radius =  6378135.0d0 m 
-c       The Earth's polar radius       = 6356750.0d0 m
-c       The Earth's authalic ("equal area") mean radius                 = 6371005.0761230d0 m 
-c       The Earth's volumic radius (radius of a sphere of equal volume) = 6370998.685023d0 m 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
+c     The Earth's equatorial radius =  6378135.0d0 m 
+c     The Earth's polar radius       = 6356750.0d0 m
+c     The Earth's authalic ("equal area") mean radius                 = 6371005.0761230d0 m 
+c     The Earth's volumic radius (radius of a sphere of equal volume) = 6370998.685023d0 m 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      module constants
       implicit none
       private                     ! default visibility
 

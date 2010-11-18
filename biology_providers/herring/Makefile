@@ -10,7 +10,7 @@ particle_state.mod particle_state.o: herring.f
 
 
 
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
+include $(COMMON_RULES)  # shared information between makefiles
 
 
 clean: FORCE

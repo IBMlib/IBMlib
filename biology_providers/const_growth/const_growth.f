@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Constant Growth 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Empty public interface of particle_state
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module particle_state
@@ -29,6 +36,8 @@ c     -----------------------------------------------
       public :: delete_state_attributes 
       public :: write_state_attributes
 
+      public :: get_particle_version
+
 
 c     -------------------- module data --------------------  
       real, parameter :: growth_speed = 1./86400. ! mm/sec
@@ -42,9 +51,14 @@ c     --------
          
  
       subroutine init_particle_state()  ! module operator
+      write (*,*) trim(get_particle_version())
       end subroutine 
 
-
+      character*100 function get_particle_version()  
+      get_particle_version = "Constant growth particle biology" //
+     +     " provider : $Rev$"
+      end function
+      
       subroutine close_particle_state() ! module operator
       end subroutine 
       

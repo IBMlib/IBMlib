@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     SUNFISH pbi 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     PBI interface for SUNFISH cmod + NPZD data
 c
 c     Coast line reconstruction: this module features
@@ -16,6 +23,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
       use time_tools           ! import clock type
       use constants
+      use geometry
       use run_context, only: simulation_file
       use input_parser
       use netcdf   ! use site installation
@@ -57,6 +65,7 @@ c      public :: interpolate_wind    ! currently unused
       public :: d_cart2d_xy
       public :: d_xy2d_cart 
       public :: add_finite_step
+      public :: get_pbi_version
 
 c     -------------------- module data --------------------  
       
@@ -130,6 +139,7 @@ c     ------------------------------------------
       type(clock), intent(in),optional :: time
 c     ------------------------------------------
       if (present(time)) master_clock = time
+      write(*,*) trim(get_pbi_version()) 
 
       call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
       write(*,*) "init_physical_fields: hydrographic database path =", 
@@ -144,6 +154,9 @@ c.....Set reference offset for hydrographic data: 1900-01-01 00:00:00.
       end subroutine init_physical_fields
 
  
+      character*100 function get_pbi_version()  
+      get_pbi_version =  "SUNFISH pbi version: $Rev$"
+      end function
 
    
 
@@ -1137,21 +1150,21 @@ c     ------------------------------------------
 
 
 
-      subroutine get_horizontal_distance(xy1, xy2, r)
-c     ------------------------------------------ 
-      real, intent(in)     :: xy1(:), xy2(:)
-      real, intent(out)    :: r
-      real :: costheta, l1,l2,p1,p2, angle
-c     ------------------------------------------ 
-      p1 = xy1(1)*deg2rad
-      p2 = xy2(1)*deg2rad
-      l1 = xy1(2)*deg2rad
-      l2 = xy2(2)*deg2rad
-      costheta = cos(p1)*cos(p2) + sin(p1)*sin(p2)
-      costheta = costheta*cos(l1)*cos(l2) + sin(l1)*sin(l2)
-      angle    = acos(costheta) ! 0 < angle < pi
-      r        = angle*earth_radius
-      end subroutine 
+c      subroutine get_horizontal_distance(xy1, xy2, r)
+cc     ------------------------------------------ 
+c      real, intent(in)     :: xy1(:), xy2(:)
+c      real, intent(out)    :: r
+c      real :: costheta, l1,l2,p1,p2, angle
+cc     ------------------------------------------ 
+c      p1 = xy1(1)*deg2rad
+c      p2 = xy2(1)*deg2rad
+c      l1 = xy1(2)*deg2rad
+c      l2 = xy2(2)*deg2rad
+c      costheta = cos(p1)*cos(p2) + sin(p1)*sin(p2)
+c      costheta = costheta*cos(l1)*cos(l2) + sin(l1)*sin(l2)
+c      angle    = acos(costheta) ! 0 < angle < pi
+c      r        = angle*earth_radius
+c      end subroutine 
 
 
  

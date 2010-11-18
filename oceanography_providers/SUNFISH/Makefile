@@ -11,7 +11,7 @@ physical_fields.mod physical_fields.o: sunfish_pbi.f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o
 
 
-include $(IBMLIB_DIR)/common.mk   # shared information between makefiles
+include $(COMMON_FILES)   # shared information between makefiles
 FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 
 clean: FORCE

@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Particles tracking
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     TODO: update doc
 c     old vars clean up
 c     spatial_attributes access/setting

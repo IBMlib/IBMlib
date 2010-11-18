@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Empty physical biology interface 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Empty public interface of physical_fields
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields

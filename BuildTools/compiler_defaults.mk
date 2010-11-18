@@ -1,8 +1,15 @@
-# ==========================================
+#ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+# ---------------------------------------------------
+# Intel Fortran (ifort) Compiler default flags 
+# ---------------------------------------------------
+# $Rev$
+# $LastChangedDate$
+# $LastChangedBy$ 
+#
 # compiler settings   
 # export directive faciliates that variables are passed to sub-make
 # (unless locally overwritten)
-# ==========================================
+#ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 # compiler settings   
 export FC        = ifort

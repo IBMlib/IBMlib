@@ -1,7 +1,13 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Sandeel simple biology provider 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Preliminary port of sandeel biology module
 c     to Phoenix version of IBMlib
-c
 c     
 c     NOW: deactivate backtracking (dt<0)
 c          removed habitat part, because it was grid specific to cmod 
@@ -48,6 +54,7 @@ c     -----------------------------------------------
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+      public :: get_particle_version
 
 
 
@@ -102,7 +109,7 @@ c     ===============================================================
       subroutine init_particle_state()  ! module operator
 c     ---------------------------------------------------------------
 c     ---------------------------------------------------------------
-      write(*,*) "init_particle_state():"
+      write (*,*) trim(get_particle_version())
       eggID   = 1    ! module stamp counters
       larvID  = 1    ! module stamp counters
       juvID   = 1    ! module stamp counters
@@ -136,6 +143,10 @@ c --- Read juvenile transition parameters ---
 
       end subroutine 
 
+      character*100 function get_particle_version()  
+      get_particle_version = "Sandeel simple particle biology" //
+     +     " provider : $Rev$"
+      end function
 
 
       subroutine close_particle_state() ! module operator

@@ -48,6 +48,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: is_land
       public :: horizontal_range_check
       public :: coast_line_intersection
+      public :: get_pbi_version
 
       interface  read_control_robust
         module procedure read_control_robust_vec
@@ -80,8 +81,7 @@ c     ---------------------------------------------------
 c     ---------------------------------------------------
 
 c.....Display version numbers for reference
-      write(*,*) "Linear Flow Fields Oceanography Provider: " //
-     &   "$Rev$"
+      write(*,*) trim(get_pbi_version()) 
      
 c.....Import configuration from control file, or default if not specified
       call read_control_robust(simulation_file,"surface_vel",
@@ -106,6 +106,11 @@ c.....Report results
 c.....Set clock if present     
       if (present(time)) master_clock = time
       end subroutine 
+
+      character*100 function get_pbi_version()  
+      get_pbi_version =  "Linear Flow Fields Oceanography Provider: " //
+     &   "$Rev$"
+      end function
 
       subroutine close_physical_fields()
       end subroutine 

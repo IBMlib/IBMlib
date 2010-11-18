@@ -1,13 +1,13 @@
-
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c
 c     ---------------------------------------------------
-c     Provide utilities for input of limited control data
+c     Input parser
 c     ---------------------------------------------------
-c
-c     Version stamp  :  24 May 2007 11:43:55
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c     Template file  :  /home/asbjorn/HAMSOM/InputParser/input_parser_template.py
 c
+c     Provide utilities for input of limited control data
 c     Implements a simple "name = value" input format like:
 c    
 c     ! --- Simulation parameters for ... 

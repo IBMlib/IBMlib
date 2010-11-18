@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Empty biology provider 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Empty public interface of particle_state
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module particle_state
@@ -25,6 +32,9 @@ c     -----------------------------------------------
 c     ----------------------------------------------------
       end subroutine 
 
+
+      character*100 function get_particle_version()  
+      end function
 
       subroutine close_particle_state() ! module operator
 c     ----------------------------------------------------

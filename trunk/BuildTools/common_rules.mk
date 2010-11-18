@@ -1,3 +1,13 @@
+#ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+#     ---------------------------------------------------
+#     Makefiles common rules
+#     ---------------------------------------------------
+#     $Rev$
+#     $LastChangedDate$
+#     $LastChangedBy$ 
+#
+#     Common rules shared by Makefiles
+#ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 # ============== implicit rules ==============
 %.o : %.f

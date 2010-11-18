@@ -1,4 +1,10 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Runtime tools 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c     
 c     Collection of misc run time utilities
 c     organized as standard subroutine/function aggregation

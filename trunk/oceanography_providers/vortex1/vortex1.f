@@ -1,4 +1,11 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Vortex1 pbi 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Stationary gyre at (lon,lat) = (lonvc,latvc) with 
 c     tangential current = cspeed m/s
 c
@@ -38,6 +45,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: is_land
       public :: horizontal_range_check
       public :: coast_line_intersection
+      public :: get_pbi_version
 
 c     -------------------- module data --------------------  
 c
@@ -82,7 +90,12 @@ c     ------------------------------------------
       subroutine init_physical_fields(time)
       type(clock), intent(in),optional :: time 
       if (present(time)) master_clock = time
+      write(*,*) trim(get_pbi_version()) 
       end subroutine 
+c     ------------------------------------------ 
+      character*100 function get_pbi_version()  
+      get_pbi_version =  "Vortex 1 pbi version: $Rev$"
+      end function
 c     ------------------------------------------ 
       subroutine close_physical_fields()
       end subroutine

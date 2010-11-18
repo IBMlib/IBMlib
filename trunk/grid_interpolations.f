@@ -1,8 +1,17 @@
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Grid interpolations 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     ========= TODO extend with "deriv" argument
 c                    0(value), 3(zgrad), 12(horiz grad), 123(full 3Dgrad)
 c                    upgrade to module and have an overloaded interface, 
 c                    accepting scalar/vector output request
 c                    currently, below, only scalar output enabled
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 
       subroutine interp_2Dbox_data(sx,sy,vc,deriv,result)

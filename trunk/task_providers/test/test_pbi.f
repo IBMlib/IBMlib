@@ -1,10 +1,15 @@
-      program ibmrun
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
 c     Test template for physical fields interface
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 c     make ibmrun
 c     ibmrun task_providers/test/testpar
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      program ibmrun
       use input_parser
       use time_tools
       use run_context

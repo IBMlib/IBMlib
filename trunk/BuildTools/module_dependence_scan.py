@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 # -----------------------------------------------------------------
+#  Module dependencies scan 
+# ---------------------------------------------
+# $Rev$
+# $LastChangedDate$
+# $LastChangedBy$ 
+#
 # Quick'n'dirty scanning of module "use" associations of Fortran90
 #
 # Usage:

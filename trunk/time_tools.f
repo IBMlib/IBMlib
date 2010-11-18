@@ -1,12 +1,18 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c                 Time tool module                      c
-c                                                       c
-c                                                       c
-c     recompiled asbjorn(Aug2005)                       c
-c     default scope public                              c
-c                                                       c
-c     test compilation mode: (libtime must be compiled) c
-c         ifort -e90 time_tools.f  -Llibtime -ltime77   c                       
+c     ---------------------------------------------------
+c                 Time tool module                      
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
+c                                                      
+c                                                     
+c     recompiled asbjorn(Aug2005)                    
+c     default scope public                          
+c                                                  
+c     test compilation mode: (libtime must be compiled) 
+c         ifort -e90 time_tools.f  -Llibtime -ltime77                          
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module time_tools
       implicit none

@@ -53,6 +53,7 @@ c     -----------------------------------------------
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+      public :: get_particle_version
 
 c     =================================================
 c     ========       module parameters         ========
@@ -73,7 +74,7 @@ c     ---------------------------------------------------------------
       integer :: start(256), nwords
 c     ---------------------------------------------------------------
 c     Display version
-      write (*,*) "Herring biology provider : $Rev$"
+      write (*,*) trim(get_particle_version())
       tracerID = 1  ! set counter for next particle instance
     
 c --- Read growth parameters 
@@ -108,6 +109,11 @@ c --- Read vertical behaviour scheme
             write(*,*) "DVM day/night target depths = ",vert_params
       endif
       end subroutine init_particle_state
+
+
+      character*100 function get_particle_version()  
+      get_particle_version = "Herring biology provider : $Rev$"
+      end function
 
 
       subroutine close_particle_state() ! module operator

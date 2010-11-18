@@ -1,3 +1,13 @@
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Random number generators
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
       module random_numbers
 
       contains

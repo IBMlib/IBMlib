@@ -1,4 +1,11 @@
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     Letcher template 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Preliminary skeleton for Letcher type larval bioenergetics
 c     with daily growth increments
 c
@@ -48,6 +55,7 @@ c.....All other subroutine than these below are private to the module
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+      public :: get_particle_version
 
 
 c     ==============================================================
@@ -70,16 +78,17 @@ c     ===============================================================
 c     ---------------------------------------------------------------
 c     This subroutine should initialize this module 
 c     ---------------------------------------------------------------
-      write(*,*) "init_particle_state():"
+      write (*,*) trim(get_particle_version())
       larv_counter = 1 ! ID for next larvae
 
 c     you may read parameters like this:
 c
 c     call read_control_data(ctrlfile,"my_parameter_name", value)
-    
-
       end subroutine 
 
+      character*100 function get_particle_version()  
+      get_particle_version = "Letcher biology provider : $Rev$"
+      end function
 
 
       subroutine close_particle_state() ! module operator

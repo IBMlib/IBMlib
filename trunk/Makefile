@@ -1,7 +1,11 @@
 ##################################################################
+#  ---------------------------------------------------
+#  Makefile
+#  ---------------------------------------------------
+#  $Rev$
+#  $LastChangedDate$
+#  $LastChangedBy$ 
 #
-#               Basic makefile for IBMlib (requires gmake) 
-#         
 #  This makefile builds IBMLIB_CORE and delegates out the update  
 #  of modules PHYSICAL_FIELDS/PARTICLE_STATE/TASK and makes to 
 #  final linking to all objects into the final executable EXECUTABLE.

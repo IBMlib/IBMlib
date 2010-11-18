@@ -1,4 +1,11 @@
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     String tools 
+c     ---------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
 c     Fortran standard functionality for string handling sucks 
 c     
 c     Collect a set of usefull string handling utilities

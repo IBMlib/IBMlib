@@ -44,6 +44,7 @@ c     -----------------------------------------------
       end interface
       public :: get_property
       public :: get_metadata_state
+      public :: get_particle_version
 
 c     -----------------
 c     Module parameters
@@ -56,9 +57,15 @@ c     --------
      
       subroutine init_particle_state()  ! module operator
 c     Display version
-      write (*,*) "Passive particle biology provider : $Rev$"
+      write (*,*) trim(get_particle_version())
       tracerID=1
       end subroutine 
+
+
+      character*100 function get_particle_version()  
+      get_particle_version = "Passive particle biology" //
+     +     " provider : $Rev$"
+      end function
 
 
       subroutine close_particle_state() ! module operator

@@ -1,4 +1,4 @@
-c     ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Geometry module
 c     ---------------------------------------------------
@@ -7,7 +7,7 @@ c     $LastChangedDate$
 c     $LastChangedBy$ 
 c
 c     Provides basic geography functions and transformations
-c     ccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       module geometry
       use constants

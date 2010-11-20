@@ -246,14 +246,15 @@ c.....vertical layer structure: levels -> layer_width0 + acc_width0
 c     set acc_width0, layer_width0 from levels
 c     last element acc_width0(nz+1) is total (dslm=0) max depth of grid
       layer_faces(1)    = 0.
-      acc_width0(:,:,1) = 0. ! sea surface
+      acc_width0(:,:,1) = 0. ! sea surface (DSLM=0)
       do iz=1,nz 
          layer_width(iz)      = 2.0*(levels(iz) - layer_faces(iz))
          layer_faces(iz+1)    = layer_faces(iz) + layer_width(iz)
          ccdepth0(:,:,iz)     = levels(iz)
          acc_width0(:,:,iz+1) = layer_faces(iz+1)
       enddo
-      
+      acc_width = acc_width0 ! allow certain grid functions to work on land
+      ccdepth   = ccdepth0   ! allow certain grid functions to work on land
 
       write(*,242) layer_width
       write(*,243) layer_faces
@@ -320,6 +321,7 @@ c            adjust grid bottum by stretching the last wet layer
      +                                  acc_width0(ix, iy,iz+1)) ! re-center mid point of bottom cell
 c
       enddo ! idx = 1, nwet
+
       write(*,288) nwet, nacc
       write(*,289) nbott
  288  format("read_grid_desc: read",i6," wet points - ",i6, 
@@ -421,7 +423,9 @@ c     the hour interval, i.e time = 912385h represents
 c     time interval ]912384h; 912385h] since 1900-01-01 00:00:00.
 c     [ref == mam@dmu.dk; ma 11-10-2010 12:13]
 c
-c     Tag YYYYMMDDHH refers to the beginning of that day
+c     In the SUNFISH set, data are bundled by months
+c     YYYYMM0100 refers to the beginning of the month corresponding to the data
+c     so that YYYYMM0100 is the tag corresponding to time YYYYMMDDHH
 c     ------------------------------------------
       type(clock), intent(in)                :: aclock
       character(len=tag_lenght), intent(out) :: tag
@@ -430,7 +434,7 @@ c     ------------------------------------------
       real             :: h1900_r
 c     ------------------------------------------
       call get_date_from_clock(aclock, year, month, day)
-      write(tag,455) year, month, day, 0   ! beginning of that day
+      write(tag,455) year, month, 1, 0   ! beginning of that month
       call get_period_length_hour(ref_clock, aclock, h1900_r)
       h1900 = nint(h1900_r + 0.5)     
  455  format(i4.4,3i2.2)
@@ -454,6 +458,7 @@ c
          call reset_frame_handler() ! resets cur_h1900+close old
          call open_data_files(tag)
          cur_tag = tag
+         needed = .true. ! force update if accidentally h1900 == cur_h1900
       endif
 c      
       if ((h1900 /= cur_h1900).or.needed) then
@@ -586,8 +591,10 @@ c     ------------------------------------------
       integer, intent(in) :: h1900 ! pick frame, corresponding to h1900 hours since ref_clock 
       integer :: iframe 
       integer :: start3D(4),start2D(3),varid
-      integer :: ix,iy,iz
+      integer :: ix,iy,iz,no_fill
       real    :: dz
+      logical :: not_ok
+      real    :: u_fill,v_fill,w_fill
 c     ------------------------------------------ 
 c
 c     1) locate frame to pick - time frame map h1900_map already loaded in open_data_files
@@ -603,27 +610,34 @@ c
          stop "load_data_frames: load error"
       endif
 c
-c     2) load iframe from set
+c     2) load iframe from set 
 c
 c     ---- 2D ----
       start2D(:) = 1
       start2D(3) = iframe
       call NetCDFcheck( nf90_inq_varid(ncid_dslm,     "z",   varid) )
       call NetCDFcheck( nf90_get_var(ncid_dslm, varid, dslm, start2D) )
+      
 c     ---- 3D ----
       start3D(:) = 1
       start3D(4) = iframe
       call NetCDFcheck( nf90_inq_varid(ncid_u,     "u", varid) )
-      call NetCDFcheck( nf90_get_var(ncid_u, varid, u, start3D))      
+      call NetCDFcheck( nf90_get_var(ncid_u, varid, u, start3D))   
+c      
       call NetCDFcheck( nf90_inq_varid(ncid_v,     "v", varid) )
       call NetCDFcheck( nf90_get_var(ncid_v, varid, v, start3D))
+c
       call NetCDFcheck( nf90_inq_varid(ncid_w,     "w", varid) )
       call NetCDFcheck( nf90_get_var(ncid_w, varid, w, start3D))
-      call NetCDFcheck( nf90_inq_varid(ncid_t,     "t", varid) )
-      call NetCDFcheck( nf90_get_var(ncid_t, varid, temp, start3D))
-      call NetCDFcheck( nf90_inq_varid(ncid_zoo,     "zoo", varid) )
-      call NetCDFcheck( nf90_get_var(ncid_zoo, varid, zoo, start3D))
 c
+      call NetCDFcheck( nf90_inq_varid(ncid_t,     "t", varid) )
+      call NetCDFcheck( nf90_get_var(ncid_t, varid, temp, start3D))   
+c
+      call NetCDFcheck( nf90_inq_varid(ncid_zoo,     "zoo", varid) )
+      call NetCDFcheck( nf90_get_var(ncid_zoo, varid, zoo, start3D))   
+
+c
+
 c     3) postprocess data, suncronize auxillary fields, pad holes
 c      
 c     ---- currently no horizontal turbulent diffusivity: set to
@@ -634,6 +648,15 @@ c          interpolate_turbulence_deriv must be updated
 c
       vdiffus = 1.e-9
       hdiffus = 1.e-9   
+c
+c     4) replace fill values for (u,v,w), because boundary faces are given the fill value
+c        and boundary faces are needed for interpolation. Implicit boundary condition is 
+c        (u,v,w)=0. Unfortunately the nf90 fill query appears broken so apply fill=100
+c        as detection limit (hack - unable to do better right now)
+c
+      where(abs(u)>100.0) u=0.0
+      where(abs(v)>100.0) v=0.0
+      where(abs(w)>100.0) w=0.0
 c
 c     ------ flip sign of w 
 c     ------ physical_fields sign convention is positive down, cmod convention is positive up
@@ -656,6 +679,8 @@ c
      +            iframe,"/", size(h1900_map)
       data_in_buffers = .true.
       cur_h1900 = h1900
+
+
       end subroutine load_data_frames
 
 
@@ -744,7 +769,7 @@ c     --------------------------------------------------------------------
       endif
 
       call interpolate_wdepth(xyz,depth,idum)
-      if ((z<0).or.(z>depth)) then
+      if ((xyz(3)<0).or.(xyz(3)>depth)) then
          status = 2                ! signal vertical out-of-bound
          result = padval           ! derivative interpolation
          if (deriv>0) result = 0   ! value interpolation
@@ -779,20 +804,23 @@ c
       dfz        = 0.      ! default for dry/out-of-bounds pillars
 c
 c     ------ setup 4 interpolation pillars ------
+c            project z onto these pillars and interpolate
 c
       do i = 1,4
          if (wetmask(cx(i),cy(i))>0) then
             valid(i) = .true.
             ibot     = bottom_layer(cx(i),cy(i)) ! ibot >= 1
-            zgrid    => ccdepth(cx(i),cy(i),:)
-            call search_sorted_list(z,zgrid,iz) ! 0<=iz<=nz+1
-            ! ---- capture vertical extrapolation ----
+            zgrid    => ccdepth(cx(i),cy(i),:)   ! range = 1:nz
+            call search_sorted_list(z,zgrid,iz) ! 0<=iz<=nz
+            ! ---- handle projection extrapolation 
+            !      but do not flag flag vertical extrapolation
+            !      since 0<z<depth
             if ((iz<1).or.(iz>=ibot)) then 
                iz = min(max(iz,1),ibot) ! now iz = 1 or ibot
                flow    = array(cx(i),cy(i),iz)
                fup     = flow    ! => dfz = 0
                sz      = 0.5     ! set dummy
-               status  = 2       ! flag vertical extrapolation
+c               status  = 2       ! flag vertical extrapolation
                dz(i)   = 1.0     ! avoid numerical problems, assign dummy
             ! ---- interior linear vertical interpolation ----
             else
@@ -928,6 +956,7 @@ c     ------------------------------------------
       real, intent(out)    :: r3(:)
       integer, intent(out) :: status
       integer              :: statv,stath
+      
 c     ------------------------------------------ 
       call interpolate_cc_3Dgrid_data(xyz,vdiffus,3,r3(3),statv)
       r3(1:2) = 0. ! Currently do not support horizontal derivatives
@@ -956,6 +985,7 @@ c
 c     u(ix,iy,iz) in grid position (ix+0.5, iy    , iz)     (i.e. eastern  cell face)
 c     v(ix,iy,iz) in grid position (ix    , iy-0.5, iz)     (i.e. southern cell face)
 c     w(ix,iy,iz) in grid position (ix    , iy,     iz-0.5) (i.e. upper    cell face)
+c
 c     The boundary condition:
 c           w( ix, iy, bottom_layer(ix,iy)+0.5 ) = 0
 c     is implicit 
@@ -964,6 +994,8 @@ c     Implied interpolation ranges in ncc coordinates:
 c           1.5 < x < nx+0.5
 c           0.5 < y < ny-0.5
 c           0.5 < z < nz+0.5 (due to bottom BC)
+c
+c     Nov 18, 2010: abort at entry, if xyz is a dry point
 c     ------------------------------------------ 
       real, intent(in)     :: xyz(:)  ! (lon,lat,depth)
       real, intent(out)    :: uvw(:)
@@ -972,7 +1004,14 @@ c     ------------------------------------------
       integer              :: statu, statv, statw
       integer              :: ix,iy,iz,jwest,jnorth,jlow,ibot
       real                 :: x,y,z, sx,sy,sz
+      logical              :: wet_point
 c     ------------------------------------------ 
+      wet_point = (horizontal_range_check(xyz).and.is_wet(xyz))
+      if (.not.wet_point) then
+         uvw    = 0.
+         status = 1  ! signal 
+         return
+      endif
 c.....transform to continuous node-centered grid coordinates
 c     and check ranges for this staggering
       call get_ncc_coordinates(xyz,x,y,z)
@@ -980,8 +1019,8 @@ c     and check ranges for this staggering
       statv = 0 
       statw = 0
       if ((x<1.5).or.(x>(nx+0.5))) statu = 1 ! flag x range violation
-      if ((y<0.5).or.(y>(ny-0.5))) statv = 1 ! flag x range violation
-      if ((z<0.5).or.(z>(nz+0.5))) statw = 1 ! flag x range violation
+      if ((y<0.5).or.(y>(ny-0.5))) statv = 1 ! flag y range violation
+      if ((z<0.5).or.(z>(nz+0.5))) statw = 1 ! flag z range violation
       status  = max(statu, statv, statw) 
 
 c.....determine cell associations of point, constrained to 1 <= i <= n
@@ -999,7 +1038,7 @@ c     when point exceed coordinate bounds s is assigned 0 or 1
 c.....face-to-face interpolation 
 c     cell indices satisfy 1 <= (ix,iy,iz) <= (nx,ny,ibot)
       jwest  = max(1, min(nint(x-1), nx)) ! cell west  face
-      jnorth = max(1, min(nint(y+1), ny)) ! cell north face
+      jnorth = max(1, min(nint(y+1), ny)) ! cell north fce
       uvw(1) = sx*u(ix, iy, iz)    + (1.-sx)*u(jwest, iy, iz)
       uvw(2) = sy*v(ix, jnorth,iz) + (1.-sy)*v(ix, iy, iz)
 
@@ -1098,9 +1137,7 @@ c     ------------------------------------------
       integer          :: ixc,iyc
       real             :: xc,yc
 c     ------------------------------------------ 
-c      call interpolate_wdepth(xy, wdepth, status) 
-  
-      call get_horiz_ncc(xy,ixc,iyc,xc,yc)
+
 
 c     avoid probing wetmask at range violation
 
@@ -1217,7 +1254,7 @@ c     If xyz1 is dry, a warning is issued and anycross is returned false
 c     This misses potential rare edge cuttings (assuming a straight line of motion).
 c     In this implementation the fine scale coast line geometry follows 
 c     cell centered grid boxes. 
-c     In this implementation does not hand multiple reflection effects
+c     In this implementation does not handle multiple reflection effects
 c     xyz1 and xyz2 must have same length (2 or 3) so they are vector addable
 c     ------------------------------------------ 
       real, intent(in)     :: xyz1(:),xyz2(:)
@@ -1343,8 +1380,12 @@ c     ------------------------------------------------------
 c     ------------------------------------------ 
 c     Get continuous node-centered grid coordinates with grid points 
 c     on integer values of (x,y,z) from xyz = (lon,lat,depth)
-c     water surface is at z = 0.5, bottom at z = bottom_layer(...)+0.5
-c     No range check imposed
+c     water surface is at z = 0.5, sea bed at z = bottum_layer+0.5
+c     It is not checked that z is above the sea bed. The inter grid
+c     range is 0.0 <= z <= nz+0.5.
+c     If vertical range is exceeded the first/last layer, respectively,
+c     is used to extrapolate a vertical grid coordinate 
+c     (no extrapolation is flagged) 
 c     ------------------------------------------ 
       real, intent(in)  :: xyz(:)
       real, intent(out) :: x,y,z
@@ -1358,10 +1399,11 @@ c     ------------------------------------------
       ixc = nint(x)     
       iyc = nint(y)
 c     --- locate vertical cell ---
-      this_col => acc_width(ixc, iyc, :)
-      call search_sorted_list(xyz(3), this_col, izc) 
-      layerw = this_col(izc+1) -  this_col(izc)
-      z      = 1.0 + (xyz(3)-ccdepth(ixc, iyc, izc))/layerw
+      this_col => acc_width(ixc, iyc, :) ! range = 1:nz+1
+      call search_sorted_list(xyz(3), this_col, izc) ! 0<=izc<=nz+1
+      izc = min(max(izc,1),nz) ! capture vertical range excess
+      layerw = this_col(izc+1) -  this_col(izc) 
+      z      = (izc - 0.5) + (xyz(3)-this_col(izc))/layerw
 c     ------------------------------------------ 
       end subroutine get_ncc_coordinates
 

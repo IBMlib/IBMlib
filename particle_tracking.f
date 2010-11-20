@@ -68,7 +68,7 @@ c...............................................................
       integer, parameter :: rk4   = 30
 
 
-      integer, parameter :: verbose = 0    ! control output volume
+      integer, parameter :: verbose = 0    ! control output volume of certain subroutines
 
 
       integer, parameter, public :: BC_reflect = 0 ! handle to invoke reflecting boundary conditions
@@ -250,9 +250,13 @@ c     and immobile tracers
      +    tracattr%outofdomain .or.
      +    tracattr%atbottom .or.
      +    all(tracattr%mobility == 0)) return
-          
+
+c.....Capture sea surface fluctuation artifacts near sea bed          
+      call renormalize_vertical_position(tracattr)
+
 c.....evaluate position increments in tangent space additively into dR
       dR = h * v_active * tracattr%mobility
+c      write(*,*) tracattr%position
       call add_advection_step(tracattr, h, dR) ! Cartesian step  
       call add_diffusion_step(tracattr, h, dR) ! Cartesian step   
 c
@@ -265,8 +269,31 @@ c
       end subroutine update_tracer_position
 
 
-      
-     
+      subroutine renormalize_vertical_position(tracattr)
+c-------------------------------------------------------------
+c     For hydrodynamic data with a free surface,
+c     particles very close to the sea bed may 
+c     artificially get displaced below the sea bed by 
+c     sea surface fluctuations
+c     Lift these cases to just above (== wlift) the sea bed
+c     Do nothing, if ashore/outofdomain/atbottom or vertically frozen
+c-------------------------------------------------------------
+      type(spatial_attributes), intent(inout) :: tracattr
+      real    :: wd
+      integer :: istat
+      real, parameter :: wlift = 0.01 ! [m] lift affected particles wlift above sea bed
+c-------------------------------------------------------------
+      if (tracattr%ashore .or. 
+     +    tracattr%outofdomain .or.
+     +    tracattr%atbottom .or.
+     +    (tracattr%mobility(3) == 0)) return
+      call interpolate_wdepth(tracattr%position,wd,istat)  
+      call checkstat(istat, "renormalize_vertical_position:"//
+     +               "interpolate_wdepth ")
+      if (tracattr%position(3)>wd) tracattr%position(3) = wd-wlift
+      end subroutine renormalize_vertical_position
+
+
 
       subroutine add_advection_step(tracattr, h, dR)
 c-------------------------------------------------------------------------------
@@ -274,13 +301,15 @@ c     Add advection step to dR (as Cartasian step in meters**3)
 c     using Euler/RK2/RK4 of the tracer described by tracattr
 c     without checking for BC violations
 c
-c     predictor steps for current interpolation is based 
-c     tangent space arithmics.
+c     Predictor steps for current interpolation is based tangent space arithmics.
 c     Current position of tracer is assumed valid (within bounds, but not checked)
 c     h is the time step. h>0 for forward time simulation, h<0 for backtracking
 c 
-c     Low level method: assumes tracattr is in a consistent state at a valid position
+c     Low level method: assert tracattr is in a consistent state at a valid position
 c     (not checked)
+c
+c     Nov 18, 2010 (asc): added test to make sure that predictor step(s) are
+c                         valid wet points, else rk2/rk4 defaults to an Euler step
 c-------------------------------------------------------------------------------
       type(spatial_attributes), intent(inout) :: tracattr
       real,intent(in)                         :: h     ! time step in seconds. h<0 for backtracking
@@ -290,15 +319,18 @@ c-------------------------------------------------------------------------------
       real            :: k1(3),k2(3),k3(3),k4(3) ! automatic array for rk1-4
       real            :: pos(3), dxyz(3)
       integer         :: istat
+      logical         :: valid_predictor
+      real            :: wd
 c--------------------------------------------------------
 
 c
 c     resolve Cartesian position change dxyz(3) for either 
 c     integration scheme Euler/RK2/RK4 
 c     Apply tangent space arithmics for predictor steps
-c
+c     Assert tracattr%position is a valid wet point
+
       call interpolate_currents(tracattr%position,k1,istat) ! real(3) in physical units
-      call checkstat(istat, "add_advection_step:interpolate_currents")
+      call checkstat(istat, "add_advection_step:interpolate_currents ")
       
 c     -----------------------------------------
 c.....1) Euler forward integration
@@ -307,7 +339,7 @@ c        x  += k1
 c     -----------------------------------------
       if (advec_intg_method == euler) then
 
-         dxyz = k1*h
+         dxyz = k1*h 
 
 
 c     -----------------------------------------
@@ -318,15 +350,18 @@ c        x  += k2
 c     -----------------------------------------
       elseif (advec_intg_method == rk2) then
 
-         dpos = 0.5*k1*h
          pos  = tracattr%position
+
+         dpos = 0.5*k1*h
          call dcart2dxy(pos, dpos) ! tangent space arithmics
-         pos = pos + dpos
+         pos = pos + dpos          ! predictor position
          call interpolate_currents(pos, k2, istat)
-         call checkstat(istat,"add_advection_step:interpolate_currents")
-        
-         dxyz  = k2*h
-        
+         if (istat == 0) then
+            dxyz  = k2*h   ! predictor OK
+         else
+            dxyz  = k1*h   ! predictor step not OK, default to Euler step
+         endif
+            
 c     -----------------------------------------         
 c.....3) Runge-kutta 4th order forward integration (may be optimized)
 c       k1  = dt*v(x)
@@ -337,28 +372,39 @@ c       x  += k1/6. + k2/3. + k3/3. + k4/6.
 c     -----------------------------------------
       elseif (advec_intg_method == rk4) then
          
-         dpos = 0.5*k1*h
          pos  = tracattr%position
+         valid_predictor = .true.
+
+         dpos = 0.5*k1*h
          call dcart2dxy(pos, dpos) ! tangent space arithmics
          pos = pos + dpos
          call interpolate_currents(pos, k2, istat) 
-         call checkstat(istat,"add_advection_step:interpolate_currents")
+         if (istat /= 0) valid_predictor = .false.
 
-         dpos = 0.5*k2*h
-         pos  = tracattr%position
-         call dcart2dxy(pos, dpos) ! tangent space arithmics
-         pos = pos + dpos
-         call interpolate_currents(pos, k3, istat) 
-         call checkstat(istat,"add_advection_step:interpolate_currents")
+         if (valid_predictor) then
+            dpos = 0.5*k2*h
+            pos  = tracattr%position
+            call dcart2dxy(pos, dpos) ! tangent space arithmics
+            pos = pos + dpos
+            call interpolate_currents(pos, k3, istat) 
+            if (istat /= 0) valid_predictor = .false.
+         endif
+
+         if (valid_predictor) then
+            dpos = k3*h
+            pos  = tracattr%position
+            call dcart2dxy(pos, dpos) ! tangent space arithmics
+            pos = pos + dpos
+            call interpolate_currents(pos, k4, istat) 
+            if (istat /= 0) valid_predictor = .false. 
+         endif
          
-         dpos = k3*h
-         pos  = tracattr%position
-         call dcart2dxy(pos, dpos) ! tangent space arithmics
-         pos = pos + dpos
-         call interpolate_currents(pos, k4, istat) 
-         call checkstat(istat,"add_advection_step:interpolate_currents") 
+         if (valid_predictor) then
+            dxyz = (k1/6.0d0 + k2/3.0d0 + k3/3.0d0 + k4/6.0d0)*h ! predictor OK
+         else
+            dxyz  = k1*h   ! predictor step not OK, default to Euler step
+         endif
 
-         dxyz = (k1/6.0d0 + k2/3.0d0 + k3/3.0d0 + k4/6.0d0)*h 
          
       endif
       
@@ -391,6 +437,10 @@ c                used since a stationary random walk is time symmetric
 c
 c     Low level method: assumes tracattr is in a consistent state at a valid position
 c     (not checked)
+c
+c     Nov 18, 2010 (asc): fix over-correction bug in turbulence gradient correction to RW
+c     Nov 18, 2010 (asc): added test to make sure that uphill step is
+c                         valid wet points, else defaults to naive RW step
 c-------------------------------------------------------------------------------
       type(spatial_attributes), intent(inout) :: tracattr
       real,intent(in)                         :: h     ! time step in seconds. h<0 for backtracking
@@ -404,24 +454,34 @@ c--------------------------------------------------------
       if (all(tracattr%mobility == 0)) return 
       abs_h  = abs(h)
 
+c     Assert tracattr%position is a valid wet point
       call interpolate_turbulence_deriv(tracattr%position, dk, istat) 
       call checkstat(istat, 
      +               "add_diffusion_step:interpolate_turbulence_deriv") 
-         
+c         
 c.....Use tangent space approx to estimate uphill point where to 
 c     evaluate diffusivity (gives higher order deviation)
-
+c
       uphill = 0.5d0*dk*abs_h   ! step where to evaluate k
       pos    = tracattr%position 
       call dcart2dxy(pos, uphill) ! transform uphill to (lon,lat,z)
-      pos    = pos + uphill
-      call interpolate_turbulence(pos + uphill, k, istat) 
-      call checkstat(istat, "add_diffusion_step:interpolate_turbulence")  
-
-c.....RW step with custom RNG providing rn3 
+      pos    = pos + uphill     
       call get_random_number(rn3) ! avg(R)=0, Var(R)=1
+c
+c.....Attempt gradient corrected RW step (MEPS 158 pp275-281 (1997), Eq 6)
+c     If uphill position is not valid, default to 
+c     naive RW step (MEPS 158 pp275-281 (1997), Eq 2)
+c
+      call interpolate_turbulence(pos, k, istat) 
+      if (istat == 0) then ! uphill step OK
+         dxyz = dk*abs_h + rn3*sqrt(2.0d0*k*abs_h) ! factor 2 corresponding to Var(R)=1
+      else                 ! uphill step not OK
+         call interpolate_turbulence(tracattr%position, k, istat)
+         call checkstat(istat, 
+     +               "add_diffusion_step:interpolate_turbulence") 
+         dxyz = rn3*sqrt(2.0d0*k*abs_h) ! factor 2 corresponding to Var(R)=1
+      endif 
 
-      dxyz = dk*abs_h + rn3*sqrt(2.0d0*k*abs_h) ! factor 2 corresponding to Var(R)=1
       dR   = dR + dxyz*tracattr%mobility      ! Cartasian step in meters**3
 
       end subroutine add_diffusion_step
@@ -449,10 +509,10 @@ c       C) Return flags telling whether a boundary violation has
 c          occured in current step: surfenc, botenc, shoreenc, domainenc
 c
 c     If dR satisfies boundary conditions add it to tracattr%position, update
-c     tracattr state flags and set BC flags (surfenc, botenc, shoreenc, domainenc); 
+c     tracattr state flags and set BC flags (surfenc, botenc, shoreenc, domainenc) to false; 
 c     otherwise truncate step according to applicable boundary conditions and 
 c     add truncated step to tracattr, update tracattr state flags and set 
-c     BC flags (surfenc, botenc, shoreenc, domainenc).
+c     BC flags (surfenc, botenc, shoreenc, domainenc) accordingly.
 c     Boundary condition control tags (tracattr%*BC) have the
 c     following options and meaning
 c
@@ -461,6 +521,7 @@ c       1: sticky tracer              => BC state = .TRUE.
 c     
 c     Current position (tracattr%position) is assumed valid before considering dR.
 c     No tracers violating BC are removed by this subroutine
+c     The algorithm below is based on separability of horizontal/vertical BC analysis
 c
 c     Boundary condition checks are performed in this order:
 c
@@ -496,6 +557,7 @@ c          surfenc = .FALSE.: water surface not crossed not by dR
 c          surfenc = .TRUE. : water surface crossed at least once by dR
 c        Tracer state is updated after application of BC to step:
 c          tracattr%atsurface = .TRUE.  => tracattr%mobility = (/1,1,0/)
+c                   (this allows particle to flow with surface currents)
 c          tracattr%atsurface = .FALSE. => tracattr%mobility unchanged
 c
 c        Response controller:
@@ -507,6 +569,11 @@ c        Tracer state is updated after application of BC to step:
 c          tracattr%atbottom = .TRUE.  => tracattr%mobility = 0
 c          tracattr%atbottom = .FALSE. => tracattr%mobility unchanged
 c          
+c     Nov 19, 2010: added multiple reflection analysis
+c     Nov 19, 2010: added (verbose>0) debug hooks           
+c   
+c     TODO: validate that particle with tracattr%atsurface = .TRUE. at entry
+c           is handled consistent
 c--------------------------------------------------- 
       type(spatial_attributes), intent(inout) :: tracattr
       real, intent(in)                        :: dR(3)      
@@ -530,17 +597,29 @@ c     virpos = current position with dR added. virpos is manipulated
 c              iteratively below so that it finally satisfies all BC
 c              At exit, virpos is assigned to tracattr%position. 
 c
+      if (verbose>0) then
+         
+         write(*,387) "add_constrained_step: begin analysis",
+     +           "proposed Cartesian step dR = ", dR
+ 387     format(5("-"),1x,a,1x,5("-"),/,a, 3f7.2,1x,5("-"))
+         write(*,*) "spatial_attributes at entry ="
+         call write_spatial_attributes(tracattr)
+      endif
+      
+
       curpos = tracattr%position ! current position - assumed valid
       virpos = curpos
-      dxy=dR
+      dxy    = dR
       call dcart2dxy(virpos,dxy)
       virpos = virpos + dxy
+
+      if (verbose>0) write(*,*) "initial virpos = ", virpos
 
 c.....reset motion status flags 
       tracattr%ashore      = .FALSE. 
       tracattr%outofdomain = .FALSE. 
       tracattr%atbottom    = .FALSE. 
-      tracattr%atsurface   = .FALSE. 
+      tracattr%atsurface   = .FALSE.   ! ... should this be reset ?
 
 c.....Give all step status flags a default value (no BC violations)
       surfenc   = .FALSE.
@@ -563,6 +642,8 @@ c        We currently do not accept domainBC == BC_reflect
 c     -----------------------------------------------------
    
       isOK = horizontal_range_check(virpos)
+      
+      if (verbose>0) write(*,*) "horizontal_range_check =", isOK
 
       if (.not.isOK) then
          domainenc = .TRUE.
@@ -574,9 +655,18 @@ c     -----------------------------------------------------
      +                  tracattr%domainBC
             stop
          endif
-c........BC exit point
+c
+c........Elwis has left the building, return to sender 
+c
          tracattr%position = virpos ! set illegal position
+
+         if (verbose>0) then
+            write(*,*) "exit due to horizontal range violation"
+            write(*,*) "spatial_attributes at exit(1) ="
+            call write_spatial_attributes(tracattr)
+         endif
          return                     ! no further BC processing when outofdomain
+
       endif
 
 
@@ -596,11 +686,16 @@ c        Handle the situation that both vertical and horizontal
 c        BC are violated       
 c     -----------------------------------------------------   
 
-      call coast_line_intersection(curpos, virpos, 
+      if (verbose>0) write(*,*) "Horizontal analysis begin"
+
+      call multiple_reflection_path(curpos, virpos, 
      +            anycross, xyzref, xyzhit) 
       
 
       if (anycross) then
+
+         if (verbose>0) write(*,*) "coast line crossing detected" 
+
          shoreenc = .TRUE.
          if      (tracattr%shoreBC == BC_sticky) then
             virpos    = xyzhit
@@ -609,17 +704,36 @@ c     -----------------------------------------------------
             tracattr%mobility = 0
             tracattr%ashore   = .TRUE.
 c...........BC exit point
-            tracattr%position = virpos
+            
+            if (verbose>0) then
+               write(*,*) "particle washed ashore (shoreBC==sticky)"
+               write(*,*) "spatial_attributes at exit(2) ="
+               call write_spatial_attributes(tracattr)
+            endif
             return         ! do not consider vertical BC, when ashore
+
          elseif  (tracattr%shoreBC == BC_reflect) then
+
             virpos = xyzref ! update virpos - proceed to vertical BC
+
+            if (verbose>0) then
+               write(*,*) "particle reflected on coast line virpos=",
+     +                    virpos
+            endif   
+
          else
+
             write(*,*) "add_constrained_step: invalid tracattr%shoreBC",
      +                  tracattr%shoreBC
-            stop   
+            stop 
+  
          endif
+      else  ! if anycross
+         if (verbose>0) write(*,*) "No coast line crossings detected" 
       endif
 
+      if (verbose>0) write(*,*) "After horizontal analysis: virpos =", 
+     +                           virpos 
 
 c     -----------------------------------------------------   
 c     3) Enforce vertical boundary conditions, if tracer is not 
@@ -627,21 +741,28 @@ c        advected ashore:
 c
 c        0(surface) < z <  wdepth(xyz)
 c
+c        At this point, the horizontal component of virpos corresponds to a wet point
 c        Assume sea bed is so flat that we need not compute exactly
 c        where bottom is hit, but may use the depth at virpos
 c        to enforce vertical boundary conditions
-c        If not ashore, assume it is a wet point 
-c        (assertion not checked))
 c     ----------------------------------------------------- 
 
       call interpolate_wdepth(virpos, depth, istat)
       call checkstat(istat,"add_constrained_step:interpolate_wdepth")
+
+      if (verbose>0) then
+         write(*,*) "Vertical analysis begin: wdepth at virpos =", depth                   
+      endif   
+
       zv    = virpos(3)
       pingpong = .FALSE.
 c
 c.....check for and handle surface crossing
 c
       if (zv<0) then            ! a surface crossing has occured
+
+         if (verbose>0) write(*,*) "surface crossing detected"
+
          surfenc              = .TRUE.
          if     (tracattr%surfaceBC == BC_sticky) then
             virpos(3)  = 0.0    ! place tracer at surface
@@ -655,11 +776,15 @@ c
      +                 "tracattr%surfaceBC", tracattr%surfaceBC
             stop   
          endif
+         if (verbose>0) write(*,*) "updated virpos = ", virpos
       endif
 c
 c.....check for and handle bottom crossing
 c       
       if (zv>depth) then        ! a bottom crossing has occured
+
+         if (verbose>0) write(*,*) "bottom crossing detected"
+
          botenc  = .TRUE.
          if     (tracattr%bottomBC == BC_sticky) then
             virpos(3)         = depth    ! place tracer at bottom
@@ -676,26 +801,113 @@ c
             write(*,*) "add_constrained_step: invalid "//
      +                 "tracattr%bottomBC", tracattr%bottomBC
             stop   
-         endif   
+         endif  
+
+         if (verbose>0) write(*,*) "updated virpos = ", virpos
+
       endif
 c
 c.....handle a flagged ping pong situation
 c         
       if (pingpong) then
+
+         if (verbose>0) write(*,*) "pingpong condition detected"
+
          surfenc   = .TRUE.
          botenc    = .TRUE.
          call random_number(znew) ! compiler provided uniform RNG (0<znew<1)
          znew = znew*depth
          virpos(3) = znew  
+
+         if (verbose>0) write(*,*) "updated virpos = ", virpos
       endif
 c
 c.....now virpos has been massaged so that all BC are satisfied
 c     assign it here, if no previous exit point has been applied
 c     
+      if (verbose>0) write(*,*) "final truncated virpos = ", virpos
+
       tracattr%position = virpos
+
+      if (verbose>0) then
+         write(*,*) "spatial_attributes at exit(3) ="
+         call write_spatial_attributes(tracattr)
+         write(*,*) 
+      endif
+
 
       end subroutine add_constrained_step
 
+
+
+      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)
+c-------------------------------------------------------------------------
+c     Compute key points of multiple horizontal coastal reflection path
+c     by iterative application of coast_line_intersection primitive
+c     when trying to move from (valid, wet) s0 to new position s1
+c     If a coast line is crossed retrun anycross == .true.
+c     Then sref is the (multiple) horizontal coastal reflected end point
+c     which is valid and wet. shit1 is the point of first coastal intersection
+c     If anycross == .false. (sref, shit) is undefined
+c-------------------------------------------------------------------------
+      real,intent(in)      :: s0(3), s1(3)
+      logical,intent(out)  :: anycross
+      real,intent(out)     :: sref(3), shit1(3)
+
+      real                 :: start(3), sfin(3), shit(3)
+      integer              :: iter
+      integer, parameter   :: max_reflections = 5 ! otherwise time step too long ...
+c---------------------------------------------------------------
+      if (verbose>0) write(*,*) " multiple reflection analysis begin"
+
+      call coast_line_intersection(s0, s1, anycross, sref, shit1)
+
+      if (verbose>0) then
+         if (anycross) then 
+            write(*,422) s0, s1, anycross, sref, shit1
+            write(*,*) "is_land(reflected point) = ", is_land(sref)
+         else
+            write(*,423) s0, s1
+         endif
+      endif ! verbose
+
+      if (.not.anycross) return
+      
+c
+c     --- we hit the coast line, start multiple reflection analysis
+c         (this means (sref, shit1) are defined.
+c
+      iter  = 1
+      shit  = shit1
+c     note: is_land = .false. at horizontal range violation
+c     The loop below computes the final reflection, sref
+c     In most cases we will not enter the while loop, because sref is a wet point
+c
+      do while (is_land(sref).and.(iter <= max_reflections))
+         start = shit
+         sfin  = sref
+         call coast_line_intersection(start, sfin, anycross, sref, shit)
+         
+         if (verbose>0) then
+            if (anycross) then 
+               write(*,422) start, sfin, anycross, sref, shit
+               write(*,*) "is_land(reflected point) = ", is_land(sref)
+            else
+               write(*,423) start, sfin
+            endif
+         endif ! verbose
+
+         iter  = iter + 1
+      enddo
+      if (iter > max_reflections) then
+         write(*,*) "multiple_reflection_path: max_reflections exceeded"
+         stop
+      endif
+ 
+ 422  format(3f7.2, "->", 3f7.2, ":ref=", 3f7.2, " hit=", 3f7.2)    
+ 423  format(3f7.2, "->", 3f7.2, ":no cross")
+c-----------------------------------------------------------
+      end subroutine
 
 
 
@@ -923,6 +1135,8 @@ c     Each box is issued a runtime unique stamp (integer) emission_boxID
 c     Return nullified pointer boxref, if no sources are created
 c     The maximum number of tracers that may be emitted by
 c     boxes in boxref are summed in nmaxpar 
+c
+c     Nov 18, 2010 (asc): allow partially/fully dry corners in emission box, but issue warning
 c---------------------------------------------------  
       character*(*),intent(in)    :: identifier
       type(emission_box), pointer :: boxref(:)
@@ -1051,7 +1265,12 @@ c
             stop
          endif          
 c
-c        4) flag dry corners 
+c        4) Test for dry corners 
+c
+c           Partially/fully dry corners in emission box are accepted, but 
+c           a warning is issued. Boxes with partially/fully dry corners may
+c           have wet zones - this is tested at release time, and execution
+c           is halted, if no wet zones are found at release time
 c
          anydry = .FALSE.
          if (absspec) then
@@ -1078,10 +1297,8 @@ c
          endif
          
          if (anydry) then
-            write(*,*) "create_emission_boxes: box dry"
-            write(*,*) "box", ibox, "partially or fully dry"
-            call write_emission_box(boxref(ibox))
-            stop
+            write(*,*) "create_emission_boxes: warning: box", ibox, 
+     +                 "is partially/fully dry"
          endif
 c
 c........initialize internal release counter and emission cap
@@ -1136,7 +1353,7 @@ c-----------------------------------------------------------------
       integer,intent(in)                   :: nstart ! offset in parbuf
       integer,intent(out)                  :: npar   ! generated tracers
 c     ..............................................
-      integer, parameter     :: pos_attemps = 100
+      integer, parameter     :: pos_attemps = 10**4  ! max attemps to find a wet point in box
       logical                :: pos_OK, absspec
       integer                :: iatt, nwish, maxp_mem, maxp_box,ip
       integer                :: i, forw_back, istat

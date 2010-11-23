@@ -875,7 +875,7 @@ c---------------------------------------------------------------
       
 c
 c     --- we hit the coast line, start multiple reflection analysis
-c         (this means (sref, shit1) are defined.
+c         (this means (sref, shit1) are defined and anycross == .true.)
 c
       iter  = 1
       shit  = shit1
@@ -883,11 +883,13 @@ c     note: is_land = .false. at horizontal range violation
 c     The loop below computes the final reflection, sref
 c     In most cases we will not enter the while loop, because sref is a wet point
 c
-      do while (is_land(sref).and.(iter <= max_reflections))
+      do while (anycross .and. 
+     +          is_land(sref).and.
+     +          (iter <= max_reflections))
          start = shit
          sfin  = sref
          call coast_line_intersection(start, sfin, anycross, sref, shit)
-         
+         if (.not.anycross) sref=sfin ! roll back, in case sref is overwritten
          if (verbose>0) then
             if (anycross) then 
                write(*,422) start, sfin, anycross, sref, shit

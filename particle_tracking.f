@@ -864,7 +864,7 @@ c---------------------------------------------------------------
 
       if (verbose>0) then
          if (anycross) then 
-            write(*,422) s0, s1, anycross, sref, shit1
+            write(*,422) s0, s1, sref, shit1
             write(*,*) "is_land(reflected point) = ", is_land(sref)
          else
             write(*,423) s0, s1

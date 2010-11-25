@@ -892,7 +892,7 @@ c
          if (.not.anycross) sref=sfin ! roll back, in case sref is overwritten
          if (verbose>0) then
             if (anycross) then 
-               write(*,422) start, sfin, anycross, sref, shit
+               write(*,422) start, sfin, sref, shit
                write(*,*) "is_land(reflected point) = ", is_land(sref)
             else
                write(*,423) start, sfin

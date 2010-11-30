@@ -27,6 +27,7 @@ c     -----------------------------------------------
       type state_attributes
       private
         integer :: tracerID
+        integer :: sourceBox 
       end type
       public :: state_attributes
 
@@ -83,6 +84,7 @@ c     ----------------------------------------------------
       integer,intent(in)                     :: emitboxID
 c     ----------------------------------------------------
       state%tracerID = tracerID
+      state%sourceBox = emitboxID       ! box of origin 
       tracerID = tracerID +1
       call set_tracer_mobility_free(space)  
 c     
@@ -126,6 +128,8 @@ c------------------------------------------------------------
       select case (get_name(var))
       case ("tracerID")
         call construct(bucket,"tracerID",state%tracerID)
+      case ("sourceBox")
+        call construct(bucket,"sourceBox",state%sourceBox)
       case default
         status=1   !Cannont find variable name
       end select
@@ -142,6 +146,9 @@ c------------------------------------------------------------
       select case (var_name)
        case ("tracerID")
          call construct(var,"tracerID","tracer ID number",
+     +     units="-",fmt="(i6)",type="int")
+       case ("sourceBox")
+         call construct(var,"sourceBox","source box ID",
      +     units="-",fmt="(i6)",type="int")
       case default
         status=1  !Cannot find variable

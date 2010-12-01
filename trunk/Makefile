@@ -116,6 +116,10 @@ OUTPUT_ARCS  = $(patsubst %.mod,%.a,$(OUTPUT_MODS))
 IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
                particles.o $(OUTPUT_ARCS) task.a 
 
+#Variables relating to the packaging
+IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but the working copy thereof)
+IBMLIB_PACKAGE = IBMlib_srcs.tgz
+
 #     Main task of this Makefile: EXECUTABLE - should be first target, to appear as default
 # --- currently TASK appears as task.a - at some point we may homogenize 
 #     the setup. Dependencies order reflect strict build order of IBMlib
@@ -180,7 +184,7 @@ libtime/Makefile:
 
 
 clean: FORCE
-	-/bin/rm -f *.o *.a *.mod dependences.mk $(EXECUTABLE)
+	-/bin/rm -f *.o *.a *.mod $(IBMlib_package) dependences.mk $(EXECUTABLE)
 	-make -C libtime cleanall
 	-make -C $(PHYSICAL_FIELDS_DIR) clean
 	-make -C $(PARTICLE_STATE_DIR) clean
@@ -192,6 +196,9 @@ clean: FORCE
 
 remake:
 	make clean; make
+	
+package:
+	tar cvfzh $(IBMLIB_PACKAGE) $(IBMLIB_SRCS) --exclude=.* --ignore-failed-read 
 
 FORCE:
 

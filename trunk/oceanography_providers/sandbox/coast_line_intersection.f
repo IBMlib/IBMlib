@@ -54,6 +54,7 @@ c     In this implementation does not handle multiple reflection effects,
 c     i.e. it does not test that georef is a wet point (the step steps geo1 -> geo2
 c     may become reflected onto land in concave coastal geometries for large steps)
 c     geo1 and geo2 must have same length (2 or 3) so they are vector addable
+c     Currently it is being asserted that geo2 does not violate the outer domain (not checked)
 c     
 c     Conceptual revision ASC/MPA Nov 24, 2010 
 c     Infinitesimal coast line repulsion added ASC Dec 06, 2010 
@@ -64,7 +65,7 @@ c     ------------------------------------------
 c   
       real                 :: s, s_min
      
-      logical              :: leaving,loopflag
+      logical              :: leaving,loopflag,ldum
       character*1          :: reftype, xface
       real                 :: direct(size(geo1)), reflect(size(geo1))
       integer              :: ix,iy,ix2,iy2
@@ -85,8 +86,10 @@ c     Test if geo1 and geo2 are in same cell => no coast line crossing
 c     most cases terminate here
 c
       if ((ix==ix2).and.(iy==iy2)) then
-         cross_coast = .false.
          if (verbose>0) write(*,*) "geo1 -> geo2 in same cell"
+         cross_coast = check_coastal_osculation(geo2,georef,geohit)
+         if ((verbose>0).and.cross_coast) 
+     +       write(*,*) "coastal osculation of geo2 handled"
          return
       endif
       if (verbose>0) write(*,*) "trajectory analysis: begin"
@@ -140,7 +143,12 @@ c
 c     if (cross_coast == .true.) continue and resolve georef and geohit
 c     else let georef and geohit remain undefined
 c
-      if (.not.cross_coast) return
+      if (.not.cross_coast) then
+         cross_coast = check_coastal_osculation(geo2,georef,geohit)
+         if ((verbose>0).and.cross_coast) 
+     +       write(*,*) "coastal osculation of geo2 handled"
+         return
+      endif
 c
 c     If the coast line is crossed, compute georef, geohit
 c     0 < s_min < 1 is the coordinate along the vector (geo2-geo1)
@@ -161,8 +169,8 @@ c     |direct| == |reflect|
 c     Repel both (geohit,georef) from the coastline, if the they end there
 c     to within a numerical tolerance, by a small displacement
 
-      call repel_from_coast_line(geohit)
-      call repel_from_coast_line(georef)
+      ldum = repel_from_coast_line(geohit)   ! do not parse result
+      ldum = repel_from_coast_line(georef)   ! do not parse result
 
       return   ! from coast_line_intersection
 
@@ -238,9 +246,9 @@ c     First the east-west direction
 
 
       
-      subroutine repel_from_coast_line(geo)   ! -> regular_lonlat_grid.f
+      logical function repel_from_coast_line(geo)   ! -> regular_lonlat_grid.f
 c----------------------------------------------
-c     Internal subroutine that repels geo(1:2) inplace
+c     Internal function that repels geo(1:2) inplace
 c     from the coast line. 
 c     Includes test of whether geo(1:2) is numerically 
 c     on a coast line. Enforce outter domain range: 
@@ -249,14 +257,16 @@ c     For corner points, coordinate is displaced to
 c     a (strictly) random valid adjecent wet cell to avoid bias
 c----------------------------------------------
       real, intent(inout) :: geo(:)
-      logical             :: east_west,north_south,corner   ! for classify_coastal_point
-      integer             :: iwe, iso, dir(2,4), ndir       ! for classify_coastal_point
+      logical             :: east_west,north_south,corner   ! for check_coastal_proximity
+      integer             :: iwe, iso, dir(2,4), ndir       ! for check_coastal_proximity
       integer             :: pick
       real                :: rnum
 c----------------------------------------------
-      if (.not.classify_coastal_point(geo, 
-     +                       east_west, north_south, corner,  
-     +                       iwe, iso, dir, ndir)) return
+      repel_from_coast_line = check_coastal_proximity(geo, 
+     +                           east_west, north_south, corner,  
+     +                           iwe, iso, dir, ndir)
+
+      if (.not.repel_from_coast_line) return
 c
 c     At this point we know that geo has been flagged as 
 c     coastal point; repel it
@@ -285,7 +295,7 @@ c
          stop "repel_from_coast_line: unexpected"
       endif
 
-      end subroutine repel_from_coast_line
+      end function repel_from_coast_line
       
 
 
@@ -295,14 +305,14 @@ c
 c----------------------------------------------
 c     Just return the main result whether geo
 c     geo is numerically on a coast line and
-c     waste detailed results from classify_coastal_point
+c     waste detailed results from check_coastal_proximity
 c     Do not modify geo 
 c----------------------------------------------
       real, intent(in)    :: geo(:)
-      logical             :: east_west,north_south,corner   ! dummies for classify_coastal_point
-      integer             :: iwe, iso, dir(2,4), ndir       ! dummies for classify_coastal_point
+      logical             :: east_west,north_south,corner   ! dummies for check_coastal_proximity
+      integer             :: iwe, iso, dir(2,4), ndir       ! dummies for check_coastal_proximity
 c----------------------------------------------      
-      at_coast_line = classify_coastal_point(geo,    
+      at_coast_line = check_coastal_proximity(geo,    
      +                   east_west, north_south, corner,  
      +                   iwe, iso, dir, ndir)      
       end function at_coast_line
@@ -311,7 +321,7 @@ c----------------------------------------------
 
 
 
-      logical function classify_coastal_point(geo,     ! -> regular_lonlat_grid.f
+      logical function check_coastal_proximity(geo,     ! -> regular_lonlat_grid.f
      +                       east_west, north_south, corner,  
      +                       iwe, iso, dir, ndir)
 c---------------------------------------------------------------------
@@ -367,7 +377,7 @@ c
 c     -------------------------------------------------------  
 c     Part 1): test point straddles one (or two) cell faces
 c     ------------------------------------------------------- 
-      classify_coastal_point = .false.   ! default value
+      check_coastal_proximity = .false.   ! default value
       east_west   = at_lon_face(geo, iwe) ! iwe = western  side
       north_south = at_lat_face(geo, iso) ! iwe = southern side
       corner      = east_west.and.north_south
@@ -424,7 +434,7 @@ c
                return ! only diagnose exception here (dir = ndir = 0)
             endif
 c           ... now we know either wet_w OR wet_e          
-            classify_coastal_point = .true.  ! this is a coastal case
+            check_coastal_proximity = .true.  ! this is a coastal case
             if     (wet_w) then
                dir(1,1) = -1     ! move right
                ndir     = 1
@@ -432,7 +442,7 @@ c           ... now we know either wet_w OR wet_e
                dir(1,1) =  1     ! move right
                ndir     = 1
             else
-               stop "classify_coastal_point: unexpected w/e"
+               stop "check_coastal_proximity: unexpected w/e"
             endif
          endif ! if (iwe==
 c     ------------------------------------          
@@ -465,7 +475,7 @@ c
                return ! only diagnose exception here (dir = ndir = 0)
             endif
 c           ... now we know either wet_s OR wet_n          
-            classify_coastal_point = .true.  ! this is a coastal case
+            check_coastal_proximity = .true.  ! this is a coastal case
             if     (wet_s) then
                dir(2,1) = -1     ! move down
                ndir = 1
@@ -473,7 +483,7 @@ c           ... now we know either wet_s OR wet_n
                dir(2,1) =  1     ! move up
                ndir = 1
             else
-               stop "classify_coastal_point: unexpected n/s"
+               stop "check_coastal_proximity: unexpected n/s"
             endif
          endif ! if iso==
 
@@ -495,14 +505,43 @@ c
                endif
             enddo
          enddo
-c        
-         if (ndir < 4) classify_coastal_point = .true. ! conclude corner analysis
+c        ---- ndir == 4 means all wet ----
+         if (ndir < 4) check_coastal_proximity = .true. ! conclude corner analysis
 c         
       else
          stop "repel_from_coast_line: unexpected (overall case)"
       endif
 
-      end function classify_coastal_point
+      end function check_coastal_proximity
+
+
+
+      
+      logical function check_coastal_osculation(geo,georef,geohit) ! -> regular_lonlat_grid.f
+c     ----------------------------------------------------------- 
+c     Auxillary function that chacks whether geo is in the coastal proximity
+c     i.e. at the coastal line within a predefined tolerence
+c
+c     Output:   check_coastal_osculation = .false.
+c                  geo is not in the coastal proximity
+c                  geo unchanged
+c                  georef = geo
+c                  geohit = geo
+c
+c               check_coastal_osculation = .true.
+c                  geo is in the coastal proximity
+c                  geo unchanged
+c                  georef: is the position geo displaced infinitesimally
+c                          outside the coastal proximity detection
+c                  geohit: a copy of input geo (reciding in the coastal proximity)
+c     ----------------------------------------------------------- 
+      real, intent(in)  :: geo(:)
+      real, intent(out) :: georef(:), geohit(:)    
+c     -----------------------------------------------------------
+      geohit = geo
+      georef = geo
+      check_coastal_osculation = repel_from_coast_line(georef) 
+      end function check_coastal_osculation
 
 
 
@@ -833,8 +872,7 @@ CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
       program test_it
 c     -------------------------------------------------
-c     Compile
-c     ifort coast_line_intersection.f; a.out
+c     Compile & run:  ifort -e90 coast_line_intersection.f; a.out
        
 c     Plot results in R       
 c     dat <- read.table("fort.10");
@@ -846,15 +884,17 @@ c     -------------------------------------------------
       use test_coast_line_intersection
       implicit none
       real    :: geo1(3), geo2(3), georef(3), geohit(3),deg2rad
-      real    :: dgeo(3)
+      real    :: dgeo(3),x,y,s
       logical :: anycross
       real    :: angle,r2(2)
       integer :: ixc,iyc,ix,iy,istep
       real,parameter :: rjump = 0.5  ! Bee jump range
-      
+      real    :: stability
 c     -------------------------------------------------
 
+c$$$c     ------------------------ 
 c$$$c     ---- MPA test block ----
+c$$$c     ------------------------ 
 c$$$      geo1 = (/2.0, 53.0, 0.0/)
 c$$$      call get_horiz_ncc(geo1,ixc,iyc)     
 c$$$      !Surround the point with dry cells
@@ -867,28 +907,66 @@ c$$$      geo2 = geo1 + 0.5*
 c$$$     +             (/cos(angle*deg2rad), sin(angle*deg2rad),0.0/)
 c$$$      call multiple_reflection_path(geo1,geo2,anycross,georef,geohit)
 
-
+c$$$c     ------------------------------- 
+c$$$c     ---- cross coast line test ----
+c$$$c     ------------------------------- 
+c$$$      ixc = 10
+c$$$      iyc = 10 
+c$$$      wetmask  = 0 ! 0 dry, 1 wet
+c$$$      wetmask(ixc,iyc)     = 1  ! 0 dry, 1 wet 
+c$$$c      do s = ixc-0.501, ixc-0.499, 1.0e-6
+c$$$      do s = ixc+0.499, ixc+0.501, 1.0e-6
+c$$$         x = ixc
+c$$$         y = s
+c$$$         geo1 = (/x2lon(x), y2lat(y), 0.0/)
+c$$$         geo2 = geo1
+c$$$         call repel_from_coast_line(geo2)
+c$$$         write(*,*) s, sum(geo2-geo1)
+c$$$      enddo
+      
+c     ------------------ 
 c     ---- Bee test ----
+c     ------------------
       geo1 = (/2.0, 53.0, 0.0/)
+      stability = 9   ! log10 of number of steps
       call get_horiz_ncc(geo1,ixc,iyc)     
       !Surround the point with dry cells
       wetmask   = 0 ! 0 dry, 1 wet
       wetmask(ixc,iyc)     = 1  ! 
       wetmask(ixc+1,iyc)   = 1  ! 
       wetmask(ixc+1,iyc+1) = 1  ! 
-      do istep=1,100000
+      do istep = 1, nint(10**stability)
          call random_number(r2)
          angle = 8*atan(1.0)*r2(2)
          dgeo  = r2(1)*rjump*(/cos(angle), sin(angle), 0.0/)
          geo2  = geo1+dgeo
          call multiple_reflection_path(geo1,geo2,anycross,georef,geohit)
-         if (anycross) then
-            geo1 = georef
+         if (anycross) geo2 = georef
+
+         if (is_land(geo2)) then
+            if (anycross) then
+               write(*,522) istep, geo1(1:2),geo1(1:2)+dgeo(1:2),
+     +                    georef(1:2),geohit(1:2)
+            else
+               write(*,523) istep, geo1(1:2), geo2(1:2)
+            endif
+ 522        format(i8,"    cross g1=", 2f12.6," g1+dg=",
+     +             2f12.6," ref=",2f12.6," hit=",2f12.6)
+ 523        format(i8," no cross g1=", 2f12.6," g1+dg=",2f12.6)
          else
-            geo1 = geo2
+            geo1 = geo2 ! accept step
          endif
-         write(*,*) geo1(1:2)
+
+c         write(*,*) geo1(1:2)
+c         if (is_land(geo1)) then
+c            write(*,*) "geo1 dry at step",istep
+c            write(*,*) "geo1 = ", geo1
+c            write(*,*) geo1(1:2)
+c            stop
+c         endif
       enddo
+
+
 
       end program
 

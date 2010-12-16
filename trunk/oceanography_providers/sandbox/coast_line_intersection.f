@@ -12,7 +12,7 @@ c     ---------------------------------------
       real, parameter    :: dlambda =  1.0
       real, parameter    :: phi1    = 49.0
       real, parameter    :: dphi    =  1.0
-      real, parameter    :: facial_tol(2) = 1.0e-4 ! note: lon part should be lat dependent
+      real, parameter    :: facial_tol(2) = 2.0e-4 ! note: lon part should be lat dependent
       integer,parameter  :: verbose = 0
 
 
@@ -928,7 +928,7 @@ c     ------------------
 c     ---- Bee test ----
 c     ------------------
       geo1 = (/2.0, 53.0, 0.0/)
-      stability = 9   ! log10 of number of steps
+      stability = 8   ! log10 of number of steps
       call get_horiz_ncc(geo1,ixc,iyc)     
       !Surround the point with dry cells
       wetmask   = 0 ! 0 dry, 1 wet

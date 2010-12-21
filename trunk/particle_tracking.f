@@ -840,15 +840,15 @@ c
 
 
 
-      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)
+      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)  ! update to particle_tracking.f 
 c-------------------------------------------------------------------------
 c     Compute key points of multiple horizontal coastal reflection path
 c     by iterative application of coast_line_intersection primitive
 c     when trying to move from (valid, wet) s0 to new position s1
 c     If a coast line is crossed retrun anycross == .true.
 c     Then sref is the (multiple) horizontal coastal reflected end point
-c     which is valid and wet. shit1 is the point of first coastal intersection
-c     If anycross == .false. (sref, shit) is undefined
+c     which is valid and wet. shit1 is the point of (first) coastal intersection
+c     If anycross == .false. (sref, shit1) is undefined
 c-------------------------------------------------------------------------
       real,intent(in)      :: s0(3), s1(3)
       logical,intent(out)  :: anycross
@@ -860,14 +860,17 @@ c-------------------------------------------------------------------------
 c---------------------------------------------------------------
       if (verbose>0) write(*,*) " multiple reflection analysis begin"
 
+      iter  = 0
       call coast_line_intersection(s0, s1, anycross, sref, shit1)
 
       if (verbose>0) then
          if (anycross) then 
-            write(*,422) s0, s1, sref, shit1
+            write(*,422) iter, s0(1:2), s1(1:2), sref(1:2), shit1(1:2)  
             write(*,*) "is_land(reflected point) = ", is_land(sref)
+            write(*,*) "continue multiple reflection analysis"
          else
-            write(*,423) s0, s1
+            write(*,423) iter, s0(1:2), s1(1:2)
+            write(*,*)"wet reflection: multiple reflection analysis end"
          endif
       endif ! verbose
 
@@ -878,7 +881,7 @@ c     --- we hit the coast line, start multiple reflection analysis
 c         (this means (sref, shit1) are defined and anycross == .true.)
 c
       iter  = 1
-      shit  = shit1
+      shit  = shit1  ! save first coastal hit
 c     note: is_land = .false. at horizontal range violation
 c     The loop below computes the final reflection, sref
 c     In most cases we will not enter the while loop, because sref is a wet point
@@ -892,10 +895,11 @@ c
          if (.not.anycross) sref=sfin ! roll back, in case sref is overwritten
          if (verbose>0) then
             if (anycross) then 
-               write(*,422) start, sfin, sref, shit
+               write(*,422) iter, start(1:2), sfin(1:2), 
+     +                      sref(1:2), shit(1:2)
                write(*,*) "is_land(reflected point) = ", is_land(sref)
             else
-               write(*,423) start, sfin
+               write(*,423) iter, start(1:2), sfin(1:2)
             endif
          endif ! verbose
 
@@ -906,10 +910,14 @@ c
          stop
       endif
  
- 422  format(3f7.2, "->", 3f7.2, ":ref=", 3f7.2, " hit=", 3f7.2)    
- 423  format(3f7.2, "->", 3f7.2, ":no cross")
+      if (verbose>0) write(*,*) " multiple reflection analysis end"
+
+ 422  format("step ", i3, " :", 2f7.2, " ->", 2f7.2, " : ref=",
+     +        2f7.2, " hit=", 2f7.2)    
+ 423  format("step ", i3, " :", 2f7.2, " ->", 2f7.2, " : no cross")
 c-----------------------------------------------------------
       end subroutine
+  
 
 
 

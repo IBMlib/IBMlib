@@ -6,18 +6,19 @@
 #  $LastChangedDate$
 #  $LastChangedBy$ 
 #
-#  This makefile builds IBMLIB_CORE and delegates out the update  
-#  of modules PHYSICAL_FIELDS/PARTICLE_STATE/TASK and makes to 
-#  final linking to all objects into the final executable EXECUTABLE.
-#  IBMLIB has six levels giving the appropriate build order (and allowed
+#  This makefile builds IBMlib core part and delegates out the building 
+#  of modules PHYSICAL_FIELDS/PARTICLE_STATE/TASK to the designated directory
+#  and finally links to all objects into the final executable EXECUTABLE.
+#  IBMLIB has seven levels giving the appropriate build order (and allowed
 #  directions of use association)
 #
 #   1) TASK 
-#   2) particles.mod
-#   3) PARTICLE_STATE 
-#   4) particle_tracking.mod
-#   5) PHYSICAL_FIELDS 
-#   6) IBMLIB_BASE (incl external included tools)     
+#   2) OUTPUT 
+#   3) particles.mod
+#   4) PARTICLE_STATE 
+#   5) particle_tracking.mod
+#   6) PHYSICAL_FIELDS 
+#   7) IBMLIB_BASE (incl external included tools)     
 #
 #  Each actual module PHYSICAL_FIELDS/PARTICLE_STATE/TASK must  be associated
 #  with a separate directory containing one makefile providing the (minimal) targets
@@ -28,8 +29,9 @@
 #  This means that .mod files from other levels should be considered external
 #  like system installations. This means that makefile for PHYSICAL_FIELDS/PARTICLE_STATE/TASK
 #  should suppress updates of external components and that root makefile
-#  is responsible for overall build order 6->5->4->3->2->1 above. 
-#  Each makefile of  may PHYSICAL_FIELDS/PARTICLE_STATE/TASK - or may not - include common.mk
+#  is responsible for overall build order 7->6->5->4->3->2->1 above. 
+#  Each makefile of  may PHYSICAL_FIELDS/PARTICLE_STATE/TASK - or may not - include 
+#  common_rules.mk/compiler_defaults.mk
 #
 #  Update responsibilities:
 #  	$(IBMLIB_DIR)/Makefile:          IBMLIB_OBJS   EXECUTABLE 
@@ -93,14 +95,15 @@
 
 .PHONY: clean force remake variables $(OUTPUT_WRITER_DIRS)
 	
-# Set parameters for external files
+# Set environment variables for build
 export IBMLIB_DIR   = $(shell pwd)
 export BUILD_TOOLS  = $(IBMLIB_DIR)/BuildTools
 export VPATH        = $(IBMLIB_DIR)  # make search path for src/obj    
-export COMMON_RULES = $(BUILD_TOOLS)/common_rules.mk   #implicit rules shared between makefiles
- 
-# Import external configuration files
-include  config.mk
+export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared between makefiles
+
+# load build configuration 
+-include  compiler_defaults.mk                # optional include 
+include  config.mk                            # mandatory include
 -include $(PHYSICAL_FIELDS_DIR)/link_opt.mk   # optional include 
 -include $(PARTICLE_STATE_DIR)/link_opt.mk    # optional include 
 -include $(TASK_DIR)/link_opt.mk              # optional include 

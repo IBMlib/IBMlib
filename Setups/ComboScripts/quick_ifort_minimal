@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-ln -s  Setups/common_rules.mk 
+ln -sf  Setups/common_rules.mk 
 #                     
-ln -s  Setups/Compilers/ifort/compiler_defaults.mk 
+ln -sf  Setups/Compilers/ifort/compiler_defaults.mk 
 #
 cat>config.mk<<EOF
 EXECUTABLE          = ibmrun

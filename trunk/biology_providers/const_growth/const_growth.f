@@ -12,6 +12,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       use time_tools           ! import clock type
       use particle_tracking    ! space types/methods
+      use output               ! access polytype for get_prop_state/get_metadata_state
 
       implicit none
       private     
@@ -36,6 +37,12 @@ c     -----------------------------------------------
       public :: delete_state_attributes 
       public :: write_state_attributes
 
+
+      interface get_property
+        module procedure get_prop_state
+      end interface
+      public :: get_property
+      public :: get_metadata_state
       public :: get_particle_version
 
 
@@ -54,13 +61,15 @@ c     --------
       write (*,*) trim(get_particle_version())
       end subroutine 
 
+    
+      subroutine close_particle_state() ! module operator
+      end subroutine 
+      
+
       character*100 function get_particle_version()  
       get_particle_version = "Constant growth particle biology" //
      +     " provider : $Rev$"
       end function
-      
-      subroutine close_particle_state() ! module operator
-      end subroutine 
       
 
       subroutine init_state_attributes(state, space, time_dir,             
@@ -104,6 +113,41 @@ c     -----------------
       type(state_attributes), intent(in) :: state 
       write(*,*) "length = ", state%lenght, " mm"
       end subroutine 
+
+      
+
+      subroutine get_prop_state(state,var,bucket,status)
+c------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(variable),intent(in) :: var
+      type(polytype), intent(out) :: bucket
+      integer, intent(out) :: status
+c------------------------------------------------------------  
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("lenght")
+        call construct(bucket,"lenght",state%lenght)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      end subroutine
+
+
+      subroutine get_metadata_state(var_name,var,status)
+c------------------------------------------------------------  
+      character(*), intent(in) :: var_name
+      type(variable),intent(out) :: var
+      integer, intent(out) :: status
+c------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (var_name)
+       case ("tracerID")
+         call construct(var,"lenght","lenght of organism",
+     +     units="mm",fmt="(f12.4)",type="real")
+      case default
+        status=1  !Cannot find variable
+      end select
+      end subroutine get_metadata_state
 
 
       end module

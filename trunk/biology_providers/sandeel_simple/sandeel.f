@@ -1,13 +1,15 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Sandeel simple biology provider 
+c
+c     egg/larval growth model of 
+c     Can. J. Fish. Aquat. Sci. 65: 1498-1511 (2008)
 c     ---------------------------------------------------
 c     $Rev$
 c     $LastChangedDate$
 c     $LastChangedBy$ 
 c
-c     Preliminary port of sandeel biology module
-c     to Phoenix version of IBMlib
+c     Port of sandeel biology module to Phoenix version of IBMlib
 c     
 c     NOW: deactivate backtracking (dt<0)
 c          removed habitat part, because it was grid specific to cmod 
@@ -19,6 +21,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use physical_fields
       use run_context, only: ctrlfile => simulation_file
       use input_parser
+      use output  ! access polytype for get_prop_state/get_metadata_state
 
       implicit none
       private     
@@ -38,7 +41,7 @@ c     -----------------------------------------------
       integer     :: hatch_day            ! Julian day
       integer     :: day_of_metamorphosis ! Julian day 
 
-      integer     :: orig_boxID ! spatial release box
+      integer     :: sourceBox  ! spatial release box
       integer     :: eggID      ! negative is unset
       integer     :: larvID     ! negative is unset
       integer     :: juvID      ! negative is unset
@@ -54,9 +57,15 @@ c     -----------------------------------------------
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+
+      interface get_property
+        module procedure get_prop_state
+      end interface
       public :: get_particle_version
-
-
+      public :: get_property
+      public :: get_metadata_state
+      
+      
 
 c     =================================================
 c     ========       module data section       ========
@@ -142,11 +151,6 @@ c --- Read juvenile transition parameters ---
       write(*,*) "  larvae_metamorph_len =", L_metamorp1
 
       end subroutine 
-
-      character*100 function get_particle_version()  
-      get_particle_version = "Sandeel simple particle biology" //
-     +     " provider : $Rev$"
-      end function
 
 
       subroutine close_particle_state() ! module operator
@@ -380,7 +384,7 @@ c     -----------------------------------------------
       state%hatch_day            = -1  ! Julian day (negative == unset)
       state%day_of_metamorphosis = -1  ! Julian day (negative == unset) 
 
-      state%orig_boxID = origbox  ! spatial release box
+      state%sourceBox  = origbox  ! spatial release box
       state%eggID      = -1     ! negative is unset
       state%larvID     = -1     ! negative is unset
       state%juvID      = -1     ! negative is unset
@@ -464,6 +468,101 @@ c     -----------------------------------------------
       type(state_attributes), intent(in) :: state 
       write(*,*) "type ", state%type, " size = ", state%size, " mm"
       end subroutine 
+
+
+
+
+
+      character*100 function get_particle_version() 
+c------------------------------------------------------------ 
+      get_particle_version = "Sandeel simple egg/larval biology" //
+     +     " provider : $Rev$"
+      end function
+
+
+
+      subroutine get_prop_state(state,var,bucket,status)
+c------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(variable),intent(in) :: var
+      type(polytype), intent(out) :: bucket
+      integer, intent(out) :: status
+c------------------------------------------------------------  
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("size")
+        call construct(bucket,"size",state%size)
+      case ("type")
+        call construct(bucket,"type",state%type)             
+      case ("growth_seed")
+        call construct(bucket,"growth_seed",state%growth_seed)      
+      case ("spawn_day")
+        call construct(bucket,"spawn_day",state%spawn_day)   
+      case ("hatch_day")
+        call construct(bucket,"hatch_day",state%hatch_day)       
+      case ("day_of_metamorphosis")
+        call construct(bucket,"day_of_metamorphosis",
+     +                 state%day_of_metamorphosis)
+      case ("sourceBox")
+        call construct(bucket,"sourceBox",state%sourceBox)  
+      case ("eggID")
+        call construct(bucket,"eggID",state%eggID)  
+      case ("larvID")
+        call construct(bucket,"larvID",state%larvID)   
+      case ("juvID")
+        call construct(bucket,"juvID",state%juvID)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      end subroutine
+
+
+      subroutine get_metadata_state(var_name,var,status)
+c------------------------------------------------------------  
+      character(*), intent(in) :: var_name
+      type(variable),intent(out) :: var
+      integer, intent(out) :: status
+c------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (var_name)
+      case ("size")
+        call construct(var,"size",
+     +                "egg maturity level/size of organism",
+     +                 units="[0;1]/mm",fmt="(f12.5)",type="real")
+      case ("type")
+        call construct(var,"type", 
+     +                "organism type (egg/lar/juv/die/non)",
+     +                 units="-",fmt="(a3)",type="char")  
+      case ("growth_seed")
+        call construct(var,"growth_seed","relative growth speed",
+     +                 units="[0;1]",fmt="(f12.5)",type="real") 
+      case ("spawn_day")
+        call construct(var,"spawn_day", "Julian day of spawning",
+     +                 units="-",fmt="(i6)",type="int")    
+      case ("hatch_day")
+        call construct(var,"hatch_day", "Julian day of hatching",
+     +                 units="-",fmt="(i6)",type="int")        
+      case ("day_of_metamorphosis")
+        call construct(var,"day_of_metamorphosis", 
+     +                 "Julian day of metamorphosis",
+     +                 units="-",fmt="(i6)",type="int")  
+      case ("sourceBox")
+        call construct(var,"sourceBox", "source box ID",
+     +                 units="-",fmt="(i6)",type="int")  
+      case ("eggID")
+        call construct(var,"eggID", "ID number of egg stage",
+     +                 units="-",fmt="(i6)",type="int")  
+      case ("larvID")
+        call construct(var,"larvID", "ID number of larval stage",
+     +                 units="-",fmt="(i6)",type="int")    
+      case ("juvID")
+        call construct(var,"juvID", "ID number of juvenile stage",
+     +                 units="-",fmt="(i6)",type="int")     
+      case default
+        status=1  !Cannot find variable
+      end select
+      end subroutine get_metadata_state
+
 
 
       end module

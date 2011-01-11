@@ -7,10 +7,15 @@ c     $LastChangedDate$
 c     $LastChangedBy$ 
 c
 c     Empty public interface of particle_state
+c
+c     This module may trigger compiler warnings because 
+c     variables with intent(out) are not set
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module particle_state
       use time_tools           ! import clock type
       use particle_tracking    ! space types/methods
+      use output               ! access polytype for get_prop_state/get_metadata_state
+
       implicit none
 
 c     -----------------------------------------------    
@@ -24,6 +29,9 @@ c     -----------------------------------------------
       end type
       public :: state_attributes
 
+      interface get_property
+        module procedure get_prop_state
+      end interface
 
       contains
          
@@ -32,14 +40,13 @@ c     -----------------------------------------------
 c     ----------------------------------------------------
       end subroutine 
 
+      subroutine close_particle_state() ! module operator
+c     ----------------------------------------------------
+      end subroutine 
 
       character*100 function get_particle_version()  
       end function
 
-      subroutine close_particle_state() ! module operator
-c     ----------------------------------------------------
-      end subroutine 
-      
 
       subroutine init_state_attributes(state, space, time_dir,             
      +                                 initdata, emitboxID)
@@ -78,6 +85,26 @@ c     ----------------------------------------------------
 c     ----------------------------------------------------
       type(state_attributes), intent(in) :: state 
       end subroutine 
+
+      
+
+      subroutine get_prop_state(state,var,bucket,status)
+c------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(variable),intent(in)         :: var
+      type(polytype), intent(out)       :: bucket
+      integer, intent(out)              :: status
+c------------------------------------------------------------  
+      end subroutine
+
+
+      subroutine get_metadata_state(var_name,var,status)
+c------------------------------------------------------------  
+      character(*), intent(in)   :: var_name
+      type(variable),intent(out) :: var
+      integer, intent(out)       :: status
+c------------------------------------------------------------  
+      end subroutine get_metadata_state
 
 
       end module

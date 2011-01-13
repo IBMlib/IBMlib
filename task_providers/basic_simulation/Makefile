@@ -3,8 +3,8 @@
 # 
 ############################################################
 
-task.a: basic_simulation.o
-	ar rcs task.a basic_simulation.o
+task.a: basic_simulation_with_output.o
+	ar rcs task.a basic_simulation_with_output.o
 
 include $(COMMON_RULES)
 
@@ -20,6 +20,6 @@ FORCE:
 #
 #     EXTRES = -x time_tools  -x run_context  -x physical_fields  -x particles
 
-input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  particles.mod: 
+input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  particles.mod netcdf.mod netcdf_writer.mod ascii_writer.mod: 
 	echo "update of" $@ "suppressed"
 

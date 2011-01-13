@@ -1,4 +1,4 @@
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Particles module
 c     ---------------------------------------------------
@@ -626,11 +626,11 @@ c------------------------------------------------------------
       end subroutine
 
 
-      subroutine get_metadata_single(var_name,var,status)
+      subroutine get_metadata_single(var_name,var)
 c     ---------------------------------------------------
       character(*), intent(in) :: var_name
       type(variable), intent(out) :: var
-      integer, intent(out) :: status
+      integer :: status
 c     ---------------------------------------------------
       !Search for the variable systematically, stopping at first instance
       call get_metadata_space(var_name,var,status)
@@ -640,6 +640,11 @@ c     ---------------------------------------------------
       call get_metadata_system(var_name,var, status)
       if(status==0) return
       call get_metadata_par_ens(var_name,var,status)
+      if(status/=0) then
+         call abort_run("get_metadata_single","Cannot find variable '"
+     +       // trim(var_name) // "'.")
+      endif
+
       end subroutine
       
 
@@ -652,12 +657,7 @@ c     ---------------------------------------------------
       !Get metadata and insert into variable slot
       do i=1,size(var_names)
           !Get the metadata
-          call get_metadata(var_names(i),vars(i),ok)
-          if(ok/=0) then
-            write(*,*) "ERROR: Variable "//trim(var_names(i))// 
-     +       " is not available."
-            stop
-          endif
+          call get_metadata(var_names(i),vars(i))
       enddo
       end subroutine
 

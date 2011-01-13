@@ -91,8 +91,8 @@ c------------------------------------------------------------
       allocate(of%varids(of%nvars))
       of%vars = vars
       !Setup time and particle variables
-      call get_metadata("POSIX",time_var,ok)
-      call get_metadata("tracerID",par_var,ok)
+      call get_metadata("POSIX",time_var)
+      call get_metadata("tracerID",par_var)
       of%par_var = par_var
       of%time_var = time_var
       !Write a description of the file

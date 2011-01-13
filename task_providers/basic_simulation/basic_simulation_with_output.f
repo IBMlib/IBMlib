@@ -65,7 +65,7 @@ c     ------------   setup output files  ------------
       call set_var_range(vars(3),(/45.0,65.0/))
       call set_var_range(vars(4),(/-15.0,15.0/))
       call init_output(trajs,"trajectories.nc",
-     +       vars(1),vars(2),vars(3:5),get_ensemble_size(par_ens))
+     +       vars(3:5),get_ensemble_size(par_ens))
 
 c     =====================  main time loop =====================
       istep   = 0

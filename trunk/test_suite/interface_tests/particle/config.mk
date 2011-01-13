@@ -7,9 +7,6 @@ PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/passive
 TASK_DIR            = $(IBMLIB_DIR)/test_suite/interface_tests/particle
 ##################################################################
 
-#Compiler settings - use defaults as basis
-include $(BUILD_TOOLS)/compiler_defaults.mk
-
 #Modify compiler settings 
 FCFLAGS += -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
 #Add big endian to read DMI data - this should really be set as part of the DMI oceanography provider

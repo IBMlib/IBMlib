@@ -11,6 +11,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module ascii_writer
       use output
       use particles
+      use input_parser
             
       implicit none
       private
@@ -40,6 +41,10 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       end interface
       public :: write_particles
 
+      interface setup_output_from_file
+         module procedure setup_output_from_file_ascii
+      end interface
+      public :: setup_output_from_file
       
       contains
       
@@ -155,5 +160,50 @@ c------------------------------------------------------------
       !Now write the line to the unit (without the last separator)
       write(of%iunit,*) trim(outstr)
       end subroutine
+
       
+      subroutine setup_output_from_file_ascii(of,
+     +                   ctrl,fname_tag,var_tag)
+      !-------------------------------------------------------  
+      !Creates an ascii_output_file by reading configuration
+      !tags from a configuration file
+      type(ascii_output_file),intent(inout) :: of
+      type(control_file), intent(in) :: ctrl
+      character(*), intent(in) :: fname_tag, var_tag
+      !------locals ------
+      integer :: nvars,i,ihit,nwords,start(256)
+      character*999 :: strbuf,fname,fmt,var_name
+      type(variable), allocatable :: vars(:)
+      !-------------------------------------------------------  
+      !Count the number of varables in the ctrlfile and allocate
+      nvars = count_tags(ctrl,var_tag)                
+      allocate(vars(nvars))
+
+      !Read tags sequentially and create variables
+      ihit=1
+      do i=1,nvars
+        call read_control_data(ctrl,var_tag,strbuf,ihit)
+        ihit = ihit +1 
+        !Split strbuf into variables as required
+        call tokenize(strbuf, start, nwords)
+        read(strbuf(start(1):),*) var_name 
+        !Now create output variable
+        call get_metadata(adjustl(var_name),vars(i))
+        !Set variable fmt if specified
+        if(nwords>=2) then
+          read(strbuf(start(2):),*) fmt
+          call set_fmt(vars(i),fmt)
+        endif
+      enddo
+
+      !Get filename 
+      call read_control_data(ctrl,fname_tag,fname)
+      fname = adjustl(trim(fname))
+
+      !Setup file
+      call init_output(of,fname,char(9),vars)
+
+      deallocate(vars)
+      end subroutine
+
       end module

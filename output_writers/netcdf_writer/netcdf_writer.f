@@ -27,6 +27,7 @@ c------------------------------------------------------------
       use output
       use netcdf
       use particles
+      use input_parser
             
       implicit none
       private
@@ -56,6 +57,11 @@ c------------------------------------------------------------
          module procedure write_frame_netcdf   
       end interface
       public :: write_frame
+
+      interface setup_output_from_file
+         module procedure setup_output_from_file_netcdf
+      end interface
+      public :: setup_output_from_file
 
       integer, parameter :: NF90_SHORT_highlim = (2**15)-1
       integer, parameter :: NF90_SHORT_lowlim  = -NF90_SHORT_highlim+1
@@ -445,5 +451,61 @@ c     -------------------------------------------------------
       call set_scalar(this,scalar)
       call set_offset(this,offset)
       end subroutine
+
   
+      subroutine setup_output_from_file_netcdf(of,par_ens,
+     +            ctrl,fname_tag,var_tag)
+      !-------------------------------------------------------  
+      !Creates an ascii_output_file by reading configuration
+      !tags from a configuration file
+      type(netcdf_output_file),intent(inout) :: of
+      type(control_file), intent(in) :: ctrl
+      character(*), intent(in) :: fname_tag, var_tag
+      type(particle_ensemble), intent(in) :: par_ens
+      !------locals ------
+      integer :: nvars,i,ihit,nwords, start(256),npars
+      real    :: var_range(2)
+      character*999 :: strbuf,fname,var_type,var_name
+      type(variable), allocatable :: vars(:)
+      type(variable) :: time_var, par_var
+      !-------------------------------------------------------  
+      !Count the number of varables in the ctrlfile and allocate
+      nvars = count_tags(ctrl,var_tag)                
+      allocate(vars(nvars))
+
+      !Read tags sequentially and create variables
+      ihit=1
+      do i=1,nvars
+        call read_control_data(ctrl,var_tag,strbuf,ihit)
+        ihit = ihit +1 
+        !Split strbuf into variables as required
+        call tokenize(strbuf, start, nwords)
+        read(strbuf(start(1):),*) var_name 
+        !Now create output variable
+        call get_metadata(adjustl(var_name),vars(i))
+        !Set variable type if specified
+        if(nwords>=2) then
+          read(strbuf(start(2):),*) var_type
+          call set_type(vars(i),var_type)
+        endif
+        !Set variable range if specified
+        if(nwords>=4) then
+          read(strbuf(start(3):),*) var_range(1)
+          read(strbuf(start(4):),*) var_range(2)
+          call set_var_range(vars(i),var_range)
+        endif
+
+      enddo
+
+      !Get filename 
+      call read_control_data(ctrl,fname_tag,fname)
+      fname = adjustl(trim(fname))
+
+      !Setup file
+      npars = get_ensemble_size(par_ens)
+      call init_output(of,fname,vars,npars)
+
+      deallocate(vars)
+      end subroutine
+
       end module

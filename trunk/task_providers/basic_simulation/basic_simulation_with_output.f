@@ -55,7 +55,7 @@ c     ------------   setup output files  ------------
       allocate(out_vars(5))
       allocate(vars(size(out_vars)))
       out_vars(1)  = "tracerID"
-      out_vars(2)  = "sourceBox"
+      out_vars(2)  = "POSIX"
       out_vars(3:4)=(/"lat","lon"/)
       out_vars(5)  = "depth"
       call get_metadata(out_vars,vars)

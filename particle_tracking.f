@@ -1583,7 +1583,7 @@ c------------------------------------------------------------
         call construct(var,"lon","Longitude","deg E","(f6.2)","real")
       case ("depth")
         call construct(var,"depth","Depth positive downwards",
-     +                  units="m",fmt="(f6.2)",type="real")
+     +                  units="m",fmt="(f7.2)",type="real")
       case ("mobx")
         call construct(var,"mobx","Meridonal mobility",
      +                  units="T/F",fmt="(l1)",type="log")

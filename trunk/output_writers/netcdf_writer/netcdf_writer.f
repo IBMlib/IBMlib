@@ -69,16 +69,16 @@ c------------------------------------------------------------
       contains
       
       
-      subroutine init_output_netcdf(of,filename,
-     +              par_var,time_var,vars,npars)
+      subroutine init_output_netcdf(of,filename,vars,npars)
 c------------------------------------------------------------  
       type(netcdf_output_file),intent(out) :: of
       character(*), intent(in) :: filename
-      type(variable), intent(in) :: par_var,time_var,vars(:)
+      type(variable), intent(in) :: vars(:)
       integer, intent(in)    :: npars
       !----locals----
       type(particle) :: par
       integer i, ncid, ok, time_dimid, par_dimid,dimids(2)
+      type(variable) :: time_var, par_var
 c------------------------------------------------------------        
       !Initialise file object
       write(*,*) "Initialising netcdf outputfile : ",trim(filename)
@@ -89,14 +89,13 @@ c------------------------------------------------------------
       allocate(of%par_var)
       allocate(of%time_var)
       allocate(of%varids(of%nvars))
+      of%vars = vars
+      !Setup time and particle variables
+      call get_metadata("POSIX",time_var,ok)
+      call get_metadata("tracerID",par_var,ok)
       of%par_var = par_var
       of%time_var = time_var
-      of%vars = vars
       !Write a description of the file
-      write(*,380) 000, trim(get_name(of%par_var)),
-     +       trim(get_desc(of%par_var)) 
-      write(*,380) 000, trim(get_name(of%time_var)),
-     +       trim(get_desc(of%time_var)) 
       do i=1,of%nvars
           write(*,380) i, trim(get_name(of%vars(i))),
      +       trim(get_desc(of%vars(i))) 
@@ -326,7 +325,7 @@ c     !type that will be stored in the netcdf file
          case default
            call abort_run("prepare_variable_netcdf()"," Variable '"// 
      +      trim(get_name(var)) // "' is of"
-     +      //" type '" //trim(get_name(bucket))//"' and cannot "
+     +      //" type '" //trim(get_type(bucket))//"' and cannot "
      +      //"be cast as NF90_FLOAT or NF90_DOUBLE")
          end select
          !Now construct the bucket

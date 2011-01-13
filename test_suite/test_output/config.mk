@@ -9,9 +9,6 @@ OUTPUT_WRITER_DIRS = $(IBMLIB_DIR)/output_writers/ascii_writer
 OUTPUT_WRITER_DIRS  += $(IBMLIB_DIR)/output_writers/netcdf_writer
 ##################################################################
 
-#Compiler settings - use defaults as basis
-include $(BUILD_TOOLS)/compiler_defaults.mk
-
 #Modify compiler settings 
 FCFLAGS += -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
 #Add big endian to read DMI data - this should really be set as part of the DMI oceanography provider

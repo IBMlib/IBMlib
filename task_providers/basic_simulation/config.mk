@@ -7,8 +7,5 @@ PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/passive
 TASK_DIR            = $(IBMLIB_DIR)/task_providers/basic_simulation
 ##################################################################
 
-#Compiler settings - use defaults as basis
-include $(BUILD_TOOLS)/compiler_defaults.mk
-
 #Modify compiler settings 
 FCFLAGS += -check bounds -check uninit -traceback  #Add bounds checking and tracebacks

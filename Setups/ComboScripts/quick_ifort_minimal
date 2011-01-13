@@ -1,6 +1,5 @@
 #!/bin/sh
 #
-ln -sf  Setups/common_rules.mk 
 #                     
 ln -sf  Setups/Compilers/ifort/compiler_defaults.mk 
 #

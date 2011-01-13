@@ -102,7 +102,7 @@ export VPATH        = $(IBMLIB_DIR)  # make search path for src/obj
 export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared between makefiles
 
 # load build configuration 
--include  compiler_defaults.mk                # optional include 
+include  compiler_defaults.mk                 # mandatory include 
 include  config.mk                            # mandatory include
 -include $(PHYSICAL_FIELDS_DIR)/link_opt.mk   # optional include 
 -include $(PARTICLE_STATE_DIR)/link_opt.mk    # optional include 

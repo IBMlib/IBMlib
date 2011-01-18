@@ -273,18 +273,19 @@ c     Currently it is being asserted that geo2 does not violate the outer domain
 c     
 c     Conceptual revision ASC/MPA Nov 24, 2010 
 c     Infinitesimal coast line repulsion added ASC Dec 06, 2010 
-c     ------------------------------------------ 
+c     Resolve association conflict at cell transition analysis, ASC Jan 18, 2011 
+c     ---------------------------------------------------- 
       real, intent(in)     :: geo1(:),geo2(:)
       logical, intent(out) :: cross_coast
       real, intent(out)    :: georef(:), geohit(:)
 c   
-      real                 :: s, s_min
+      real                 :: s
      
       logical              :: leaving,loopflag,ldum
       character*1          :: reftype, xface
       real                 :: direct(size(geo1)), reflect(size(geo1))
-      integer              :: ix,iy,ix2,iy2
-c     ------------------------------------------ 
+      integer              :: ix,iy,ix2,iy2,istep,maxsteps
+c     ---------------------------------------------------- 
       call get_horiz_ncc(geo1,ix,iy)    ! resolve start point cell
       call get_horiz_ncc(geo2,ix2,iy2)  ! resolve end point cell
 c
@@ -312,14 +313,16 @@ c
       if (verbose>0) write(*,*) "trajectory analysis: begin"
 
 c     Now we know that we are leaving the cell. But where? 
-      call assess_cell_leaving(geo1,geo2,ix,iy,leaving,s,xface) 
-
 c     Follow sequence moving from one cell to the next until we either
-c     reach the end of the vector, or encounter land
-      s_min = 1.0           ! upper bound
+c     reach the end of the vector (s=1), or encounter land
+
       cross_coast = .false. ! default unless detected below
-      loopflag  = .true.
+      loopflag    = .true.
+      istep       = 1
+      maxsteps    = max(1,abs(ix-ix2))*max(1,abs(iy-iy2)) ! safety plug
+
       do while(loopflag)
+         call assess_cell_crossing(geo1,geo2,ix,iy,s,xface)
          if (verbose>0) write(*,421) ix,iy,xface
  421     format("leaving cell ",2i4," via ", a," face") 
          !Move into the next cell
@@ -336,8 +339,7 @@ c     reach the end of the vector, or encounter land
             write (*,*) "coast_line_intersection: Exit face error"
             stop
          end select
-         !Is the next cell wet or dry? If its dry, then we've hit the
-         !coast.  
+         !Is the next cell wet or dry? If its dry, then we've hit the coast.  
          !Move into the next cell
          if (verbose>0) then
             if(wetmask(ix,iy)>0) then
@@ -348,13 +350,18 @@ c     reach the end of the vector, or encounter land
 422        format("new cell : ",2i4," is ", a) 
          endif
 
-         if(wetmask(ix,iy) == 0) then  !have crossed onto land
-           cross_coast = .true.        !so setup for exit
-           loopflag    = .false.        
-         else   !do we leave this new cell?
-           call assess_cell_leaving(geo1,geo2,ix,iy,leaving,s,xface) 
-           loopflag = leaving     !loop if we leave this new cell
+         if(wetmask(ix,iy) == 0) then     ! have crossed onto land
+            cross_coast = .true.          ! so setup for exit
+            loopflag    = .false.        
+         elseif ((ix==ix2).and.(iy==iy2)) then ! we are in final cell without crossing the coast  
+            loopflag    = .false.         ! so setup for exit, still cross_coast == .false.
+         elseif (istep>maxsteps) then
+            write(*,*) "coast_line_intersection: maxsteps exceeded)"
+            stop
          endif
+
+         istep = istep + 1
+
       enddo
 c  
 c     if (cross_coast == .true.) continue and resolve georef and geohit
@@ -368,8 +375,9 @@ c
       endif
 c
 c     If the coast line is crossed, compute georef, geohit
-c     0 < s_min < 1 is the coordinate along the vector (geo2-geo1)
-c          
+c     0 < s < 1 is the coordinate along the vector (geo2-geo1) 
+c     corresponding to the point geohit
+c     
       direct  = geo2-geo1
       reflect = direct
       if     (xface=="N" .or. xface =="S") then
@@ -395,25 +403,25 @@ c     -----------------------------
       contains  ! local subroutines
 c     -----------------------------
 
-      subroutine assess_cell_leaving(geo1,geo2,ix,iy,leave,s,exitface) ! internal to coast_line_intersection
+      subroutine assess_cell_crossing (geo1,geo2,ix,iy,s,exitface) ! internal to coast_line_intersection
 c     --------------------------------------------------------------
-c     Determine whether and where the direct line from geo1 to geo2 
+c     Determine where the direct line from geo1 through geo2 
 c     leaves the cell with center (ix,iy)
-c     If so return leave=.true. (else .false.)
-c     If so return leave=.true., determine 0 < s < 1 which is the 
-c     coordinate along the vector (geo2-geo1) where the vector exits the
-c     cell. Also identify the exit face as one of "N","S","E","W" 
+c     Return 0 < s  which is the coordinate along the vector (geo2-geo1) 
+c     where the vector exits the cell. Notice s may exceed 1 
+c     (which is the case, if cell (ix,iy) contains geo2)
+c     Also identify the exit face as one of "N","S","E","W" 
 c     so the proper reflection can be calculated
-c     If leave=.false. (s,exitface) are undefined
+c
+c     Modified from assess_cell_leaving to avoid decision conflicts ASC/18Jan2011
 c     --------------------------------------------------------------
       real, intent(in)         :: geo1(:),geo2(:)
       integer, intent(in)      :: ix,iy
-      logical, intent(out)     :: leave
       real, intent(out)        :: s
       character*1, intent(out) :: exitface
 c
       logical                  :: yes
-      real                     :: stest,dgeo(2)
+      real                     :: stest,tdum,dgeo(2)
       real                     :: c00(2),c01(2),c10(2),c11(2)
 c     --------------------------------------------------------------
       call get_horiz_ncc_corners(ix,iy,c00,c01,c10,c11) ! resolve faces          
@@ -423,42 +431,55 @@ c     We can make efficiency gains by taking advantage of the direction
 c     that the particle is travelling in - a particle travelling NE
 c     can only leave by the North and East faces etc
 c
-      leave = .false.
-      exitface = "@"
-      s     = 1.0 
-      dgeo = geo2(1:2)-geo1(1:2)
+      exitface = "@"    ! we should not pick this one up now, but ...
+      s        = 1.0e12 ! must be set before first comparison
+      dgeo     = geo2(1:2)-geo1(1:2)
+c
 c     First the east-west direction
+c
       if(dgeo(1)>0) then    !we're moving to the east
-         call cross_2Dline_segments(geo1,geo2,c10,c11,stest,yes)
-         if (yes.and.(stest<=s)) then ! rely on right-to-left evaluation
-            leave = .true.
-            s     = stest
+
+         call cross_2Dlines(geo1,geo2,c10,c11,stest,tdum,yes)
+         if (yes.and.(stest<s)) then ! rely on right-to-left evaluation
+            s         = stest
             exitface  = "E"   
          endif
       else   !we're moving to the west
-         call cross_2Dline_segments(geo1,geo2,c00,c01,stest,yes)
-         if (yes.and.(stest<=s)) then ! rely on right-to-left evaluation
-            leave = .true.
-            s     = stest
+         call cross_2Dlines(geo1,geo2,c00,c01,stest,tdum,yes)
+         if (yes.and.(stest<s)) then ! rely on right-to-left evaluation
+            s         = stest
             exitface  = "W"   
          endif
       endif
+c
+c     Then the north-south direction
+c
       if(dgeo(2) >0) then !we're moving to the North
-         call cross_2Dline_segments(geo1,geo2,c01,c11,stest,yes)
-         if (yes.and.(stest<=s)) then ! rely on right-to-left evaluation
-            leave = .true.
-            s     = stest
+         call cross_2Dlines(geo1,geo2,c01,c11,stest,tdum,yes)
+         if (yes.and.(stest<s)) then ! rely on right-to-left evaluation
+            s         = stest
             exitface  = "N"   
          endif
       else  !we're moving to the south
-         call cross_2Dline_segments(geo1,geo2,c00,c10,stest,yes)
-         if (yes.and.(stest<=s)) then ! rely on right-to-left evaluation
-            leave = .true.
-            s     = stest
+         call cross_2Dlines(geo1,geo2,c00,c10,stest,tdum,yes)
+         if (yes.and.(stest<s)) then ! rely on right-to-left evaluation
+            s         = stest
             exitface  = "S"   
          endif
       endif
-      end subroutine assess_cell_leaving     ! local subroutine
+c
+c     check exit conditions
+c
+      if (s<0) then
+         write(*,*) "assess_cell_crossing: unexpected s<0"
+         write(*,*) "found s =",s
+         write(*,*) "geo1    =",geo1
+         write(*,*) "geo2    =",geo2
+         write(*,*) "(ix,iy) =",ix,iy
+         stop       
+      endif
+      end subroutine assess_cell_crossing     ! local subroutine
+
       end subroutine coast_line_intersection ! embedding subroutine
 
 
@@ -761,22 +782,20 @@ c     ------------------------------------------
       end subroutine get_horiz_ncc_corners
 
 
-      
-      subroutine cross_2Dline_segments(x0,x1,y0,y1,s,cross)    ! paste-in dummy
+      subroutine cross_2Dlines(x0,x1,y0,y1,s,t,cross) ! paste-in dummy from geometry.f
 c     ----------------------------------------------------------
-c     Calculate whether the line from x0 to x1 crosses
-c     the line from y0 to y1. s is the coordinate along the
-c     vector from x0 to x1, and 0<s<1 if cross == .true.
-c     If cross == .false. lines do not cross between (x0 to x1)
-c     and between (y0 to y1) or lines are parallel.
-c
-c     Corrected 28 Oct 2010 to ensure only interior solution
+c     Calculate whether and where the line through (x0, x1) crosses
+c     the line through (y0, y1). s is the coordinate along the
+c     vector from x0 to x1, and t is the coordinate along the
+c     vector from y0 to y1. The solution (s,t) may be any real values 
+c     if it exists (cross == .true.). If cross == .false. lines 
+c     are parallel or either (x0==x1) or (y0==y1). 
 c     ----------------------------------------------------------
       implicit none
       real, intent(in)     :: x0(*),x1(*),y0(*),y1(*)
-      real, intent(out)    :: s
+      real, intent(out)    :: s,t
       logical, intent(out) :: cross
-      real                 :: vx(2),vy(2),lvx2,lvy2,det,t
+      real                 :: vx(2),vy(2),lvx2,lvy2,det
       real,parameter       :: s_parallel = 1.e20
       real,parameter       :: s_undef    = 2.e20
 c     ----------------------------------------------------------
@@ -786,12 +805,14 @@ c     ----------------------------------------------------------
       lvy2  = sum(vy*vy)
       if ((lvx2 < 1.e-12).or.(lvy2 < 1.e-12)) then ! angle undef
          s = s_undef
+         t = s_undef
          cross=.false.
          return
       endif   
       det = vx(2)*vy(1) - vx(1)*vy(2)     
-      if (abs(det)< 1.e-8) then ! lines parallel
+      if (abs(det)< 1.e-12) then ! lines parallel
          s = s_parallel
+         t = s_parallel
          cross=.false.
          return
       endif
@@ -811,23 +832,12 @@ c
 c     condition for interior crossing: 0 < s,t < 1
 c
 
+      cross = .true.
       s = (vy(2)*x0(1) - vy(1)*x0(2) - vy(2)*y0(1) + vy(1)*y0(2))/det
       t = (vx(2)*x0(1) - vx(1)*x0(2) - vx(2)*y0(1) + vx(1)*y0(2))/det
-
-      if (in_princip_range(s).and.in_princip_range(t)) then
-         cross = .true.
-      else
-         cross = .false.
-      endif
-      
-      contains
-
-      logical function in_princip_range(x)
-      real, intent(in)     :: x
-      in_princip_range = ((x >= 0.0).and.(x <= 1.0))
-      end function
 c     ----------------------------------------------------------
-      end subroutine cross_2Dline_segments
+      end subroutine cross_2Dlines
+
 
       end module
 

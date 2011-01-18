@@ -16,6 +16,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       private
 
       public ::  cross_2Dline_segments
+      public ::  cross_2Dlines
       public ::  dcart2dxy
       public ::  get_horizontal_distance
 
@@ -31,7 +32,7 @@ c     vector from x0 to x1, and 0<s<1 if cross == .true.
 c     If cross == .false. lines do not cross between (x0 to x1)
 c     and between (y0 to y1) or lines are parallel.
 c
-c     Corrected 28 Oct 2010 to ensure only interior solution
+c     Wrapper variant of cross_2Dlines to ensure only interior solution
 c     ----------------------------------------------------------
       implicit none
       real, intent(in)     :: x0(*),x1(*),y0(*),y1(*)
@@ -41,18 +42,50 @@ c     ----------------------------------------------------------
       real,parameter       :: s_parallel = 1.e20
       real,parameter       :: s_undef    = 2.e20
 c     ----------------------------------------------------------
+      call cross_2Dlines(x0,x1,y0,y1,s,t,cross)
+      cross = cross .and. in_princip_range(s) .and. in_princip_range(t)
+
+      contains
+ 
+      logical function in_princip_range(x)
+      real, intent(in)     :: x
+      in_princip_range = ((x >= 0.0).and.(x <= 1.0))
+      end function
+c     ----------------------------------------------------------
+      end subroutine cross_2Dline_segments
+
+
+      subroutine cross_2Dlines(x0,x1,y0,y1,s,t,cross)
+c     ----------------------------------------------------------
+c     Calculate whether and where the line through (x0, x1) crosses
+c     the line through (y0, y1). s is the coordinate along the
+c     vector from x0 to x1, and t is the coordinate along the
+c     vector from y0 to y1. The solution (s,t) may be any real values 
+c     if it exists (cross == .true.). If cross == .false. lines 
+c     are parallel or either (x0==x1) or (y0==y1). 
+c     ----------------------------------------------------------
+      implicit none
+      real, intent(in)     :: x0(*),x1(*),y0(*),y1(*)
+      real, intent(out)    :: s,t
+      logical, intent(out) :: cross
+      real                 :: vx(2),vy(2),lvx2,lvy2,det
+      real,parameter       :: s_parallel = 1.e20
+      real,parameter       :: s_undef    = 2.e20
+c     ----------------------------------------------------------
       vx    = x1(1:2)-x0(1:2)
       vy    = y1(1:2)-y0(1:2)
       lvx2  = sum(vx*vx)
       lvy2  = sum(vy*vy)
       if ((lvx2 < 1.e-12).or.(lvy2 < 1.e-12)) then ! angle undef
          s = s_undef
+         t = s_undef
          cross=.false.
          return
       endif   
       det = vx(2)*vy(1) - vx(1)*vy(2)     
-      if (abs(det)< 1.e-8) then ! lines parallel
+      if (abs(det)< 1.e-12) then ! lines parallel
          s = s_parallel
+         t = s_parallel
          cross=.false.
          return
       endif
@@ -72,23 +105,11 @@ c
 c     condition for interior crossing: 0 < s,t < 1
 c
 
+      cross = .true.
       s = (vy(2)*x0(1) - vy(1)*x0(2) - vy(2)*y0(1) + vy(1)*y0(2))/det
       t = (vx(2)*x0(1) - vx(1)*x0(2) - vx(2)*y0(1) + vx(1)*y0(2))/det
-
-      if (in_princip_range(s).and.in_princip_range(t)) then
-         cross = .true.
-      else
-         cross = .false.
-      endif
-      
-      contains
-
-      logical function in_princip_range(x)
-      real, intent(in)     :: x
-      in_princip_range = ((x >= 0.0).and.(x <= 1.0))
-      end function
 c     ----------------------------------------------------------
-      end subroutine cross_2Dline_segments
+      end subroutine cross_2Dlines
 
 
       subroutine dcart2dxy(xy, r2)

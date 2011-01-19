@@ -652,7 +652,10 @@ c           1.5 < x < nx+0.5
 c           0.5 < y < ny-0.5
 c           0.5 < z < nz+0.5 (due to bottom BC)
 c
-c     Nov 18, 2010: abort at entry, if xyz is a dry point
+c     this means that the proper interpolation domain is different from the simulation domain
+c     definition derived from the grid. Project these rim points onto the
+c     interior domain and interpolate currents here and do not flag them as domain violation
+c
 c     ------------------------------------------ 
       real, intent(in)     :: xyz(:)  ! (lon,lat,depth)
       real, intent(out)    :: uvw(:)
@@ -661,14 +664,18 @@ c     ------------------------------------------
       integer              :: statu, statv, statw
       integer              :: ix,iy,iz,jwest,jnorth,jlow,ibot
       real                 :: x,y,z, sx,sy,sz
-      logical              :: wet_point
 c     ------------------------------------------ 
-      wet_point = (horizontal_range_check(xyz).and.is_wet(xyz))
-      if (.not.wet_point) then
+      if (.not.horizontal_range_check(xyz)) then
          uvw    = 0.
-         status = 1  ! signal 
+         status = 1  ! signal range violation
          return
       endif
+      if (.not.is_wet(xyz)) then
+         uvw    = 0.
+         status = 3  ! signal dry point
+         return
+      endif
+      
 c.....transform to continuous node-centered grid coordinates
 c     and check ranges for this staggering
       call get_ncc_coordinates(xyz,x,y,z)
@@ -678,7 +685,11 @@ c     and check ranges for this staggering
       if ((x<1.5).or.(x>(nx+0.5))) statu = 1 ! flag x range violation
       if ((y<0.5).or.(y>(ny-0.5))) statv = 1 ! flag y range violation
       if ((z<0.5).or.(z>(nz+0.5))) statw = 1 ! flag z range violation
-      status  = max(statu, statv, statw) 
+c
+c     Currently ignore the mismatch between interpolation and simulation domain 
+c     original test: status  = max(statu, statv, statw) 
+c
+      status = 0 ! signal all OK, after range/wet check
 
 c.....determine cell associations of point, constrained to 1 <= i <= n
       ix   = max(1, min(nint(x), nx)) ! u at cell east  face

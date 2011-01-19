@@ -432,6 +432,10 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
  
  \item {\tt LOGICAL is\_wet(xyz)} (function) Return TRUE if continuous position 
          xyz is a (currently) wet point,  else FALSE.
+         Sea surface/bottom points must be accepted as wet. 
+         Normally this means that a parameter htol is given a very small value and that
+         the accepted horizontal range is  -htol < z < wdepth+htol
+         where wdepth comes from interpolate\_wdepth(xy,wdepth,status).
 
  \item {\tt LOGICAL is\_land(xy)} (function) Return TRUE if continuous horizontal 
          position xy is a (currently) dry column, else FALSE.

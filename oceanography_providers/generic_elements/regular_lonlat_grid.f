@@ -82,6 +82,8 @@ c     -------------------- module data --------------------
       type(clock), target,public :: master_clock
 
       integer, parameter :: verbose = 0  ! debugging output control
+      real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
+
 
 c     ------ grid dimensions:   ------
 
@@ -457,7 +459,10 @@ c     ------------------------------------------------------
 c     -------------------------------------------------------------------- 
 c     Interpolate on grid of corner centered data 3D array on point xyz.
 c     Apply appropriate extrapolations near boundaries or return padvalue
-c
+c     For points 0 < z <ccdepth(., ., 1) and ccdepth(., ., ibot) < z < wd
+c     the surface/bottom layer value is used, i.e. the value is assumed 
+c     constant in upper half of first layer/lower half of bottom layer
+c     
 c     deriv = 0 gives value, deriv = (1,2,3) gives derivative along (x,y,z)
 c     Reserve deriv = 123 for overloaded full gradient ?
 c     Currently, only deriv = (0,3) is implemented, until other derivatives 
@@ -470,12 +475,9 @@ c       status = 0: interior interpolation performed
 c       status = 1: horizontal range violation, set result = padval
 c       status = 2: vertical extension using boundary values
 c                   for a dry point set result = padval
-c       status = 3: rank deficit interpolation performed (this 
-c                   is the case near the coast, where some data columns
-c                   may be absent, or at land) status = 3 may include 
-c                   vertical extension additionally. At interior land
-c                   points, result = padval for deriv = 0
-c
+c       status = 3: dry point / rank deficit situation not permitting interpolation
+c                   Return result = padval for deriv = 0  
+c    
 c     tested: deriv=0,3
 c     --------------------------------------------------------------------
       real, intent(in)     :: xyz(:),array(:,:,:)
@@ -500,14 +502,14 @@ c     --------------------------------------------------------------------
       endif
 
       call interpolate_wdepth(xyz,depth,idum)
-      if ((xyz(3)<0).or.(xyz(3)>depth)) then
+      if ((xyz(3)<-htol).or.(xyz(3)>depth+htol)) then
          status = 2                ! signal vertical out-of-bound
          result = padval           ! derivative interpolation
          if (deriv>0) result = 0   ! value interpolation
          return
       endif
 c
-c     define corners clock wise
+c     define corners in this order
 c         col1  (ix0,iy0)
 c         col2  (ix0,iy1)
 c         col3  (ix1,iy0)  
@@ -526,7 +528,7 @@ c
       hweight(1) = (1.0-sx)*(1.0-sy)
       hweight(2) = (1.0-sx)*(  sy  )
       hweight(3) = (  sx  )*(1.0-sy)
-      hweight(4) = (  sx  )*(  s  y)
+      hweight(4) = (  sx  )*(  sy  )
 
       z          = xyz(3)  ! short hand
       status     = 0       ! assume interpolation possible
@@ -766,6 +768,7 @@ c     ------------------------------------------
 c     ------------------------------------------ 
 c     Probe wdepth
 c     return is_wet = .true. at horizontal range violation
+c     accept points at sea surface/bottom as wet (htol)
 c     ------------------------------------------ 
       real, intent(in) :: xyz(:) 
       real             :: wd
@@ -776,7 +779,7 @@ c     ------------------------------------------
          is_wet = .true.
          return
       elseif (status==0) then
-         if ((xyz(3)>0).and.(xyz(3)<wd)) then
+         if ((xyz(3)>-htol).and.(xyz(3)<wd+htol)) then
             is_wet = .true.
          else
             is_wet = .false.

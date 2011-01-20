@@ -10,6 +10,8 @@ c        generated using the "ascii_writer" module
 c     2. "trajectories.nc" - A NetCDF file containing the lat and lot
 c        of each particle at each time step. This file is generated
 c        using the "netcdf_writer" module
+c     This task provider will inquire particle properties that are 
+c     provided by e.g. biology_providers/passive
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
       use time_tools

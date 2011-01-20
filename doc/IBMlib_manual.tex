@@ -1,12 +1,62 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%    latex  IBMlib_manual.tex 
+%    latex  --shell-escape IBMlib_manual.tex  
 %    dvipdf IBMlib_manual.dvi
+%    
+%    The command line option shell-escape enables \write18 used for
+%    generating global revsion number at the front page
+#
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentstyle[12pt,epsfig]{book}
+
+% --------- define \svnRev: doc ---------
+%% http://newsgroups.derkeiler.com/Archive/Comp/comp.text.tex/2006-06/msg01205.html
+%% Subversion provides the $Revision$ keyword. Don't use it, it's useless if your 
+%% document has multiple files, because the revision number you'll get is the one of 
+%% the last change of the file containing $Revision$, not the global revision number 
+%% for the whole project.
+%% The Subversion FAQ proposes a solution there:
+%%   http://subversion.tigris.org/faq.html#version-value-in-source
+%% But it is a dangerous solution because it suppose that all compilation will be done 
+%% through the makefile or calling a script. Hence if someone compiles with the makefile,
+%% do some modifications, commit them, and recompile with only a 'latex' command, the 
+%% revision number will not be correct.
+%% Hence it is required to check that the revision number has been retrieved at 
+%% compilation time.
+%% Here is my solution: if you include this code in your source, 
+%% it defines a \svnRev command which prints the revision number.
+
+% Subversion revision number.
+%% Retrieve the revision number, and dump it into the file .revnum-XXXXXXX
+% Hack given by Thierry Bouche (Thanks !)
+% --------- define \svnRev: begin ---------
+\def\tmpfile{.revnum-\the\year\the\month\the\day\the\time}
+\immediate\write18{svnversion . > \tmpfile}
+\IfFileExists{\tmpfile}{ %
+\message{Revision number retrieved.} %
+\newsavebox{\revNum} %
+\sbox{\revNum}{\texttt{\input{\tmpfile}}}%
+\newcommand{\svnRev}{Revision: \usebox{\revNum}}%
+\immediate\write18{rm -f \tmpfile} %
+%
+}{%
+\message{ ==================}%
+\message{ WARNING:}%
+\message{ You must enable the \write18 command}%
+\message{ in order to have the correct version number}%
+\message{ ==================}%
+\newcommand{\svnRev}{Revision: Unknown}%
+%
+}
+% --------- define \svnRev: end ---------
+
+
+
+
 \title{IBMlib concept description\\
        \vspace{5mm}
-       \small{SVN $ $Revision$ $  \\
-              SVN    $ $Date$ $}}
+ \small{Global version of code: \svnRev \\
+ SVN revision of this manual: $ $Revision$ $  \\
+ Last change of this manual   $ $Date$ $}}
 
 
 \begin{document}

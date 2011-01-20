@@ -101,6 +101,11 @@ export BUILD_TOOLS  = $(IBMLIB_DIR)/BuildTools
 export VPATH        = $(IBMLIB_DIR)  # make search path for src/obj    
 export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared between makefiles
 
+# currently define the output set statically
+OUTPUT_DIR         = output_writers
+OUTPUT_WRITERS     = ascii_writer  netcdf_writer # here you select which writers to build
+OUTPUT_WRITER_DIRS = $(addprefix $(OUTPUT_DIR)/, $(OUTPUT_WRITERS))
+
 # load build configuration 
 include  compiler_defaults.mk                 # mandatory include 
 include  config.mk                            # mandatory include
@@ -115,7 +120,8 @@ BASELIBS     = grid_interpolations.o  runtime_tools.o  string_tools.o
 BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
                run_context.mod  output.mod  geometry.mod
 BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
-OUTPUT_ARCS  = $(patsubst %.mod,%.a,$(OUTPUT_MODS))
+OUTPUT_MODS  = $(addsuffix .mod, $(OUTPUT_WRITERS))
+OUTPUT_ARCS  = $(addsuffix .a,   $(OUTPUT_WRITERS))
 IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
                particles.o $(OUTPUT_ARCS) task.a 
 

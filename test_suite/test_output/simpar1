@@ -10,3 +10,14 @@ particle_time_step = 43200     ! seconds
 
 emitbox = 2005 03 01 0     2005 03 02  0   4.8 55.4 0.5   5 55 0.5   4
 
+! ------------------------------------------------------------
+! Flow Field parameter example for PBI provider linear_field below
+! ------------------------------------------------------------
+
+surface_vel = 1 90    ! speed (m/s), angle degrees clockwise from North
+bottom_vel  = 1 0    ! 
+depth       = 1000    ! m
+temp        = 15  ! deg C - uniform throughout 
+salin       = 35  ! psu   - uniform throughout
+hdiffus     = 10  ! horizontal diffusivity m^2/s
+vdiffus     = 0.01 ! horizontal diffusivity m^2/s

@@ -94,6 +94,9 @@ c     ----------------- close down ---------------------------
       call close_physical_fields()
       call close_particles()
 
-      write(*,*) "normal end of simulation"
+c     ------- normal simulation ends: write test report -------
+      open(31,file="test_summary") 
+      write(31,*) "result test_output: test OK"
+      close(31)
 
       end program

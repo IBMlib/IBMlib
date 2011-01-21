@@ -69,7 +69,7 @@ c     ...... hydrodynamic parameters
 c
       real, parameter :: latvc    = 55.0 ! vortex center, degrees North
       real, parameter :: lonvc    = 3.0  ! vortex center, degrees East
-      real, parameter :: cspeed   = 0.0  ! clockwise current speed, m/s
+      real, parameter :: cspeed   = 1.0  ! clockwise current speed, m/s
       real, parameter :: wtemp    = 8.0  ! constant water temp, deg Celcius
       real, parameter :: vdiff    = 5.**2/86400. ! constant vertical   diffusivity, m2/s
       real, parameter :: hdiff    = 0.   ! constant horizontal diffusivity, m2/s

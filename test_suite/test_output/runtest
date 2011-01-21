@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+#########################################################33
+#  script to invoke minimal_simulation 
+#########################################################
+[ -d ../../config.mk ] && cp -P config.mk.save
+export TESTDIR=$PWD; echo ${TESTDIR}
+cp -f config.mk ../..
+cd ../..; make ibmrun_test; cd ${TESTDIR}
+../../ibmrun_test simpar1 > /dev/null # writes test_summary
+# --- restore + clean up
+rm -f ../../ibmrun_test
+[ -d config.mk.sav ]   && cp -P ../../config.mk
+# 

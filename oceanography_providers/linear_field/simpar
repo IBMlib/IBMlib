@@ -1,0 +1,16 @@
+! ------------------------------------------------------------
+! Flow Field parameter example for PBI provider linear_field
+! ------------------------------------------------------------
+! Define the velocities, with direction, at the top and bottom of 
+! the water column. Velocities are defined as a speed and direction
+! These parameters should be contained in the main simulation file
+! when applying PBI provider linear_field
+!
+surface_vel = 1 90    ! speed (m/s), angle degrees clockwise from North
+bottom_vel  = 1 0    ! 
+depth       = 1000    ! m
+temp        = 15  ! deg C - uniform throughout 
+salin       = 35  ! psu   - uniform throughout
+hdiffus     = 10  ! horizontal diffusivity m^2/s
+vdiffus     = 0.01 ! horizontal diffusivity m^2/s
+

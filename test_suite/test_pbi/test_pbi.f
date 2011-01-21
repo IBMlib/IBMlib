@@ -1,9 +1,17 @@
       program ibmrun
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Test template for physical fields interface
+c     
+c     Below it will "measure" physical properties in the point xyz
+c     specified in the input file, e.g. test_suite/test_pbi/simpar
+c     This is a good initial test of a new interface
+c   
+c     1) Point PHYSICAL_FIELDS_DIR to the new interface in config.mk
+c     2) Copy it to IBMlib base directory
+c     3) Build & run in IBMlib base directory:   
+c          make ibmrun
+c          ibmrun test_suite/test_pbi/simpar
 c
-c     make ibmrun
-c     ibmrun task_providers/test/testpar
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
       use time_tools
@@ -29,10 +37,6 @@ c     Init fields
       call update_physical_fields()
       call read_control_data(simulation_file, "xyz", xyz)
       
-c.....set clocks 
-      call read_control_data(simulation_file, "start_time", idum4)
-      call set_clock(start_time, idum4(1), idum4(2), idum4(3), idum4(4))
-      call set_master_clock(start_time)
 
 c     ------------   test interface  ------------
       write(*,*) "-----------------------------"
@@ -53,10 +57,9 @@ c     ------------   test interface  ------------
       write(*,*) "Temp             : ", res
       call interpolate_salty(xyz,res,istat)
       write(*,*) "Salinity         :", res
-      call interpolate_wind(xyz,res2,istat)
-      write(*,*) "Wind             :", res2
-      write(*,*) "-----------------------------"
-      
+c      call interpolate_wind(xyz,res2,istat)
+c      write(*,*) "Wind             :", res2
+c      write(*,*) "-----------------------------"      
 c     ------------   end  ------------      
       write(*,*) "normal end of simulation"
       call close_physical_fields()

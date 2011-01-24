@@ -47,7 +47,7 @@ c     Init fields
 
 c     ------------   test interface  ------------
       write(*,*) "============================="
-      write(*,*) trim(output_var) //" field"
+      write(*,*) "Writing " //trim(output_var) //" field"
       write(*,*) "-----------------------------"
       call find_free_IO_unit(iunit)
       open(unit=iunit,file="2D_fields.txt")
@@ -85,6 +85,6 @@ c     ------------   test interface  ------------
         enddo
       enddo
       close(iunit)
-      write(*,*) "-----------------------------"
+      write(*,*) "============Complete========="
       call close_physical_fields()
       end program

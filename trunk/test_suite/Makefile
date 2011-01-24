@@ -2,9 +2,9 @@
 #  ---------------------------------------------------
 #  Makefile for running IBMlib tests
 #  ---------------------------------------------------
-#  $Rev: $
-#  $LastChangedDate: $
-#  $LastChangedBy:$ 
+#  $Rev$
+#  $LastChangedDate$
+#  $LastChangedBy$ 
 #  ---------------------------------------------------
 #
 #  Invoking test sets:

@@ -2,9 +2,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Trajectories Generator
 c     ---------------------------------------------------
-c     $Rev: 164 $
-c     $LastChangedDate: 2010-12-01 15:50:31 +0100 (Wed, 01 Dec 2010) $
-c     $LastChangedBy: mpay $ 
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 c     Generic task provider to generate a set of trajectories. All 
 c     configuration, including the selection of the output variables
@@ -52,7 +52,7 @@ c     ------------ declarations ------------
 c     ------------   Initialise config file   ------------
       call tic(stopwatch)
       call init_run_context()
-      write(*,*) "Trajectories task provider:  $Rev: 164 $"
+      write(*,*) "Trajectories task provider:  $Rev$"
 
 c     ------------   set clocks  ------------   
       call read_control_data(simulation_file, "start_time", idum4)

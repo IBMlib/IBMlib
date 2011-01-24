@@ -1,0 +1,10 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+start_time  = 2005 01 01 3600    !  year  month  day  second_of_day
+xy1         = 4.0 56.0        !lon, lat, depth
+xy2         = 5.0 57.0        !lon, lat, depth
+output_var  = depth           !temperature, salinity, U, V, hdiffus, vdiffus, depth
+n_lon       = 101             !number of grid points in the lon direction
+n_lat       = 101             !number of grid points in the lat diretion

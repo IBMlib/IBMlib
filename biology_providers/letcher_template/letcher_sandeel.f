@@ -947,7 +947,7 @@ c     ---------------------------------------------------
       character*100 function get_particle_version() ! FROM HERE
 c------------------------------------------------------------ 
       get_particle_version = "Zeren model for sandeel larval growth" //
-     +     " provider : $Rev: 181 $"
+     +     " provider : $Rev$"
       end function
 
 

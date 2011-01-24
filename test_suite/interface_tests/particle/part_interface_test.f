@@ -2,9 +2,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Interface test 
 c     ---------------------------------------------------
-c     $Rev: 147 $
-c     $LastChangedDate: 2010-11-19 00:33:57 +0100 (Fri, 19 Nov 2010) $
-c     $LastChangedBy: mpay $ 
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 c     Checks that a combination of pbi and particle providers
 c     provide the minimum set of functions with the appropriate

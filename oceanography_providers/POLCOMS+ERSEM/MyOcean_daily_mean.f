@@ -2,9 +2,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     POLCOMS+ERSEM pbi for daily averaged data sets
 c     ---------------------------------------------------
-c     $Rev: 151 $
-c     $LastChangedDate: 2010-11-20 01:51:34 +0100 (Sat, 20 Nov 2010) $
-c     $LastChangedBy: asch $ 
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 c     TODO: load zooplankton Z4cD(time, z, lat, lon) = "Daily Mean Mesozooplankton C  mg C/m^3" 
 c           load             Z5cD(time, z, lat, lon) = "Daily Mean Microzooplankton C mg C/m^3" 
@@ -108,7 +108,7 @@ c     ---- specials for this data set / version ----
  
 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "POLCOMS+ERSEM pbi version: $Rev: 151 $"
+      get_pbi_version =  "POLCOMS+ERSEM pbi version: $Rev$"
       end function
 
 

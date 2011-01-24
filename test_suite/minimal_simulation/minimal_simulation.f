@@ -9,9 +9,9 @@ c     task_providers/basic_simulation/basic_simulation_test_input.txt
 c     
 c     Test success criterium: the code builds and the simulation completes normally
 c     ---------------------------------------------------
-c     $Rev: 175 $
-c     $LastChangedDate: 2011-01-06 17:23:41 +0100 (Thu, 06 Jan 2011) $
-c     $LastChangedBy: asch $ 
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       program tracker

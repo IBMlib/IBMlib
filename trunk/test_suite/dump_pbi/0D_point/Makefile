@@ -3,8 +3,8 @@
 # 
 ############################################################
 
-task.a: test_pbi.o
-	ar rcs task.a test_pbi.o
+task.a: dump_pbi_pt.o
+	ar rcs task.a dump_pbi_pt.o
 
 include $(COMMON_RULES)
 

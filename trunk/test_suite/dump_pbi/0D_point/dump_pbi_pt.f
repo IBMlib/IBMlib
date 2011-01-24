@@ -3,14 +3,14 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Test template for physical fields interface
 c     
 c     Below it will "measure" physical properties in the point xyz
-c     specified in the input file, e.g. test_suite/test_pbi/simpar
+c     specified in the input file, e.g. test_suite/dump_pbi/simpar
 c     This is a good initial test of a new interface
 c   
 c     1) Point PHYSICAL_FIELDS_DIR to the new interface in config.mk
 c     2) Copy it to IBMlib base directory
 c     3) Build & run in IBMlib base directory:   
 c          make ibmrun
-c          ibmrun test_suite/test_pbi/simpar
+c          ibmrun test_suite/dump_pbi/simpar
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser

@@ -126,7 +126,8 @@ IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_stat
                particles.o $(OUTPUT_ARCS) task.a 
 
 #Variables relating to the packaging
-IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but the working copy thereof)
+IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but the working copy there
+IBMLIB_SRCS    += config.mk compiler_defaults.mk
 IBMLIB_PACKAGE = IBMlib_srcs.tgz
 
 #     Main task of this Makefile: EXECUTABLE - should be first target, to appear as default

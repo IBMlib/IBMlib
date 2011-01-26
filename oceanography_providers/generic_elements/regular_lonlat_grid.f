@@ -45,10 +45,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: init_regular_lonlat_grid   ! init  this module
       public :: close_regular_lonlat_grid  ! close this module
 
-      interface get_local_distance
-         module procedure get_local_distance_scalar
-         module procedure get_local_distance_vector      
-      end interface
+     
 
       public :: get_master_clock
       public :: set_master_clock
@@ -65,12 +62,7 @@ c      public :: interpolate_wind    ! currently unused
       public :: is_wet    
       public :: is_land
       public :: horizontal_range_check
-      public :: get_horizontal_distance
-      public :: get_local_distance   ! reexport
       public :: coast_line_intersection
-      public :: d_cart2d_xy
-      public :: d_xy2d_cart 
-      public :: add_finite_step
       
 c     ---------- other exports ----------
 
@@ -833,19 +825,6 @@ c     ------------------------------------------
 
 
 
-      subroutine get_jacobian(xy,r3)
-c     ------------------------------------------
-c     Transform from coordinates space to Cartesian
-c     dR = r3 * (dlon[deg], dlat[deg], dz[m]) [m**3]
-c     ------------------------------------------
-      real, intent(in)     :: xy(:) ! only 1:2 used
-      real, intent(out)    :: r3(:) ! jacobian
-      r3(1) = earth_radius*cos(xy(2)*deg2rad)*deg2rad
-      r3(2) = earth_radius*deg2rad
-      r3(3) = 1.0
-      end subroutine
-
-
 
 
       subroutine coast_line_intersection(geo1, geo2,cross_coast,georef,  ! -> regular_lonlat_grid.f
@@ -1346,96 +1325,6 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       end subroutine get_horiz_ncc_corners
 
-
-      subroutine d_cart2d_xy(xy, r2)
-c     ------------------------------------------ 
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      real                 :: jac(3)
-c     ------------------------------------------ 
-      call get_jacobian(xy, jac)
-      r2(1:2) = r2(1:2)/jac(1:2) ! element-by-element
-      end subroutine 
-
-
-
-      subroutine d_xy2d_cart(xy, r2) 
-c     ------------------------------------------ 
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      real                 :: jac(3)
-c     ------------------------------------------ 
-      call get_jacobian(xy, jac)
-      r2(1:2) = r2(1:2)*jac(1:2) ! element-by-element
-      end subroutine 
-
-
-
-
-      subroutine add_finite_step(xy, dR) 
-c     ------------------------------------------ 
-c     TODO: implementation deferred, use tmp tangent space 
-c     implementation
-c     ------------------------------------------ 
-      real, intent(inout) :: xy(:)
-      real, intent(in)    :: dR(:)
-      real :: dxy(3) 
-c     ------------------------------------------ 
-      if (size(dR) == 3) then  
-         dxy = dR
-      elseif (size(dR) == 2) then 
-         dxy(1:2) = dR
-         dxy(3)   = 0.
-      else
-         write(*,*) "add_finite_step: array mismatch"
-         stop
-      endif
-c
-      call d_cart2d_xy(xy,dxy)   ! inplace transform of dxy
-      xy = xy + dxy
-      
-      end subroutine 
- 
-
-
-      subroutine get_local_distance_scalar(xyz1, xyz2, r)
-c     ------------------------------------------ 
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: r
-      real                 :: v(3)
-c     ------------------------------------------ 
-      call get_local_distance_vector(xyz1, xyz2, v)
-      r = sqrt(sum(v*v))
-      end subroutine 
-
-
-      subroutine get_local_distance_vector(xyz1, xyz2, v)
-c     ------------------------------------------
-c     vector in meters (oriented from xyz1 to xyz2)
-c     ------------------------------------------
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: v(:)
-      real                 :: xyzmid(3),jac(3)
-      xyzmid = 0.5*(xyz1 + xyz2)
-      call get_jacobian(xyzmid, jac)
-      v = jac*(xyz2 - xyz1) ! element-by-element
-      end subroutine 
-
-c      subroutine get_horizontal_distance(xy1, xy2, r)
-cc     ------------------------------------------ 
-c      real, intent(in)     :: xy1(:), xy2(:)
-c      real, intent(out)    :: r
-c      real :: costheta, l1,l2,p1,p2, angle
-cc     ------------------------------------------ 
-c      p1 = xy1(1)*deg2rad
-c      p2 = xy2(1)*deg2rad
-c      l1 = xy1(2)*deg2rad
-c      l2 = xy2(2)*deg2rad
-c      costheta = cos(p1)*cos(p2) + sin(p1)*sin(p2)
-c      costheta = costheta*cos(l1)*cos(l2) + sin(l1)*sin(l2)
-c      angle    = acos(costheta) ! 0 < angle < pi
-c      r        = angle*earth_radius
-c      end subroutine 
 
 
 

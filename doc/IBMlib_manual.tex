@@ -4,7 +4,7 @@
 %    
 %    The command line option shell-escape enables \write18 used for
 %    generating global revsion number at the front page
-#
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \documentstyle[12pt,epsfig]{book}
 
@@ -498,16 +498,6 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
         position xy is inside horizontal domain covered by the physical data set - else FALSE.
         Notice that this is not a wet point check.
 
- \item {\tt get\_horizontal\_distance(xy1, xy2, r)} m \newline
-   r is the sphere distance in meters between xy1, xy2 (i.e. distance when travelling at the ideal sea surface
-   between xy1, xy2 ).
-
- \item {\tt get\_local\_distance(xyz1, xyz2, v)}    m \newline
-
-   Overloaded function.
-   If v is scalar, return distance in meters between xyz1 and xyz2 in the average tangent spaces of xyz1 and xyz2
-   (so the function is symmetric in xyz1 and xyz2).
-   If v is a vector, return distance vector in meters (oriented from xyz1 to xyz2)
  
  \item {\tt coast\_line\_intersection(xyz1, xyz2, anycross, xyzref, xyzhit)} 
  
@@ -527,39 +517,7 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
 
 \end{itemize}
 
-
-
-\subsection{Public transformation functions}
-
-\begin{itemize}
-
-    \item {\tt d\_cart2d\_xy(xy, r2) } Convert a small Cartesian displacement vector r2 (meters)
-           inplace in tangent space at xy to a displacement vector in (longitude,latitude,depth).
-
-    \item {\tt d\_xy2d\_cart(xy, r2) } Convert a small displacement vector in (longitude,latitude,depth)
-           inplace in tangent space at xy to a Cartesian displacement vector (meters).
-
-
-      
-for xy an xyz may be provided (only xy is transformed)
-to get the Jacobian at xyz: \newline
-jacobian = (/1,1/) \newline
-call d\_xy2d\_cart(xyz, jacobian)\newline
-
-we will add a convenience subroutine: get\_jacobian ...
-
-    \item {\tt add\_finite\_step(xy, dR)} inplace add a finite
-           Cartesian vector dR(2/3) in meters to xy including the 
-           effect of sphere curvature (i.e. not based on tangent space arithmetics)
-           Make a isospheric translation of length |dR(1:2)| in the direction
-           of dR(1:2). If dR has length 3, add the vertical component afterwards
-           i.e. xy(3) = xy(3) + dR(3). 
-           Tangent space arithmetics is obtained by: \newline
-           call d\_cart2d\_xy(xyz,dR);\newline
-           xyz = xyz + dR   \newline
-
-
-\end{itemize}
+.
 
 \subsection{Access exceptions}
 
@@ -648,8 +606,8 @@ memory leakage from non-referenced memory space.
 
 Mainly for debugging
 
-
 \end{itemize}
+
 
 %%====================================================================
 \section{The task interface}
@@ -657,6 +615,48 @@ Mainly for debugging
 A task interface
 must be associated with a separate directory under directory {\tt task\_providers}
 
+%%====================================================================
+\section{Other modules}
+\subsection{geometry}
+
+\begin{itemize}
+
+    \item {\tt d\_cart2d\_xy(xy, r2) } Convert a small Cartesian displacement vector r2 (meters)
+           inplace in tangent space at xy to a displacement vector in (longitude,latitude,depth).
+
+    \item {\tt d\_xy2d\_cart(xy, r2) } Convert a small displacement vector in (longitude,latitude,depth)
+           inplace in tangent space at xy to a Cartesian displacement vector (meters).
+
+
+      
+for xy an xyz may be provided (only xy is transformed)
+to get the Jacobian at xyz: \newline
+jacobian = (/1,1/) \newline
+call d\_xy2d\_cart(xyz, jacobian)\newline
+
+we will add a convenience subroutine: get\_jacobian ...
+
+    \item {\tt add\_finite\_step(xy, dR)} inplace add a finite
+           Cartesian vector dR(2/3) in meters to xy including the 
+           effect of sphere curvature (i.e. not based on tangent space arithmetics)
+           Make a isospheric translation of length |dR(1:2)| in the direction
+           of dR(1:2). If dR has length 3, add the vertical component afterwards
+           i.e. xy(3) = xy(3) + dR(3). 
+           Tangent space arithmetics is obtained by: \newline
+           call d\_cart2d\_xy(xyz,dR);\newline
+           xyz = xyz + dR   \newline
+ \item {\tt get\_horizontal\_distance(xy1, xy2, r)} m \newline
+   r is the sphere distance in meters between xy1, xy2 (i.e. distance when travelling at the ideal sea surface
+   between xy1, xy2 ).
+
+ \item {\tt get\_local\_distance(xyz1, xyz2, v)}    m \newline
+
+   Overloaded function.
+   If v is scalar, return distance in meters between xyz1 and xyz2 in the average tangent spaces of xyz1 and xyz2
+   (so the function is symmetric in xyz1 and xyz2).
+   If v is a vector, return distance vector in meters (oriented from xyz1 to xyz2)
+
+\end{itemize}
 
 %%====================================================================
 

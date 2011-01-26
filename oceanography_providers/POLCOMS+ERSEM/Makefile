@@ -2,8 +2,8 @@
 #              Makefile for physical_fields.mod 
 ############################################################
 
-physical_fields.a: dependences.mk regular_lonlat_grid.o monthly_mean_test.o 
-	ar rcs physical_fields.a monthly_mean_test.o regular_lonlat_grid.o
+physical_fields.a: dependences.mk regular_lonlat_grid.o MyOcean_daily_mean.o 
+	ar rcs physical_fields.a MyOcean_daily_mean.o  regular_lonlat_grid.o
 	cd $(IBMLIB_DIR); ln -sf $(shell pwd)/regular_lonlat_grid.mod # tmp fix: project up regular_lonlat_grid.mod
 
 physical_fields.mod:
@@ -27,5 +27,5 @@ FORCE:
 #     calling makefiles
 #     EXTRES = -x time_tools -x run_context
 
-time_tools.mod constants.mod run_context.mod  input_parser.mod  netcdf.mod:
+time_tools.mod geometry.mod constants.mod run_context.mod  input_parser.mod  netcdf.mod:
 	@echo "update of" $@ "suppressed"

@@ -25,7 +25,7 @@ FORCE:
 #     calling makefiles
 #     EXTRES = -x time_tools -x run_context
 
-time_tools.mod constants.mod: 
+time_tools.mod geometry.mod constants.mod: 
 	echo "update of" $@ "suppressed"
 
 

@@ -13,7 +13,8 @@
 
 # compiler settings   
 export FC        = ifort
-export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR)  
+export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR) -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
+
 export FPPFLAGS  = -fpp 
 
 # linker settings

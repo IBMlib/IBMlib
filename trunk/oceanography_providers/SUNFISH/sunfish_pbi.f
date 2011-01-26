@@ -25,6 +25,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use regular_lonlat_grid, 
      +          interpolate_currents_cc => interpolate_currents  ! use face-centered local
 
+      use geometry
       use run_context, only: simulation_file
       use time_tools           ! import clock type
       use input_parser
@@ -51,12 +52,7 @@ c      public :: interpolate_wind    ! currently unused
       public :: is_wet    
       public :: is_land
       public :: horizontal_range_check
-      public :: get_horizontal_distance
-      public :: get_local_distance   ! reexport
       public :: coast_line_intersection
-      public :: d_cart2d_xy
-      public :: d_xy2d_cart 
-      public :: add_finite_step
       public :: get_pbi_version
 
 c     -------------------- module data --------------------  

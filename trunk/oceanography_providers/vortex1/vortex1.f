@@ -19,14 +19,10 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
       use time_tools           ! import clock type
       use constants
+      use geometry
 
       implicit none
       private     
-
-      interface get_local_distance
-         module procedure get_local_distance_scalar
-         module procedure get_local_distance_vector      
-      end interface
 
 
       public :: init_physical_fields     
@@ -255,56 +251,9 @@ c     ..........................................
       else
          horizontal_range_check = .true.
       endif
-
-
-
-
       end function
-c     ------------------------------------------
-      subroutine get_jacobian(xy,r3)
-c     ....................................
-c     Transform from coordinates space to Cartesian
-c     dR = r3 * (dlon[deg], dlat[deg], dz[m]) [m**3]
-c     .................................
-      real, intent(in)     :: xy(:) ! only 1:2 used
-      real, intent(out)    :: r3(:) ! jacobian
-      r3(1) = earth_radius*cos(xy(2)*deg2rad)*deg2rad
-      r3(2) = earth_radius*deg2rad
-      r3(3) = 1.0
-      end subroutine
-c     ------------------------------------------ 
-      subroutine get_horizontal_distance(xy1, xy2, r)
-      real, intent(in)     :: xy1(:), xy2(:)
-      real, intent(out)    :: r
-      real :: costheta, l1,l2,p1,p2, angle
-      p1 = xy1(1)*deg2rad
-      p2 = xy2(1)*deg2rad
-      l1 = xy1(2)*deg2rad
-      l2 = xy2(2)*deg2rad
-      costheta = cos(p1)*cos(p2) + sin(p1)*sin(p2)
-      costheta = costheta*cos(l1)*cos(l2) + sin(l1)*sin(l2)
-      angle    = acos(costheta) ! 0 < angle < pi
-      r        = angle*earth_radius
-      end subroutine 
-c     ------------------------------------------ 
-      subroutine get_local_distance_scalar(xyz1, xyz2, r)
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: r
-      real                 :: v(3)
-      call get_local_distance_vector(xyz1, xyz2, v)
-      r = sqrt(sum(v*v))
-      end subroutine 
-c     ------------------------------------------ 
-      subroutine get_local_distance_vector(xyz1, xyz2, v)
-c     vector in meters (oriented from xyz1 to xyz2)
-      real, intent(in)     :: xyz1(:),xyz2(:)
-      real, intent(out)    :: v(:)
-      real                 :: xyzmid(3),jac(3)
-      xyzmid = 0.5*(xyz1 + xyz2)
-      call get_jacobian(xyzmid, jac)
-      v = jac*(xyz2 - xyz1) ! element-by-element
-      end subroutine 
-c     ------------------------------------------ 
+
+
 c     ------------------------------------------ 
       subroutine coast_line_intersection(xyz1, xyz2, anycross, xyzref, 
      +                                   xyzhit) 
@@ -434,46 +383,5 @@ c.....sign(a, b) returns the absolute value of a times the sign of b
  
       end subroutine umklapp
 
-
-c     ------------------------------------------ 
-      subroutine d_cart2d_xy(xy, r2)
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      real                 :: jac(3)
-      call get_jacobian(xy, jac)
-      r2(1:2) = r2(1:2)/jac(1:2) ! element-by-element
-      end subroutine 
-c     ------------------------------------------ 
-      subroutine d_xy2d_cart(xy, r2) 
-      real, intent(in)     :: xy(:)
-      real, intent(inout)  :: r2(:)
-      real                 :: jac(3)
-      call get_jacobian(xy, jac)
-      r2(1:2) = r2(1:2)*jac(1:2) ! element-by-element
-      end subroutine 
-c     ------------------------------------------ 
-      subroutine add_finite_step(xy, dR) 
-c     .................................................
-c     TODO: implementation deferred, use tmp tangent space 
-c     implementation
-c     .................................................
-      real, intent(inout) :: xy(:)
-      real, intent(in)    :: dR(:)
-      real :: dxy(3) 
-c     .................................................
-      if (size(dR) == 3) then  
-         dxy = dR
-      elseif (size(dR) == 2) then 
-         dxy(1:2) = dR
-         dxy(3)   = 0.
-      else
-         write(*,*) "add_finite_step: array mismatch"
-         stop
-      endif
-c
-      call d_cart2d_xy(xy,dxy)   ! inplace transform of dxy
-      xy = xy + dxy
-      
-      end subroutine 
-c     ------------------------------------------    
+    
       end module

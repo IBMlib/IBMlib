@@ -12,10 +12,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use time_tools           ! import clock type
       implicit none
 
-      interface get_local_distance
-         module procedure get_local_distance_scalar
-         module procedure get_local_distance_vector      
-      end interface
+
 
       type(clock), private, target :: master_clock
 

@@ -198,6 +198,7 @@ clean: FORCE
 	-make -C $(PHYSICAL_FIELDS_DIR) clean
 	-make -C $(PARTICLE_STATE_DIR) clean
 	-make -C $(TASK_DIR) clean
+	-make -C test_suite clean
 	-@for outdir in $(OUTPUT_WRITER_DIRS);\
 		do \
 		  make -C $$outdir clean ; \
@@ -208,6 +209,10 @@ remake:
 	
 package:
 	tar cvfzh $(IBMLIB_PACKAGE) $(IBMLIB_SRCS) --exclude=.* --ignore-failed-read 
+
+test:
+	make clean
+	make -C test_suite fulltest
 
 FORCE:
 

@@ -12,6 +12,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
       use regular_lonlat_grid
+      use geometry
       use run_context, only: simulation_file
       use time_tools           ! import clock type
       use input_parser
@@ -38,12 +39,7 @@ c      public :: interpolate_wind    ! currently unused
       public :: is_wet    
       public :: is_land
       public :: horizontal_range_check
-      public :: get_horizontal_distance
-      public :: get_local_distance   ! reexport
       public :: coast_line_intersection
-      public :: d_cart2d_xy
-      public :: d_xy2d_cart 
-      public :: add_finite_step
       public :: get_pbi_version
 
 c     -------------------- module data --------------------  
@@ -417,7 +413,6 @@ c
       data_in_buffers = .true.
       cur_frame = frame
 
-
 c$$$      do ix=1,nx
 c$$$         do iy=1,ny
 c$$$            if (wetmask(ix,iy)==0) 
@@ -427,7 +422,6 @@ c$$$            if (wetmask(ix,iy)==0) write(77,*) ix,iy
 c$$$         enddo
 c$$$      enddo
 c$$$      stop 84465
-
 
       end subroutine load_data_frames
       

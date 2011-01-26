@@ -149,7 +149,7 @@ c     tangent space
 c     ------------------------------------------ 
       real, intent(in)     :: xy(:)  !dimension 2+
       real, intent(inout)  :: r2(:)  !dimension 2+
-      real                 :: jac(2)
+      real                 :: jac(3)
 c     ------------------------------------------  
       call get_jacobian(xy, jac)
       r2(1:2) = r2(1:2)/jac(1:2) ! element-by-element
@@ -165,7 +165,7 @@ c     along (longitude,latitude) tangent space
 c     ------------------------------------------ 
       real, intent(in)     :: xy(:)  !dimension 2+
       real, intent(inout)  :: r2(:)  !dimension 2+
-      real                 :: jac(2)
+      real                 :: jac(3)
 c     ------------------------------------------ 
       call get_jacobian(xy, jac)
       r2(1:2) = r2(1:2)*jac(1:2) ! element-by-element

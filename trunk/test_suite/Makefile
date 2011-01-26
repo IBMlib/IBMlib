@@ -9,9 +9,11 @@
 #
 #  Invoking test sets:
 #
-#    1) In $(IBMLIB_DIR) invoke: make fulltest
-#    2) In this directory invoke: make fulltest or any TESTNAME
-#
+#    1) It is recommended to apply Setups/Compilers/FC/compiler_defaults_safe.mk
+#       as $(IBMLIB_DIR)/compiler_defaults.mk
+#    2) In $(IBMLIB_DIR) invoke: make fulltest
+#    3) In this directory invoke: make fulltest or any TESTNAME
+#   
 #
 #  Prerequisites:
 #    It is assumed the standard Linux scripting languages are available wtihin 
@@ -34,9 +36,12 @@
 #       "result TESTNAME: test OK"      or 
 #       "result TESTNAME: test FAILED" (... or just crash)
 #
-#
-#  In other words TESTNAME/runtest TESTNAME/test_summary are mandatory and reserved
+#       In other words TESTNAME/runtest TESTNAME/test_summary are mandatory and reserved
 #  
+#    4) The code should preferably build into the executable ibmrun_test
+#       to avoid accidental confusion with the normal name ibmrun for the
+#       executable object
+#
 #  Other parts of test_suite:
 #    * test_pbi is a stand alone test usefull for testing a new PBI
 #
@@ -57,9 +62,9 @@
 .PHONY: fulltest FORCE clean variables $(FULLTEST_SET) Makefile
 
 BASH         = bash
-FULLTEST_SET = minimal_simulation test_output dispersion  \
-               interface_tests/particle \
-	       interface_tests/pbi
+FULLTEST_SET = minimal_simulation test_output dispersion 
+#              interface_tests/particle \
+#	       interface_tests/pbi
 
 
 fulltest: $(FULLTEST_SET)

@@ -1,0 +1,14 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+start_time  = 2005 01 01 3600    !  year  month  day  second_of_day
+end_time    = 2005 01 10 0    !  year  month  day  second_of_day
+
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+! ---------------- hydrodynamic setting -----------------------
+hydroDBpath  = /data/hydroDB/NORWECOM
+bath_file    = /data/hydroDB/NORWECOM/STbio_daily2004.nc
+

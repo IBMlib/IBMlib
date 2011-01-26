@@ -1,0 +1,2099 @@
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     ---------------------------------------------------
+c     NORWEgian ECOlogical Model system (NORWECOM) 
+c     ---------------------------------------------------
+c     $Revision: 212 $
+c     $Date: 2011-01-24 12:08:32 +0100 (Mon, 24 Jan 2011) $
+c     $Author: mpay $
+c
+c     This Oceanography Provider provides a general interface to the
+c     outputs of the NORWECOM model. The provider is written to be as
+c     generic as possible, making space for other alternative outputs
+c     from this model source. 
+c
+c     Grid type: Rotated polar-stereographic grid, with sigma
+c                coordinates in the vertical
+c     Define grid according to NORWECOM
+c       u is midt point at cell west   face and positive eastward   unit == m/s
+c       v is midt point at cell south  face and positive northward  unit == m/s
+c       w is midt point at cell upper  face and positive upward     unit == m/s
+c     Coordinate definitions:
+c       See sph2gr.f for description of coordinate system. Generally speaking, the
+c       (i,j)th cell has coordinates (i-0.5,j-0.5). The SW corner of the
+c       first cell therefore has the coordinates (0,0).
+c     Orientations:
+c       Velocities returned by the model are oriented along the native
+c       NORWECOM axes, with w being positive downwards (?)
+c    TODO:
+c       1. Fix horizontal diffusivity so that it is non-zero
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      module physical_fields
+      use run_context, only: simulation_file
+      use constants
+      use netcdf
+      use input_parser
+      use time_tools
+      implicit none
+      private                     ! default visibility
+c
+c     ------------ public data / method section ------------
+c
+c.....public generic grid descriptors 
+
+      integer, parameter,   public ::  nx=160  ! 3d hydrographic grid indices
+      integer, parameter,   public ::  ny=140
+      integer, parameter,   public ::  nz=20
+
+c.....set public calling interface
+
+      public init_physical_fields
+      public update_physical_fields
+      public close_physical_fields
+      public range_check
+      public cell_centre      
+
+      public interpolate_currents           ! locally defined 
+      public interpolate_turbulence         ! redelegated to turbulence module
+      public interpolate_turbulence_deriv   ! redelegated to turbulence module
+      public interpolate_wdepth ! NEW, replaces direct array access, hides coordinate transform
+      public interpolate_dslm   ! NEW, replaces direct array access, hides coordinate transform
+      public interpolate_temp   ! NEW, replaces direct array access, hides coordinate transform
+      public interpolate_salty  ! NEW, replaces direct array access, hides coordinate transform
+      public interpolate_wind   ! NEW, replaces direct array access, hides coordinate transform 
+
+c.....public lookup interface
+      public wet            ! lookup function to tell whether a given x,y (z) is wet or not
+
+c.....Coordinate transformations
+c        xyz                 Grid coordinate space
+c        lon,lat, depth      Coordinates in terms of longitude, latitude and depth from the surface [m]
+c        geo                 Greographic coordinates ie lon, lat, depth
+      public xy2lonlat  ! horizontal transformation:   xy            -> lat/lon
+      public lonlat2xy  ! horizontal transformation:   lat/lon       -> xy
+      public z2depth      ! vertical transformation:     z|xy          -> depth [m]
+      public depth2z      ! vertical transformation:     depth|xy      -> z   (if only lon/lat available, use geo2xyz)
+      public xyz2geo     ! geographical transformation: xyz           -> lat/lon/depth
+      public geo2xyz     ! geographical transformation: lat/lon/depth -> xyz 
+
+c.....Tangent space transformations
+c        Relates a change in coordinate space to a change in "real
+c        space" (i.e. distance in meters parallet to the lat/lon/depth coordinate
+c        system). Here, cart is the geographic coordinate sysetm, and
+c        xyz is the coordinate system that the model actually operates in
+      public get_jacobian ! tanget space vectors in lon-lat-vertical representation 
+      public d_xy2d_cart      ! tanget space transformation: d(xy)         -> d(Euclidian)
+      public d_xyz2d_cart     ! tanget space transformation: d(xyz)        -> d(Euclidian)
+      public d_cart2d_xyz     ! tanget space transformation: d(Euclidian)  -> d(xyz)
+      public d_cart2d_xy      ! tanget space transformation: d(Euclidian)  -> d(xy)
+
+c
+c.....temporary public entries
+c
+c     ------------ private setup specific data section ------------
+c
+c.....NORWECOM North Sea grid descriptors (private)
+c
+      real, parameter    ::  DX =10
+      real, parameter    ::  DY =10
+      real, parameter    ::  XPOLE=382
+      real, parameter    ::  YPOLE=256
+      real, parameter    ::  YLONG=58
+      real, parameter    ::  lat_true=60
+      real  PHINUL
+
+  
+c.....grid details
+      real,    allocatable   ::  sigma_edges(:)      ! Dividing lines between layers, in sigma coordinates
+      real,    allocatable   ::  layer_width(:,:,:)  ! width for layers incl. DSLM [=] m
+      real,    allocatable   ::  acc_width(:,:,:)    ! cumulative width for layers above this incl. DSLM, [=] m
+      real,    allocatable   ::  wdepth(:,:)         ! current depth in meters, incl. DSLM (0 for dry points)
+      
+      logical, allocatable   ::  any_wet(:,:)        ! horizontal lookup function nx,ny
+      logical, allocatable   ::  is_wet(:,:,:)       ! 3D lookup array          nx,ny,nz  
+      integer, allocatable   ::  bottom_layer(:,:)   ! last wet layer (0 for dry points) nx,ny
+
+c.....lat/lon grid auxillaries      
+      real, allocatable   :: xfacelen(:,:)  ! length of the southern cell face i.e. between cell(i,j-1) and cell(i,j) [m]
+      real, allocatable   :: yfacelen(:,:)  ! length of the western  cell face i.e. between cell(i,j) and cell(i+1,j) [m]
+      real, allocatable   :: cell_area(:,:) ! horizontal area of cell (i,j) in meters**2
+
+c.....grid data state variables in physical units  (first index varies fastest)
+c     Current staggering: 
+c       u is midt point at cell west   face and positive eastward   unit == m/s
+c       v is midt point at cell south  face and positive northward  unit == m/s
+c       w is midt point at cell upward face and positive upward     unit == m/s
+c     Hide raw arrays to inhibit non transferable end code addressing staggering specific details
+      real, allocatable    :: u(:,:,:)        ! nx,ny,nz   u of current [m/s] 
+      real, allocatable    :: v(:,:,:)        ! nx,ny,nz   v of current [m/s]
+      real, allocatable    :: w(:,:,:)        ! nx,ny,nz   w of current [m/s]
+c      real, allocatable    :: uwind(:,:)      ! nx,ny      u of surface wind [m/s] - No wind in NORWECOM
+c      real, allocatable    :: vwind(:,:)      ! nx,ny      v of surface wind [m/s] - No wind in NORWECOM
+
+c.....Local physical scalars:      
+c     T,S of the (i,j,k)th cell are measured at the centre of the cell (i-0.5,j-0.5,k-0.5)
+      real, allocatable    :: temp(:,:,:)      ! nx,ny,nz   Water temp. [Celcius]
+      real, allocatable    :: salty(:,:,:)     ! nx,ny,nz   Salinity    [PSU]
+c     In a true Arakawa-C grid, dslm would be measured at the SW corner - however, we are not using
+c     dslm here as a model output, so its not too important where its measured!
+      real, allocatable    :: dslm(:,:)        ! nx,ny      deviation from sea level mean [m] == 0 for NORWECOM
+
+c     hdiffus of the (i,j,k)th cell is measured at the centre of the cell (i-0.5,j-0.5,k-0.5). However
+c     vdiffus is measured at the centre of the uppermost face (i-0.5,j-0.5,k-1)
+      real, allocatable    :: vdiffus(:,:,:)     ! nx,ny,nz+1 Vertical diffusivity [m**2/s]
+      real, allocatable    :: hdiffus(:,:,:)     ! nx,ny,nz   Horizontal diffusivity [m**2/s]
+
+c.....Miscellaneous variables
+      type(clock),target     ::  cur_daily_fields, cur_hourly_fields ! Time stamp of ocean frames currently loaded in memory
+      type(clock),target     ::  base_time              ! Basetime from which we have a offset
+      integer, parameter     ::  NORWECOM_t_offset = 631148400 ! Number of seconds between base_time and NORWECOM time baseline
+      character*1, parameter ::  path_separator = "/"   ! UNIX/Linux separator
+      character*999          ::  hydroDBpath        ! Path to the hydrographic database
+
+c.....module procedure overloading interfaces
+
+      interface xy2lonlat
+        module procedure xy2lonlat_single
+        module procedure xy2lonlat_vec
+      end interface
+
+      interface lonlat2xy
+        module procedure lonlat2xy_single
+        module procedure lonlat2xy_vec
+      end interface
+
+      interface z2depth
+        module procedure z2depth_single      
+        module procedure z2depth_vec      
+      end interface
+
+      interface depth2z
+        module procedure depth2z_single     
+        module procedure depth2z_vec      
+      end interface
+
+      interface xyz2geo
+        module procedure xyz2geo_single    
+        module procedure xyz2geo_vec    
+      end interface
+
+      interface geo2xyz
+        module procedure geo2xyz_single   
+        module procedure geo2xyz_vec     
+      end interface
+
+      interface d_cart2d_xy
+        module procedure d_cart2d_xy_single 
+        module procedure d_cart2d_xy_vec   
+      end interface
+
+      interface d_xy2d_cart
+        module procedure d_xy2d_cart_single 
+        module procedure d_xy2d_cart_vec   
+      end interface
+
+      interface d_cart2d_xyz
+        module procedure d_cart2d_xyz_single 
+        module procedure d_cart2d_xyz_vec   
+      end interface
+
+      interface d_xyz2d_cart
+        module procedure d_xyz2d_cart_single 
+        module procedure d_xyz2d_cart_vec   
+      end interface
+
+
+      contains
+
+      subroutine init_physical_fields()
+c     ---------------------------------------------------
+c     module initialization
+c
+c     physical fields are not updated
+c     ---------------------------------------------------
+      call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
+      write(*,229) "init_physical_fields: hydrographic database path =", 
+     +           trim(hydroDBpath)
+ 229  format(a,a) 
+      call setup_grid()               ! defines nx,ny,nz
+c      call init_turbulence(nx,ny,nz)      ! pass grid dimensions to delegates
+c      call init_water_pressure(nx,ny,nz)  ! pass grid dimensions to delegates
+
+c.....Misc 
+      call set_clock(base_time,1970,1,1,0)  
+      end subroutine init_physical_fields
+
+
+
+      subroutine setup_grid()
+c     ---------------------------------------------------
+c     Allocate module data arrays corresponding to defined grid
+c     ---------------------------------------------------
+      character*999        :: bath_fname
+      integer              :: ncid, varid,ix,iy,iz
+      real                 :: d(3),pos1(3),pos2(3),geopos1(3)
+      real                 :: geopos2(3),tmp
+c     ---------------------------------------------------
+c     Setup PHINUL, the radian equivalent of lat_trueL
+      PHINUL = lat_true * deg2rad        
+
+c     Write grid setup
+      write(*,231) nx, ny, nz
+      write(*,232) dx, dy, xpole, ypole
+      write(*,233) ylong,lat_true 
+ 231  format("setup_grid: 3d grid dim (nx,ny,nz) = ", i4,i4,i4)
+ 232  format("setup_grid: dx  = ",f12.7,
+     +                      " dy  = ",f12.7,
+     +                      " xpole = ",f12.7,
+     +                      " ypole = ",f12.7)
+ 233  format("setup_grid: ylong    = ",f12.7," lat_true   =",f12.7)
+     
+c.....Read the bathmetry and vertical grid data from file
+      allocate(wdepth(nx,ny))    
+      allocate(sigma_edges(nz+1))
+      call read_control_data(simulation_file,"bath_file", bath_fname) 
+      write(*,*) "setup_grid: bathymetry file = ",
+     +    trim(adjustl(bath_fname))
+      call check_ncdf(nf90_open(trim(adjustl(bath_fname)),
+     +        nf90_nowrite,ncid))
+      call check_ncdf(nf90_inq_varid(ncid,"Topo",varid))
+      call check_ncdf(nf90_get_var(ncid,varid,wdepth))
+      call check_ncdf(nf90_inq_varid(ncid,"Zedges",varid))
+      call check_ncdf(nf90_get_var(ncid,varid,sigma_edges))
+      call check_ncdf(nf90_close(ncid))
+      write(*,241) sigma_edges
+ 241  format("setup_grid: sigma layer edges = ",1000f12.7)
+
+c.....setup bathymetry query arrays                
+c     The NORWECOM grid is terrain following, so every point is wet, except those on land.
+      allocate(is_wet(nx,ny,nz))   ! 3D wet point mask
+      allocate(any_wet(nx,ny))    
+      allocate(bottom_layer(nx,ny)) 
+      where(wdepth<0)!Contents of bathymetry are -32767 for dry land. 
+c         wdepth=0.            !Force depth to zero 
+          any_wet=.FALSE.      !Mark as dry 
+          bottom_layer=0       !Bottom layer is zero
+      elsewhere
+          any_wet=.TRUE.       !Wet cell 
+          bottom_layer=nz      !Bottom layer is bottom of grid
+      end where
+      do iz=1,nz
+        is_wet(:,:,iz)=any_wet !The water column is either wet or dry - there is no bottom terrain in the grid.
+      enddo
+
+c.....setup vertical grid auxillary arrays
+      allocate(layer_width(nx,ny,nz))   
+      allocate(acc_width(nx,ny,nz+1))  
+      acc_width(:,:,1)=0.
+      do iz=1,nz
+         layer_width(:,:,iz)=wdepth*(sigma_edges(iz+1)-sigma_edges(iz))
+         acc_width(:,:,iz+1)=wdepth*sigma_edges(iz+1)
+      enddo 
+
+      write(*,*) "setup_grid: wet points in top    layer =",
+     +               count(is_wet(:,:,1))
+      write(*,*) "setup_grid: wet points in bottom layer =",
+     +               count(is_wet(:,:,nz))
+
+c.....setup cell physical dimensions
+c      xfacelen(i,j) and yfacelen(i,j) give the length of the souuth and
+c      west face of cell (i,j) respetively.
+      write(*,*) "setup_grid: allocating physical dimensions"
+      allocate(xfacelen(nx+1,ny+1))   !xfacelen(:,ny+1) are the lengths of the top edge of the grid
+      allocate(yfacelen(nx+1,ny+1))   !yfacelen(nx+1,:) are the lengths of the right-hand edge of the grid
+      allocate(cell_area(nx,ny)) 
+      pos1=0.5             !Define the facelengths to be at the surface
+      d=0
+      do ix=1,nx+1
+         do iy=1,ny+1
+c           First the xfacelengths      
+            pos1(1)=ix-1   !x-dir left hand side of cell
+            pos1(2)=iy-1.0   !xfacelen is defined at the south side of cell
+            pos2=pos1
+            pos2(1)=ix   !x-dir right hand side of cell
+            call xy2lonlat(pos1(1),pos1(2),geopos1(1),geopos1(2))            
+            call xy2lonlat(pos2(1),pos2(2),geopos2(1),geopos2(2))            
+            call gc_dist(geopos1,geopos2,xfacelen(ix,iy))
+            
+c           Then the yfacelengths 
+            pos1(1)=ix-1.0   !yfacelen is defined at the west side of cell
+            pos1(2)=iy-1.0   !y-dir bottom of cell
+            pos2=pos1
+            pos2(2)=iy   !y-dir top of cell
+            call xy2lonlat(pos1(1),pos1(2),geopos1(1),geopos1(2))            
+            call xy2lonlat(pos2(1),pos2(2),geopos2(1),geopos2(2))            
+            call gc_dist(geopos1,geopos2,yfacelen(ix,iy))
+          end do
+      end do     
+c     And now the cell area 
+      do ix=1,nx
+         do iy=1,ny
+            cell_area(ix,iy)=0.5*(xfacelen(ix,iy)+xfacelen(ix,iy+1))*
+     +            0.5*(yfacelen(ix,iy)+yfacelen(ix+1,iy))
+         end do
+      end do     
+
+
+c.....allocate hydrographical arrays 
+      write(*,*) "setup_grid: allocating physical data arrays"
+      allocate( u(nx,ny,nz) ) 
+      allocate( v(nx,ny,nz) ) 
+      allocate( w(nx,ny,nz) ) 
+
+c      allocate( uwind(nx,ny) ) 
+c      allocate( vwind(nx,ny) ) !NORWECOM lacks wind fields 
+
+      allocate( temp(nx,ny,nz)  ) 
+      allocate( salty(nx,ny,nz) ) 
+      allocate( dslm(nx,ny)     )    
+      dslm=0.                   !No DSLM information in NORWECOM
+
+      allocate(vdiffus(nx,ny,nz+1))
+      allocate(hdiffus(nx,ny,nz))
+      vdiffus=0.
+      hdiffus=0.
+
+      end subroutine setup_grid
+
+
+      subroutine update_physical_fields(ctime)
+c     -----------------------------------------------------
+c     Update physical_fields corresponding to clock time ctime
+c     The decision to update  is based upon the distance between the 
+c     current time and the current loaded fields - if this is greater 
+c     than the time resolution  of the corresponding  fields , an 
+c     update is required. 
+c     -----------------------------------------------------
+      type(clock), intent(in)   :: ctime
+      integer       :: cyear, cmonth, cday, cisec
+      integer       :: offset
+      logical       :: updated
+c     -----------------------------------------------------
+      call get_date_from_clock(ctime, cyear, cmonth, cday)
+      call get_second_in_day(ctime, cisec)
+       
+c      write(*,213) cyear, cmonth, cday, cisec
+c 213  format("update_physical_fields: current date/time = ",i5,i3,i3,i6,
+c     +       "/86400")
+      updated = .FALSE.
+      write(*,*) "update_physical_fields: current date/time = ",
+     +                 get_datetime(ctime)
+c.....Decide whether an update of the daily fields is needed or not
+      call get_period_length_sec(ctime,cur_daily_fields,offset)
+      write(*,*) "Offset between daily fields and current time:",
+     &   offset,"secs"
+      if(abs(offset) > 43200 ) then
+        write(*,*) "Daily offset is greater than 12 hours. Loading"//
+     &             " new flow fields...."
+        call update_daily_physical_fields(ctime)
+        updated = .TRUE.
+      endif
+
+     
+c.....Now decide whether an update of the hourly fields is needed or not,
+c     using similar logic
+      call get_period_length_sec(ctime,cur_hourly_fields,offset)
+      write(*,*) "Offset between hourly fields and current time:",
+     &   offset,"secs"
+      if(abs(offset) > 1800) then
+        write(*,*) "Hourly offset is greater than 30 mins. Loading"//
+     &             " new flow fields...."
+        call update_hourly_physical_fields(ctime)
+        updated = .TRUE.
+      endif
+
+c.....If fields were updated then update dependent variables      
+      if (updated) then
+        call update_horizontal_turbulence()
+      endif
+      end subroutine update_physical_fields
+
+
+      subroutine update_daily_physical_fields(ctime)
+c     -----------------------------------------------------
+c     Update physical_fields corresponding to clock time ctime
+c     We assume that the NORWECOM daily fields represent the
+c     entirity of the given day. Thus, the first entry, which
+c     is timestamped with 2006/01/01 12:00 covers everything
+c     from 00:00 to 23:59
+c     -----------------------------------------------------
+      type(clock), intent(in)   :: ctime
+      type(clock)   :: ctmp
+      integer       :: cyear, cmonth, cday
+      integer       :: jday,idx,len
+      real          :: actual_idx(1) !Index that we actually got
+c     -----------------------------------------------------
+c.....Figure out what the next data frame should be
+      call get_date_from_clock(ctime,cyear,cmonth,cday)
+      call get_julian_day(ctime,jday)  !The julian day is the index used to store the daily fields
+      idx=jday    ! Index used to look up data
+
+c.....Now load the new daily fields
+      call read_NORWECOM_fields("STbio_daily","Temp",cyear,idx,temp)
+      call read_NORWECOM_fields("STbio_daily","Salt",cyear,idx,salty)
+
+c.....Get the NORWECOM time that the array index corresponds to      
+      call read_NORWECOM_fields("STbio_daily","T",cyear,idx,
+     +         dat1d=actual_idx)
+
+c.....And finish off the update by setting the time properly etc and
+c     checking it agrees with result from NCDF files
+      call set_clock(ctmp,cyear,cmonth,cday,43200)
+      call get_period_length_sec(ctmp,base_time,len)
+      if (nint(actual_idx(1))*3600.ne.len+NORWECOM_t_offset) then
+          write(*,'(25("-"),a,25("-"))') "STOP"
+          write(*,*)"Update_daily_physical_ fields: data frame" //
+     +       " loaded does not match that desired."
+          write(*,*) "Actual time : ",get_datetime(ctime)
+          write(*,*) "Desired time frame : ",get_datetime(ctmp)
+          write(*,*) "Index of loaded time frame : ",actual_idx  
+          stop
+      else
+          call set_clock_from_clock(cur_daily_fields,ctmp)
+      endif
+c     Confirm update
+      write(*,*) "New daily fields : ",get_datetime(cur_daily_fields)
+ 
+      end subroutine update_daily_physical_fields
+
+
+
+      subroutine update_hourly_physical_fields(ctime)
+c     -----------------------------------------------------
+c     Update physical_fields corresponding to clock time ctime
+c     We assume that the NORWECOM fields are representative of 
+c     the hour period in which they lie in the middle of  
+c     eg the first field in the NCDF file,
+c     which is time stamped 2006/01/01 01:00 represents the flow
+c     fields between 00:30 and 01:30.
+c     -----------------------------------------------------
+      type(clock), intent(in)   :: ctime
+      type(clock)   :: ctmp, cstart_of_year
+      integer       :: cyear, cmonth, cday,csec
+      integer       :: jday, idx, secon
+      integer       :: i,j,len, elapsed
+      real          :: actual_idx(1)
+c     -----------------------------------------------------
+c.....Figure out what the next data frame should be
+      call set_clock_from_clock(ctmp,ctime)
+      call add_seconds_to_clock(ctmp,-1800) !Taking the clock back some 1800s avoids problems at the very start of the year
+      call get_date_from_clock(ctmp,cyear,cmonth,cday)
+      call set_clock(cstart_of_year,cyear,1,1,0)  
+      call get_period_length_sec(ctmp,cstart_of_year,elapsed) !Time elapsed since the start of the year (in secs)
+      idx = ceiling(real(elapsed)/3600.)
+      if (idx.eq.0) then 
+        idx=1
+      end if
+
+c.....Now load the new hourly fields
+      call read_NORWECOM_fields("velo_hourly","U",cyear,idx,u)
+      call read_NORWECOM_fields("velo_hourly","V",cyear,idx,v)
+      call read_NORWECOM_fields("velo_hourly","VertD",cyear,
+     +        idx,vdiffus(:,:,1:nz))
+
+c.....Polish up the vertical diffusivity - diffusivity at the boundaries
+c     conditions should be zero. Otherwise, diffusivity should not
+c     fall below the minimum background value of 1e-5.
+      where (vdiffus(:,:,2:nz) < 1e-5)
+          vdiffus(:,:,2:nz) = 1e-5
+      end where
+      vdiffus(:,:,1) =0
+      vdiffus(:,:,nz+1) =0
+      do i = 1, nx
+         do j = 1, ny
+            if(.not. any_wet(i,j)) then
+              vdiffus(i,j,:) =  0 
+            endif
+         enddo
+      enddo 
+
+c.....Get the NORWECOM time that the array index corresponds to      
+      call read_NORWECOM_fields("velo_hourly","T",cyear,idx,
+     +         dat1d=actual_idx)
+
+c.....Update derived quantities
+c      call update_layer_hashtables()
+      call update_w()
+c      call update_rhow(salty,temp,bottom_layer,layer_width)
+
+c.....Update turbulence fields
+c      call update_turbulence(u, v, uwind, vwind, rhow,
+c     +                       layer_width, wdepth, bottom_layer,
+c     +                       hydro_time_step, xfacelen, yfacelen)
+
+
+c.....And finish off the update by setting the time properly etc and
+c     checking it agrees with result from NCDF files
+      call set_clock_from_clock(ctmp,cstart_of_year)
+      call add_seconds_to_clock(ctmp,idx*3600)
+      call get_period_length_sec(ctmp,base_time,len)
+      if (nint(actual_idx(1))*3600.ne.len+NORWECOM_t_offset) then
+          write(*,'(25("-"),a,25("-"))') "STOP"
+          write(*,*)"Update_hourly_physical_ fields: data frame" //
+     +       " loaded does not match that desired."
+          write(*,*) "Actual time : ", get_datetime(ctime)
+          write(*,*) "Desired time frame : ",get_datetime(ctmp)
+          write(*,*) "Index of loaded time frame : ",actual_idx  
+          stop
+      else
+          call set_clock_from_clock(cur_hourly_fields,ctmp)
+      endif
+c     Confirm update
+      write(*,*) "New hourly fields : ",get_datetime(cur_hourly_fields)
+
+      end subroutine update_hourly_physical_fields
+
+
+      subroutine read_NORWECOM_fields(prefix,varName,year,idx,
+     +                  dat3d,dat2d,dat1d)
+c     -----------------------------------------------------
+c     Reads data directly from the NORWECOM ncdf database. The
+c     subroutine accepts either a 3d, 2d or 1d output variable
+c     which is then used to determine how the data is read
+c     -----------------------------------------------------
+      character(len=*),intent(in) ::prefix,varName
+      integer,intent(in)          ::year,idx
+      real,optional,intent(out)   ::dat3d(:,:,:)
+      real,optional,intent(out)   ::dat2d(:,:)
+      real,optional,intent(out)   ::dat1d(1)
+      integer       :: ncid,varid
+      character*999 :: ncfilename
+      integer       :: status
+      real          :: scaleFact
+c     -----------------------------------------------------
+c     Setup filename
+      write(ncfilename,801) trim(adjustl(hydroDBpath)),
+     &        path_separator,prefix,year
+ 801  format(3a,i4,".nc")
+      write(*,*) "Loading ",varName," data from: ",trim(ncfilename)
+c     Now open the file
+      call check_ncdf(nf90_open(ncfilename,nf90_nowrite,ncid))
+      call check_ncdf(nf90_inq_varid(ncid,varName,varid))
+c     Get scale factor if it exists 
+      scaleFact= 1.0
+      status = nf90_inquire_attribute(ncid,varid,"scale_factor")
+      if (status.eq. nf90_noerr) then
+        call check_ncdf(nf90_get_att(ncid,varid,
+     +      "scale_factor",scaleFact))
+      end if
+c     Read the data
+      if (present(dat3d)) then 
+         call check_ncdf(nf90_get_var(ncid,varid,dat3d,
+     &            start=(/1,1,1,idx/),count=(/nx,ny,nz,1/) )) 
+         where(.NOT. is_wet)
+            dat3d=0.
+         end where
+         dat3d=dat3d*scaleFact
+      elseif (present(dat2d)) then
+         call check_ncdf(nf90_get_var(ncid,varid,dat2d,
+     &            start=(/1,1,idx/),count=(/nx,ny,1/) )) 
+         where(.NOT. any_wet)
+            dat2d=0.
+         end where
+         dat2d=dat2d*scaleFact
+      elseif (present(dat1d)) then
+         call check_ncdf(nf90_get_var(ncid,varid,dat1d,
+     &            start=(/idx/),count=(/1/) )) 
+         dat1d=dat1d*scaleFact
+      else
+         write(*,*) "Arguments to read_NORWECOM_fields misspecified"
+         stop
+      endif
+
+c     Tidy up
+      call check_ncdf(nf90_close(ncid))
+
+      end subroutine read_NORWECOM_fields
+
+
+
+      subroutine update_w()
+c     -----------------------------------------------------
+c     Update w(:,:,:) from u(:,:,:), v(:,:,:) using 
+c     water incompressibility, starting at each bottom face
+c     with w=0 and integrating upward
+c     Notice that w(nx,:,:) and w(:,ny,:) can not be defined
+c     by this procedure, due to open faces (these planes are 
+c     assigned w=0)
+c
+c     w is midt point at cell upper face and positive upward 
+c     so that sea bed boundary condition w=0 is implicit   
+c     In principle, w(:,:,1) should equal (d/dt) dslm(:,:)
+c     (assertion not checked)
+c     -----------------------------------------------------
+      integer :: ix, iy, iz
+      real    :: dw, wlow, aoh, totwth
+c     -----------------------------------------------------      
+      w = 0.              ! pad value for undefined entries
+      do ix=1,nx-1        ! w(nx,:,:)  undefined 
+         do iy=1,ny-1     ! w(:,ny,:) undefined
+            wlow = 0.     ! sea bed boundary condition
+            do iz = bottom_layer(ix,iy), 1, -1  ! bottom_layer>= 1
+               totwth = layer_width(ix,iy,iz)
+               aoh = cell_area(ix,iy)/totwth
+               dw  = yfacelen(ix,iy)  * u(ix,iy,iz) - 
+     1               yfacelen(ix+1,iy)* u(ix+1,iy,iz) + 
+     2               xfacelen(ix,iy)  * v(ix,iy,iz) - 
+     3               xfacelen(ix,iy+1)* v(ix,iy+1,iz)
+               w(ix,iy,iz) = wlow + dw/aoh
+               wlow        = w(ix,iy,iz) ! is now next lower face
+            enddo
+         enddo
+      enddo
+  
+      end subroutine update_w
+
+
+      subroutine update_horizontal_turbulence()
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c
+c  Smagorinsky parameterization of horizontal eddy diffusivity
+c  
+c  update hdiffus in units corresponding to ...
+c  hdiffus is cell centered, i.e. hdiffus(ix,iy,iz) corresponds to (x,y,z) = (ix,iy,iz)
+c  Evaluate shear by finite differencing (with one grid spacing from center position)
+c  
+c  Smagorinsky version used in DMIs bshcmod code, apart from 
+c  damping has been dropped, use constant limit enstead, independent 
+c  on tracer time step
+c  
+c  suggested settings for North Sea:
+c  
+c    smagorinsky_constant     =  0.31    ! 0.31 (effective small viscosity DMI setting)
+c    smagorinsky_schmidtnum   =  1.0     ! 1.0 
+c    smagorinsky_eddyvisc_max =  0.1     ! unit == m2/sec (suggested NS value 0.1 m2/sec)
+c
+c  assumes (u,v) is zero in undefined/dry cells)
+c  
+c  MPA: 20100126 Extracted from eddyvis_horizontal function in 
+c       horizontal_turbulence_plugin and modified to work here. 
+c       Operates directly on the module-level data arrays
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     Smagorinsky parameters for horizontal diffusion      
+      real,parameter          :: smagorinsky_constant =0.31  !(effective small viscosity DMI setting)    
+      real,parameter          :: smagorinsky_schmidtnum = 1.0
+      real,parameter          :: smagorinsky_eddyvisc_max=0.1 ! unit = m2/sec (suggest 0.1 for NS)
+      real                :: L2                 ! Smagorinsky squared length scale
+      real                :: dudx, dudy, dvdx, dvdy, deform  ! v shear components, cell centered
+      real                :: position(3),cm0(3),cp0(3),c0m(3),c0p(3)
+      real                :: dr(2), dRx, dRy
+      integer             :: ix,iy,iz
+c     ---------------------------------------------------------------------------
+      write(*,*) "update_horizontal_turbulence: entered."
+      hdiffus(1:nx, 1:ny, 1:nz) = 0.         ! set pad value (for undefined/dry cells)
+
+c   
+c     =========  update diffus(2:nx-1, 2:ny-1, 1:nz) =========
+c         
+c     --- horizontal loop
+c
+      do iy=2,ny-1
+         do ix=2,nx-1
+            if (bottom_layer(ix,iy)==0) cycle
+c           --- assess finite differencing step lengths ---
+            position(1) = ix
+            position(2) = iy
+c            position(3) = iz    !MPA 20100125 Commented out and changed to zero
+            position(3) = 0
+            dr(1) = 1.0  ! dx,dy = 1,0
+            dr(2) = 0.0
+            call d_xy2d_cart(position, dr) ! inplace transformation of dr
+            dRx = sqrt(sum(dr**2))
+            dr(1) = 0.0  ! dx,dy = 0,1
+            dr(2) = 1.0
+            call d_xy2d_cart(position, dr) ! inplace transformation of dr
+            dRy = sqrt(sum(dr**2))
+c           
+            L2  = (smagorinsky_constant**2)*cell_area(ix,iy) 
+c
+c           --- vertical loop ---
+c
+            do iz=1,bottom_layer(ix,iy)
+               position(3) = iz
+c              --- evaluate centered finite horizontal differences ---
+               position(2) = iy
+               position(1) = ix-1.0
+               call interpolate_currents(position, cm0) !return in grid_units/s
+               position(1) = ix+1.0
+               call interpolate_currents(position, cp0)
+               position(1) = ix
+               position(2) = iy-1.0
+               call interpolate_currents(position, c0m)
+               position(2) = iy+1.0
+               call interpolate_currents(position, c0p)
+c              --- evaluate horizontal shear from finite differences ---
+c                  shear unit == 1/time
+c              MPA 20100125 dudx etc are estimated by finite
+c                 differencing over +/- 1 grid unit
+c                 differences. We can therefore remove the Ry, Rx divisors and replace
+c                 them with 2, as the grid units cancel
+               dudx = 0.5*(cp0(1)-cm0(1))/2
+               dudy = 0.5*(c0p(1)-c0m(1))/2
+               dvdx = 0.5*(cp0(2)-cm0(2))/2
+               dvdy = 0.5*(c0p(2)-c0m(2))/2
+               deform = sqrt((dudx-dvdy)**2 + (dudy+dvdx)**2)
+c
+c..............Impose upper limit on viscosity:smagorinsky_eddyvisc_max
+               hdiffus(ix,iy,iz) = min(smagorinsky_eddyvisc_max, 
+     +                                 L2*deform)  ! unit == length**2/time
+c..............Divide by Schmidt number to obtain the diffusivity
+               hdiffus(ix,iy,iz) = hdiffus(ix,iy,iz)/
+     +                             smagorinsky_schmidtnum               
+c              
+            enddo
+         enddo
+      enddo
+      write(*,*) "update_horizontal_turbulence: complete."
+      end subroutine update_horizontal_turbulence
+
+ 
+c      subroutine update_layer_hashtables()
+c     ------------------------------------------------------
+c     Update vertical layer hash tables
+c          layer_width(nx,ny,nz)     
+c          acc_width(nx,ny,nz)  
+c          wdepth(nx,ny)       
+c     with current value of sea surface elevation (dslm)
+c
+c     Undisturbed tables (dslm=0) acc_width0, layer_width0
+c     must be set
+c     acc_width(ix,iy,ibot+1) is total (instantaneous) depth in column (ix,iy)
+c     ------------------------------------------------------
+c      integer :: ix,iy,iz
+c     ------------------------------------------------------
+c      layer_width(:,:,1) = layer_width0(1) + dslm(:,:)
+c      acc_width(:,:,1)   = 0.
+c      do iz = 2,nz
+c         layer_width(:,:,iz) = layer_width0(iz) 
+c         acc_width(:,:,iz)   = acc_width0(iz) + dslm(:,:)
+c      enddo
+c      acc_width(:,:,nz+1)   = acc_width0(nz+1) + dslm(:,:)
+c     -- set current depth --
+c      wdepth = 0. ! pad value
+c      do ix=1,nx
+c         do iy=1,ny
+c            if (bottom_layer(ix,iy) > 0) then
+c               wdepth(ix,iy) = acc_width(ix,iy, bottom_layer(ix,iy)+1)
+c            endif
+c         enddo
+c      enddo
+
+c      end subroutine update_layer_hashtables
+
+c########################################################################
+c########################################################################
+c#                    Public Accessor Methods                           # 
+c########################################################################
+
+      logical function wet(x,y,z)
+c     ------------------------------------------------------
+c     Check whether (x,y,z) corresponds to a wet position or not by
+c     looking up in the any_wet or is_wet arrays, as appropriate
+c     The function will usually be call as if(wet(x,y)) then....
+c     This function is intended to replace public access to those
+c     two arrays, and thereby ensure that grid conventions are
+c     restricted to the oceanography provider
+c     ------------------------------------------------------
+      real,    intent(in)            :: x,y
+      real,    intent(in), optional  :: z
+      integer  :: ix, iy, iz
+c     ------------------------------------------------------
+      if (present(z)) then !look up in the is_wet array
+          call cell_index((/x,y,z/),ix,iy,iz)    
+          wet = is_wet(ix,iy,iz)
+      else ! just lookup in the any_wet array
+          call cell_index((/x,y/),ix,iy)    
+          wet = any_wet(ix,iy)
+      end if
+      end function wet
+
+
+      logical function range_check(x,y,z,cross)
+c     ------------------------------------------------------
+c     Check (x,y,z) wrt. interpolation ranges:
+c           0.0 < x < nx-1
+c           0.0 < y < ny-1
+c           0.0 < z < nz (due to bottom BC)
+c     which is the relevant range for interpolation of velocities
+c     return .true. if (x,y,z) is interior to above ranges, else .false.
+c     cross(1,2,3) has value 0/1/-1 for inside/above/below valid 
+c     range of x,y,z respectively
+c     This function does NOT check that position is inside water column
+c     (i.e. not in a dry point, below seabed or above surface)
+c     ------------------------------------------------------
+      real,    intent(in)  :: x,y,z
+      integer, intent(out) :: cross(:)
+c     ------------------------------------------------------
+      cross(1:3)  = 0
+      if  (x < 0.0)    cross(1) = -1
+      if  (x > nx-1.0) cross(1) =  1
+      if  (y < 0.0)    cross(2) = -1
+      if  (y > ny-1.0) cross(2) =  1
+      if  (z < 0.0)    cross(3) = -1
+      if  (z > nz)     cross(3) =  1
+      range_check = .not.any(cross(1:3).ne.0)
+      end function range_check
+
+
+      subroutine cell_centre(position,centre)     
+c     -------------------------------------------------------------------------------------
+c     For a given set of positions, x,y,z, returns the coordinates of
+c     the centre of the corresponding cell. Used primarily by
+c     particle_tracking module to reshuffle dry particles along the coastline
+c     The exact nature of how this is done is grid dependent, and has
+c     therefore been shipped into the oceanography provider
+c     -------------------------------------------------------------------------------------
+      real, intent(in)   :: position(:) ! assumed shape real(2+)
+      real, intent(out)  :: centre(:) ! assumed shape real(2+)
+      integer            :: i
+c     -------------------------------------------------------------------------------------
+      do i=1,3
+          centre(i)=real(ceiling(position(i)))-0.5
+      enddo
+      end subroutine cell_centre
+
+
+
+      subroutine interpolate_currents(position, grid_vels)
+c     -------------------------------------------------------------------------------------
+c     Perform linear two-face interpolation in current fields into vector uvw
+c     
+c     position is xyz grid coordinates,                     shape == real(3+)
+c     grid_vels are interpolated currents in grid units / second, shape == real(3+)
+c     
+c     current are extrapolated with warning, if bounds are exceeded
+c     extrapolation value corresponds to array bound in direction, where bound is violated
+c
+c     ------------- conventions / data layout ------------------------
+c     (x,y) positive along grid coordinates, z positive downwards
+c     cell (ix,iy,iz) centered at xyz = (ix-0.5,iy-0.5,iz-0.5)
+c     u,v positive along lat,lon coordinate system in units m/s
+c     w   positive upward                          in units m/s
+c     uvw is a vector holding these velocities
+c    
+c     u(ix,iy,iz) at grid position (ix-1  , iy    , iz)     (i.e. western  cell face)
+c     v(ix,iy,iz) in grid position (ix    , iy-1.0, iz)     (i.e. southern cell face)
+c     w(ix,iy,iz) in grid position (ix    , iy    , iz-1.0) (i.e. upper    cell face)
+c     The boundary condition:
+c           w( ix, iy, bottom_layer(ix,iy) ) = 0
+c     is implicit 
+c
+c     Implied interpolation ranges:
+c           0.0 < x < nx-1
+c           0.0 < y < ny-1
+c           0.0 < z < nz (due to bottom BC)
+c     -------------------------------------------------------------------------------------
+      real, intent(in)  :: position(:)   ! assumed shape real(3+)
+      real, intent(out) :: grid_vels(:)       ! assumed shape (do not check consistency with position)
+      real              :: uvw(size(grid_vels)) ! assumed shape (do not check consistency with position)
+      integer           :: ix,iy,iz,jeast,jnorth,jlow,ibot
+      integer           :: nextrp, nintp, idum(3),iunit
+      real              :: x,y,z, sx,sy,sz,pos(3)
+c     -------------------------------------------------------------------------------------
+
+c      write(*,*) "interpolate_currents : position shape = ", 
+c     +            shape(position)
+
+      nextrp = 0    ! extrapolation counter
+      nintp  = 0    ! interpolation counter
+
+      x = position(1)
+      y = position(2)
+      z = position(3)
+      if ( range_check(x,y,z,idum) ) then
+         nintp  = nintp + 1
+      else
+         nextrp = nextrp + 1    ! do not distinguish array bound violations
+      endif
+
+c.....determine integer cell associations of point, constrained to 1 <= i <= n
+c     i.e. the indices of the cell in which position is to be found 
+      call cell_index(position,ix,iy,iz)
+      ibot = bottom_layer(ix,iy)       ! For NORWECOM, this always equals nz, as it is terrain following
+
+c.....determine relative intracell coorninate s, constrained to 0 < s < 1 
+c     when point exceed coordinate bounds s is assigned 0 or 1
+      sx = max(0.d0, min(1.d0, x+1.0d0-real(ix)))  
+      sy = max(0.d0, min(1.d0, y+1.0d0-real(iy)))           
+      sz = max(0.d0, min(1.d0, z+1.0d0-real(iz)))  
+
+c.....face-to-face interpolation in physical units
+c     cell indices satisfy 1 <= (ix,iy,iz) <= (nx,ny,ibot)
+      jeast  = max(1, min(ceiling(x+1), nx)) ! next cell to the east
+      jnorth = max(1, min(ceiling(y+1), ny)) ! next cell to the north
+      uvw(1) = (1.-sx)*u(ix, iy, iz)    + sx*u(jeast, iy, iz)
+      uvw(2) = (1.-sy)*v(ix, iy,iz)     + sy*v(ix, jnorth, iz)
+
+      if (iz==ibot) then        !If in the bottom cell
+         jlow = 0               ! for debugging
+         uvw(3) = (1.-sz)*w(ix, iy, iz) ! w=0 at sea bed, iz corresponds to upper cell face
+      else
+         jlow = max(1, min(ceiling(z+1),ibot)) ! next cell deeper
+         uvw(3) = (1.-sz)*w(ix, iy, iz) + sz*w(ix, iy, jlow) 
+      endif
+        
+c.....inplace vector conversion from physical units (m/s) oriented along the NORWECOM
+c     grid to grid units (gu/s)
+      grid_vels = uvw  
+      grid_vels(1) = grid_vels(1)/xfacelen(ix,iy)
+      grid_vels(2) = grid_vels(2)/yfacelen(ix,iy)
+      grid_vels(3) = grid_vels(3)/layer_width(ix,iy,iz)
+      
+c     if(grid_vels(3).ne.grid_vels(3)) then
+c     write(*,*) "In interpolating currents---------------------------"
+c      write(*,*)"Positions : ", x,y,z
+c      write(*,*)"Cells     : ",ix,iy,iz
+c      write(*,*)"sx,sy,sz  : ",sx,sy,sz
+c      write(*,*)"Next cells: ",jeast,jnorth,jlow
+c      write(*,*)"U         : ", u(ix,iy,iz),u(jeast,iy,iz)
+c      write(*,*)"V         : ", v(ix,iy,iz),v(ix,jnorth,iz)
+c      write(*,*)"W         : ", w(ix,iy,iz),w(ix,iy,jlow)
+c     write(*,*)"uvw       : ", uvw
+c     write(*,*)"grid_vels : ", grid_vels
+c     write(*,*)"wet       : ", wet(x,y)
+c      stop "Stopped in interpolating currents"
+c     endif
+c      write(*,*) "interpolate_currents : ", nextrp, "extrapolations"
+c      write(*,*) "interpolate_currents : ", nintp,  "interpolations"
+  
+c      Dump the currents to HDD
+c      call find_free_IO_unit(iunit) 
+c      open(unit=iunit,file="big dump.txt")
+c      do ix=1,nx
+c      do iy=1,ny
+c      do iz=1,1
+c       uvw(1)=u(ix,iy,iz)
+c       uvw(2)=v(ix,iy,iz)
+c       uvw(3)=w(ix,iy,iz) 
+c       uvw(1)=1
+c       uvw(2)=0
+c       uvw(3)=0
+c       pos(1)=ix
+c       pos(2)=iy
+c      pos(3)=iz
+c       grid_vels =uvw
+c       call d_cart2d_xyz(pos, grid_vels)
+c       write(iunit,441) ix,iy,iz,uvw,grid_vels,
+c     +     wet(real(ix),real(iy),real(iz))
+c      enddo
+c      enddo
+c      enddo
+c      close(iunit)
+c      stop
+441   format(3(i4),3(f8.3),3(e12.3),L2)
+
+      end subroutine interpolate_currents
+
+
+   
+
+      subroutine interpolate_turbulence(position, k)     
+c     -------------------------------------------------------------------------------------
+c     Interpolate scalar turbulence at grid position position
+c     return result k in grid_units^2/sec
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(3+)
+      real, intent(out)    :: k(:)        ! assumed shape real(3+)
+c     -------------------------------------------------------------------------------------
+      call interp_turb_physunit(position, k) ! adapted from in turbulence module; result in m2/sec
+      call d_cart2d_xyz(position, k)
+      call d_cart2d_xyz(position, k) ! result k in grid_units^2/sec
+      end subroutine interpolate_turbulence 
+
+
+      subroutine interpolate_turbulence_deriv(position, k)     
+c     -------------------------------------------------------------------------------------
+c     Interpolation derivatives of module turbulence data with respect to 
+c     scaled coordinates (NOT Cartesian coordinates)
+c     return result k in grid_units/sec
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(3+)
+      real, intent(out)    :: k(:)        ! assumed shape real(3+)
+      real :: tmp, tmp2
+c     -------------------------------------------------------------------------------------
+c     adapted from turbulence module; result in m2/grid_units/sec
+      call interp_turb_physunit_deriv(position, k) 
+      call d_cart2d_xyz(position, k)
+      call d_cart2d_xyz(position, k) ! result k in grid_units/sec
+      end subroutine interpolate_turbulence_deriv
+
+      subroutine interp_turb_physunit(position, k) 
+c     -----------------------------------------------------------------------------
+c     Interpolate module turbulence data 
+c
+c                 hdiffus(nx,ny,nz) -> k(1:2)
+c                 vdiffus(nx,ny,nz+1) -> k(3)
+c 
+c     on position (in grid coordinates)
+c     hdiffus/vdiffus are assumed up to date (no update invoked)
+c     The output buffer k(:) is assumed sufficiently large (not checked)  
+c     
+c     The interpolation does not check for bottom crossings, but assumes diffusivities 
+c     are set with appropriate padding values
+c     -----------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(3+)
+      real, intent(out)    :: k(:)        ! assumed shape real(3+)
+      
+      integer           :: ix0,iy0,iz0,ix1,iy1,iz1
+      integer           :: nzp1, nextrp, nintp
+      real              :: x,y,z, sx,sy,sz
+      real              :: k000,k100,k010,k110, k001,k101,k011,k111
+c     -----------------------------------------------------------------------------
+      nextrp = 0    ! extrapolation counter
+      nintp  = 0    ! interpolation counter
+      nzp1   = nz+1
+
+      x = position(1)
+      y = position(2)
+      z = position(3)
+      
+c      if ( range_check(x,y,z) ) then
+c         nintp  = nintp + 1
+c      else
+c         nextrp = nextrp + 1    ! do not distinguish array bound violations
+c      endif
+c      
+c.....Perform trilinear interpolation of hdiffus/vdiffus at actual position (x,y,z)
+c     At grid edges, interpolation cube deflates to a square/line/point
+c     Interpolation is robust against this defaltion
+c 
+c.....Determine horizontal diffusivity interpolation cube
+c     This definition extrapolation is performed with zero slopes and continuous at edges
+c     hdiffus is cell centered
+c
+      ix0 = max(1, min(nint(x),   nx)) ! west  x face
+      iy0 = max(1, min(nint(y),   ny)) ! south y face
+      iz0 = max(1, min(nint(z),   nz)) ! shallower z face
+      ix1 = max(1, min(nint(x+1), nx)) ! east x face
+      iy1 = max(1, min(nint(y+1), ny)) ! north y face
+      iz1 = max(1, min(nint(z+1), nz)) ! deeper z face
+c     locate relative intra cell location (0 <= s <= 1)
+      sx    = max(0.0, min(x+0.5-real(ix0), 1.0))
+      sy    = max(0.0, min(y+0.5-real(iy0), 1.0))
+      sz    = max(0.0, min(z+0.5-real(iz0), 1.0))
+
+c.....cube degenerate at extraplation      
+      k000 = hdiffus(ix0,iy0,iz0)
+      k100 = hdiffus(ix1,iy0,iz0)
+      k010 = hdiffus(ix0,iy1,iz0)
+      k110 = hdiffus(ix1,iy1,iz0)
+      k001 = hdiffus(ix0,iy0,iz1)
+      k101 = hdiffus(ix1,iy0,iz1)
+      k011 = hdiffus(ix0,iy1,iz1)
+      k111 = hdiffus(ix1,iy1,iz1)
+      
+      k(1:2) = (1-sz)*((1-sy)*(k000*(1-sx) + sx*k100)  + 
+     &                  sy *(k010*(1-sx) + sx*k110)) + 
+     &                  sz *((1-sy)*(k001*(1-sx) + sx*k101)  + 
+     &                       sy *(k011*(1-sx) + sx*k111))
+         
+c
+c.....Determine vertical diffusivity interpolation cube
+c     This definition extrapolation is performed with zero slopes and continuous at edges
+c     vdiffus is face centered at upper face, so z index + offset 
+c     are different from horizontal diffusivity array, but x,y same
+      iz0 = max(1, min(ceiling(z), nzp1)) ! shallower z face
+      iz1 = max(1, min(ceiling(z+1.0d0), nzp1)) ! deeper z face
+      sz  = max(0.0, min(z+1.0-real(iz0), 1.0))
+ 
+c.....cube degenerate at extraplation     
+      k000 = vdiffus(ix0,iy0,iz0)
+      k100 = vdiffus(ix1,iy0,iz0)
+      k010 = vdiffus(ix0,iy1,iz0)
+      k110 = vdiffus(ix1,iy1,iz0)
+      k001 = vdiffus(ix0,iy0,iz1)
+      k101 = vdiffus(ix1,iy0,iz1)
+      k011 = vdiffus(ix0,iy1,iz1)
+      k111 = vdiffus(ix1,iy1,iz1)
+
+      k(3) = (1-sz)*((1-sy)*(k000*(1-sx) + sx*k100)  + 
+     &                          sy *(k010*(1-sx) + sx*k110)) + 
+     &                  sz *((1-sy)*(k001*(1-sx) + sx*k101)  + 
+     &                          sy *(k011*(1-sx) + sx*k111))
+
+c      write(*,*) "interp_turb_physunit : ", nextrp, "extrapolations"
+c      write(*,*) "interp_turb_physunit : ", nintp,  "interpolations"
+
+      end subroutine interp_turb_physunit
+
+
+
+      subroutine interp_turb_physunit_deriv(position, dk) 
+c     -----------------------------------------------------------------------------
+c     Interpolation derivatives of module turbulence data with respect to 
+c     scaled coordinates (NOT Cartesian coordinates)
+c
+c              (d/dx, d/dy) hdiffus(nx,ny,nz)   -> dk(1:2)
+c              (d/dz)       vdiffus(nx,ny,nz+1) -> dk(3)
+c 
+c     at position  (in grid coordinates)
+c     hdiffus/vdiffus are assumed up to date (no update invoked)
+c     Expressions are generated by Mathematica as :
+c     k = (1-sz) ((1-sy) (k000 (1-sx) + sx k100) + sy (k010 (1-sx) + sx k110)) + 
+c            sz  ((1-sy) (k001 (1-sx) + sx k101) + sy (k011 (1-sx) + sx k111))
+c     D[k, sx] -> dk(1)  where (k000, .. k111) comes from hdiffus
+c     D[k, sy] -> dk(2)  where (k000, .. k111) comes from hdiffus
+c     D[k, sz] -> dk(3)  where (k000, .. k111) comes from vdiffus
+c
+c     The output buffer k(:) is assumed sufficiently large (not checked) 
+c     The derivative scheme is consistent with scheme used in interp_turb_physunit
+c     (implementation validated by numerical differentation)
+c
+c     The interpolation does not check for bottom crossings, but assumes 
+c     diffusivities are set with appropriate padding values
+c     
+c     -----------------------------------------------------------------------------
+      real, intent(in)     :: position(:)  ! assumed shape real(3+)
+      real, intent(out)    :: dk(:)        ! assumed shape real(3+)
+      
+      integer           :: ix0,iy0,iz0,ix1,iy1,iz1
+      integer           :: nzp1,nextrp, nintp
+      real              :: x,y,z, sx,sy,sz
+      real              :: k000,k100,k010,k110, k001,k101,k011,k111
+c     -----------------------------------------------------------------------------     
+      nextrp = 0    ! extrapolation counter
+      nintp  = 0    ! interpolation counter
+      nzp1   = nz + 1
+
+      x = position(1)
+      y = position(2)
+      z = position(3)
+
+c      if ( range_check(x,y,z) ) then
+c         nintp  = nintp + 1
+c      else
+c         nextrp = nextrp + 1    ! do not distinguish array bound violations
+c      endif
+c     
+c.....Perform trilinear interpolation of hdiffus/vdiffus at actual position (x,y,z)
+c     At grid edges, interpolation cube deflates to a square/line/point
+c     Interpolation is robust against this defaltion
+c 
+c.....Determine horizontal diffusivity interpolation cube
+c     This definition extrapolation is performed with zero slopes and continuous at edges
+c     hdiffus is cell centered
+c
+      ix0 = max(1, min(nint(x),   nx)) ! west  x face
+      iy0 = max(1, min(nint(y),   ny)) ! south y face
+      iz0 = max(1, min(nint(z),   nz)) ! shallower z face
+      ix1 = max(1, min(nint(x+1), nx)) ! east x face
+      iy1 = max(1, min(nint(y+1), ny)) ! north y face
+      iz1 = max(1, min(nint(z+1), nz)) ! deeper z face
+c     locate relative intra cell location (0 <= s <= 1)
+      sx    = max(0.0, min(x+0.5-real(ix0), 1.0))
+      sy    = max(0.0, min(y+0.5-real(iy0), 1.0))
+      sz    = max(0.0, min(z+0.5-real(iz0), 1.0))
+
+        
+c.....cube degenerate at extraplation     
+      k000 = hdiffus(ix0,iy0,iz0)
+      k100 = hdiffus(ix1,iy0,iz0)
+      k010 = hdiffus(ix0,iy1,iz0)
+      k110 = hdiffus(ix1,iy1,iz0)
+      k001 = hdiffus(ix0,iy0,iz1)
+      k101 = hdiffus(ix1,iy0,iz1)
+      k011 = hdiffus(ix0,iy1,iz1)
+      k111 = hdiffus(ix1,iy1,iz1)
+
+         
+      dk(1) = ((-k000 + k100)*(1 - sy) +
+     &                 (-k010 + k110)*sy)*(1 - sz) +
+     &                ((-k001 + k101)*(1 - sy)     + 
+     &                 (-k011 + k111)*sy)*sz
+
+      dk(2) = (-(k000*(1 - sx)) + k010*(1 - sx) - 
+     &                   k100*sx + k110*sx)*(1 - sz) +
+     &                (-(k001*(1 - sx)) + k011*(1 - sx) - 
+     &                   k101*sx + k111*sx)*sz
+
+c
+c.....Determine vertical diffusivity interpolation cube
+c     This definition extrapolation is performed with zero slopes and continuous at edges
+c     vdiffus is face centered at upper face, so z index + offset 
+c     are different from horizontal diffusivity array, but x,y same
+c
+      iz0 = max(1, min(ceiling(z), nzp1)) ! shallower z face
+      iz1 = max(1, min(ceiling(z+1.0d0), nzp1)) ! deeper z face
+      sz  = max(0.0, min(z+1.0-real(iz0), 1.0))
+ 
+c.....cube degenerate at extraplation      
+      k000 = vdiffus(ix0,iy0,iz0)
+      k100 = vdiffus(ix1,iy0,iz0)
+      k010 = vdiffus(ix0,iy1,iz0)
+      k110 = vdiffus(ix1,iy1,iz0)
+      k001 = vdiffus(ix0,iy0,iz1)
+      k101 = vdiffus(ix1,iy0,iz1)
+      k011 = vdiffus(ix0,iy1,iz1)
+      k111 = vdiffus(ix1,iy1,iz1)
+   
+      
+      dk(3) = -((k000*(1 - sx) + k100*sx)*(1 - sy)) +
+     &                  (k001*(1 - sx) + k101*sx)*(1 - sy) - 
+     &                  (k010*(1 - sx) + k110*sx)*sy +
+     &                  (k011*(1 - sx) + k111*sx)*sy
+
+
+c      write(*,*) "interp_turb_physunit_deriv : ",
+c     +            nextrp, "extrapolations"
+c      write(*,*) "interp_turb_physunit_deriv : ", 
+c     +            nintp,  "interpolations"
+
+      end subroutine interp_turb_physunit_deriv
+    
+
+
+      subroutine interpolate_wdepth(position, wdpt)    
+c     -------------------------------------------------------------------------------------
+c     Interpolation of total water depth wdpt at (grid) position(1:2) corresponding to z coordinates
+c     replaces direct array access, hides coordinate transform
+c     return result in meters
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(2+)
+      real, intent(out)    :: wdpt
+      integer              :: ix,iy
+c     --------------------------------------------------      
+      call cell_index(position,ix,iy)
+      wdpt       = wdepth(ix,iy)   !No interpolation, simply a jagged bottom  
+      end subroutine interpolate_wdepth 
+
+
+
+      subroutine interpolate_dslm(position, res) 
+c     -------------------------------------------------------------------------------------
+c     Interpolate sea surface elevation from reference (dslm)
+c     replaces direct array access, hides coordinate transform
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(2+)
+      real, intent(out)    :: res
+c     -----------------------------------
+c      call interpolate_CC_xy_data(position, dslm, res)
+      res= 0.   !NORWECOM doesn't have DSLM data
+      end subroutine interpolate_dslm
+    
+
+
+      subroutine interpolate_temp(position, res)  
+c     -------------------------------------------------------------------------------------
+c     Interpolate temperature
+c     replaces direct array access, hides coordinate transform
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(2+)
+      real, intent(out)    :: res
+c     -----------------------------------
+      call interpolate_CC_xyz_data(position, temp, res)
+      end subroutine interpolate_temp
+   
+
+
+      subroutine interpolate_salty(position, res)  
+c     -------------------------------------------------------------------------------------
+c     Interpolate salinity
+c     replaces direct array access, hides coordinate transform
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(2+)
+      real, intent(out)    :: res
+c     -----------------------------------
+      call interpolate_CC_xyz_data(position, salty, res)
+      end subroutine interpolate_salty
+ 
+
+
+      subroutine interpolate_wind(position, uv) 
+c     -------------------------------------------------------------------------------------
+c     Interpolate surface wind
+c     replaces direct array access, hides coordinate transform
+c     -------------------------------------------------------------------------------------
+      real, intent(in)     :: position(:) ! assumed shape real(2+)
+      real, intent(out)    :: uv(:)
+c     -----------------------------------
+c      call interpolate_CC_xy_data(position, uwind, uv(1))
+c      call interpolate_CC_xy_data(position, vwind, uv(2))i
+      uv=0.     !NORWECOM doesn't have wind
+      end subroutine interpolate_wind 
+
+
+      
+      subroutine interpolate_CC_xyz_data(position, inptdat, res)
+c     -------------------------------------------------------------------------------------
+c     Interpolate a cell centered 3D array inptdat at position into res
+c     using trilinear interpolation. This interpolation applies to
+c     vertically flat cell boundaries - NORWECOM grid space is
+c     orthogonal and regular (in grid space, not in real space) and
+c     therefore we can get away with such tricks.
+c     Assume dimensions inptdat(1:nx, 1:ny, 1:nz) (not checked)
+c     Do not check whether point is wet/dry (some data may also apply to dry cells)
+c     If not (1 < position < (nx,ny,nz)) position is projected onto
+c     inptdat (without warning)
+c     -------------------------------------------------------------------------------------
+      real, intent(in)  :: position(:) ! assumed shape real(3+)
+      real, intent(in)  :: inptdat(:,:,:) 
+      real, intent(out) :: res
+      integer           :: ix,iy,ix0,ix1,iy0,iy1,iz0,iz1
+      real              :: x,y,z,sx,sy,sz
+      real              :: d000,d001,d010,d011,d100,d101,d110,d111
+c     -----------------------------------
+c     retrieve positions 
+      x    = position(1)
+      y    = position(2)
+      z    = position(3)
+c     determine corners around which to interpolation 
+      ix0   = max(1, min(nint(x), nx)) 
+      ix1   = max(1, min(ix0+1,  nx))
+      iy0   = max(1, min(nint(y), ny)) 
+      iy1   = max(1, min(iy0+1,  ny))
+      iz0   = max(1, min(nint(z), nz)) 
+      iz1   = max(1, min(iz0+1,  nz))
+c     retrieve data points at those corners      
+      d000  = inptdat(ix0, iy0, iz0)
+      d010  = inptdat(ix0, iy1, iz0)
+      d100  = inptdat(ix1, iy0, iz0)
+      d110  = inptdat(ix1, iy1, iz0)
+      d001  = inptdat(ix0, iy0, iz1)
+      d011  = inptdat(ix0, iy1, iz1)
+      d101  = inptdat(ix1, iy0, iz1)
+      d111  = inptdat(ix1, iy1, iz1)
+c     locate relative intra cell location (0 <= s <= 1)
+      sx    = max(0.0, min(x+0.5-real(ix0), 1.0))
+      sy    = max(0.0, min(y+0.5-real(iy0), 1.0))
+      sz    = max(0.0, min(z+0.5-real(iz0), 1.0))
+c     --------------------------------------------------------------------------
+c     Mathematica generator:
+c     dx00 = d000 + sx*(d100-d000)   
+c     dx10 = d010 + sx*(d110-d010)
+c     dx01 = d001 + sx*(d101-d001)
+c     dx11 = d011 + sx*(d111-d011)
+c     dxy0 = dx00 + sy*(dx10-dx00)
+c     dxy1 = dx01 + sy*(dx11-dx01)
+c     dxyz = dxy0 + sz*(dxy1-dxy0)
+c     Simplify[dxyz]//FortranForm
+c     intp[sx_,sy_,sz_] = dxyz
+c     --------------------------------------------------------------------------
+      res = d000 + (-d000 + d100)*sx + 
+     +    (d010 + d000*(-1 + sx) - d010*sx + (-d100 + d110)*sx)*sy + 
+     +    (-(d100*sx) + d101*sx + d001*(-1 + sx)*(-1 + sy) - d010*sy + 
+     +    d011*sy + d010*sx*sy - d011*sx*sy + d100*sx*sy - d101*sx*sy - 
+     +    d110*sx*sy + d111*sx*sy + d000*(-1 + sx + sy - sx*sy))*sz
+
+c     Check results 
+c      write(*,*) "x,y,z: ", x,y,z
+c      write(*,*) "ix   : ",ix0,ix1
+c      write(*,*) "iy   : ",iy0,iy1
+c      write(*,*) "iz   : ",iz0,iz1
+c      write(*,*) "s    : ",sx,sy,sz
+c      write(*,*) "d000 : ", d000
+c      write(*,*) "d010 : ", d010
+c      write(*,*) "d100 : ", d100
+c      write(*,*) "d110 : ", d110
+c      write(*,*) "d001 : ", d001
+c      write(*,*) "d011 : ", d011
+c      write(*,*) "d101 : ", d101
+c      write(*,*) "d111 : ", d111
+c      write(*,*) "res  : ",res
+c      stop "3D CC interpolation"
+      end subroutine interpolate_CC_xyz_data
+
+      
+     
+c      subroutine interpolate_CC_xy_data(position, inptdat, res)
+c     -------------------------------------------------------------------------------------
+c     Interpolate a cell centered 2D horizontal (in grid space) array inptdat at position into res
+c     using trilinear interpolation. This interpolation applies to
+c     vertically flat cell boundaries.
+c     Assume dimensions inptdat(1:nx, 1:ny) (not checked)
+c     Do not check whether point is wet/dry (some data may also apply to dry cells, e.g. wind)
+c     If not (1 < position < (nx,ny)) position is projected onto
+c     inptdat (without warning)
+c     -------------------------------------------------------------------------------------
+c      real, intent(in)  :: position(:) ! assumed shape real(2+)
+c      real, intent(in)  :: inptdat(:,:) 
+c      real, intent(out) :: res
+c      integer           :: ix,iy,ix0,ix1,iy0,iy1
+c      real              :: x,y,sx,sy
+c      real              :: d00,d01,d10,d11
+c     -----------------------------------
+c      write(*,*) "Interpolate_CC_xy_data is inactivated, as NORWECOM" //
+c     &  "does not require it. This function has not been checked for" //
+c     &  "grid compatibility"
+c      stop
+cc     retrieve parent cell (ix,iy,iz) and bottom layer for this (ix,iy)
+c      x    = position(1)
+c      y    = position(2)
+cc     retrieve interpolation corners
+c      ix0   = max(1, min(nint(x), nx)) 
+c      ix1   = max(1, min(ix0+1,  nx))
+c      iy0   = max(1, min(nint(y), ny)) 
+c      iy1   = max(1, min(iy0+1,  ny))
+c      d00  = inptdat(ix0, iy0)
+c      d10  = inptdat(ix1, iy0)
+c      d01  = inptdat(ix0, iy1)
+c      d11  = inptdat(ix1, iy1)
+cc     locate relative intra cell location (0 <= s <= 1)
+c      sx    = max(0.0, min(x+0.5-real(ix0), 1.0))
+c      sy    = max(0.0, min(y+0.5-real(iy0), 1.0))
+      
+cc     --------------------------------------------------------------------------
+cc     Mathematica generator:
+cc     dx0 = d00 + sx*(d10-d00)   
+cc     dx1 = d01 + sx*(d11-d01)
+cc     dxy = dx0 + sy*(dx1-dx0)     
+cc     Simplify[dxy]//FortranForm
+cc     intp[sx_,sy_] = dxy
+cc     --------------------------------------------------------------------------
+c      res = d00*(-1 + sx)*(-1 + sy) + (d01 - d01*sx + d11*sx)*sy + 
+c     +      d10*(sx - sx*sy)
+
+c     end subroutine interpolate_CC_xy_data
+
+
+c########################################################################
+c########################################################################
+c#                    Coordinate Transforms                             # 
+c########################################################################
+
+c     Import NORWECOM grid <-> lat,lon routines
+      include "gr2sph.f"
+      include "sph2gr.f"
+      
+      subroutine cell_index(xyz,ix,iy,iz)
+c-------------------------------------------------------
+c     Returns the cell index for a given set of coordinates
+c-------------------------------------------------------
+      real, intent(in)  :: xyz(:)  
+      integer, intent(out) :: ix,iy
+      integer, intent(out),optional :: iz
+c     --------------------------------------------------
+      ix   = max(1, min(ceiling(xyz(1)), nx)) ! 1 <= ix <= nx
+      iy   = max(1, min(ceiling(xyz(2)), ny)) ! 1 <= iy <= ny
+      if(present(iz)) then
+        iz   = max(1, min(ceiling(xyz(3)),nz)) !1 <= iz <= nz
+      endif
+      end subroutine cell_index
+
+      subroutine xy2lonlat_single(x,y,lambda,phi)
+c-------------------------------------------------------
+c     Horizontal single coordinate transformation (xy -> longitude/latitude)
+c     Use the gr2sph function direct from NORWECOM
+c-------------------------------------------------------
+      real, intent(in)  :: x,y  
+      real, intent(out) :: lambda,phi
+      integer           :: fail
+c     --------------------------------------------------
+      call gr2sph(x, y, XPOLE, YPOLE, DX, DY, YLONG,
+     >                  lambda, phi, fail)
+      if(fail .NE. 0) then
+         write(*,*) "Illegal coordinate conversion, gr2sph()"
+         write(*,931) "x     ", x
+         write(*,931) "y     ", y
+         write(*,931) "lambda", lambda
+         write(*,931) "phi   ", phi
+         write(*,*) "failure code = ", fail
+931      format(a," = ",f12.7)
+         stop
+      endif
+      end subroutine xy2lonlat_single
+      
+
+      subroutine xy2lonlat_vec(xy, lp)
+c-------------------------------------------------------
+c     Horizontal vectorized coordinate transformation (xy -> longitude/latitude)
+c     Use the gr2sph function direct from NORWECOM in a sequential
+c     manner
+c-------------------------------------------------------
+      real, intent(in)  :: xy(:,:)  ! assumed shape (2 <=, npos)
+      real, intent(out) :: lp(:,:)  ! assumed shape (do not check consistency with xy)
+      integer           :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(xy, 2)
+         call xy2lonlat_single(xy(1,ipos),xy(2,ipos),
+     +            lp(1,ipos),lp(2,ipos))
+      enddo
+      end subroutine xy2lonlat_vec
+
+
+
+
+      subroutine lonlat2xy_single(lambda,phi,x,y)
+c-------------------------------------------------------
+c     Horizontal single coordinate transformation (longitude/latitude -> xy) 
+c     Use the sph2gr function direct from NORWECOM
+c-------------------------------------------------------
+      real, intent(in) :: lambda,phi
+      real, intent(out)  :: x,y  
+      integer           :: fail
+c     --------------------------------------------------
+      call sph2gr(lambda,phi, XPOLE, YPOLE, DX, DY, YLONG,
+     >                  x, y, fail)
+      if(fail .NE. 0) then
+         write(*,*) "Illegal coordinate conversion, sph2gr()"
+         write(*,932) "lambda", lambda
+         write(*,932) "phi   ", phi
+         write(*,932) "x     ", x
+         write(*,932) "y     ", y
+         write(*,*) "failure code = ", fail
+932      format(a," = ",f12.7)
+         stop
+      endif
+      end subroutine lonlat2xy_single
+
+
+      subroutine lonlat2xy_vec(lp, xy)
+c-------------------------------------------------------
+c     Horizontal vectorized coordinate transformation (longitude/latitude -> xy) 
+c     Use the sph2gr function direct from NORWECOM in a sequential
+c     manner
+c-------------------------------------------------------
+      real, intent(in)  :: lp(:,:)  ! assumed shape (2 <=, npos) 
+      real, intent(out) :: xy(:,:)  ! assumed shape (do not check consistency with lp)
+      integer           :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(xy, 2)
+         call lonlat2xy_single(lp(1,ipos),lp(2,ipos),
+     +                 xy(1,ipos),xy(2,ipos))           
+      enddo
+      end subroutine lonlat2xy_vec
+
+
+      subroutine z2depth_single(z,x,y,depth)
+c-------------------------------------------------------
+c     vertical transformation:     z|xy -> depth
+c     All information for z transformation is contained in
+c     the acc_width and layer_width cells, so therefore 
+c     don't need to make any special effort to work with
+c     NORWECOM sigma coordinates
+c     Notice: sub-bottom depth is not flagged
+c     Allow extrapolation above surface/below grid bottom,
+c     based on layer most close to x,y,z
+c     acc_width, layer_width includes current dslm
+c-------------------------------------------------------
+      real, intent(in)  :: z,x,y 
+      real, intent(out) :: depth  
+      integer           :: ix, iy, iz, OKxyz(3)
+      real              :: sz
+      logical           :: rangeOK
+c--------------------------------------------------
+      rangeOK = range_check(x,y,z,OKxyz)
+      if (any(OKxyz(1:2).ne.0)) then
+         write(*,*) "invalid xy coordinate", x,y,OKxyz(1:2)
+         stop
+      endif
+c     Get parent cell 
+      call cell_index((/x,y,z/),ix,iy,iz)
+c     Now interpolate/extrapolate as necessary
+      if (z<=0.0) then      ! above surface (z<0.0), extrapolate from first layer
+         depth = z*layer_width(ix,iy,1)  ! depth < 0 as z<0
+      elseif (z>=nz) then ! below grid bottom
+         sz    =  z - real(nz)
+         depth = wdepth(ix,iy) + sz*layer_width(ix,iy,nz)
+      else     ! z is inside valid range
+         sz    = z-floor(z) 
+         depth = acc_width(ix,iy,iz) + sz*layer_width(ix,iy,iz)
+      endif
+      end subroutine z2depth_single
+
+
+
+      subroutine z2depth_vec(xyz,depth)
+c-------------------------------------------------------
+c     vectorized vertical transformation: z|xy -> depth
+c     assume output buffer depth is sufficient (not checked)
+c-------------------------------------------------------
+      real, intent(in)  :: xyz(:,:)  ! shape = (3,npos)
+      real, intent(out) :: depth(:)  ! shape = (npos)
+      integer           :: i
+c--------------------------------------------------
+      do i = 1, size(xyz,2)
+         call z2depth_single(xyz(3,i),xyz(1,i), xyz(2,i), depth(i))
+      enddo
+      end subroutine z2depth_vec
+
+
+      subroutine depth2z_single(depth,x,y,z)
+c-------------------------------------------------------
+c     vertical transformation:     depth|xy -> z   
+c     (if only lon/lat available, use geo2xyz
+c     Notice: sub-bottom depth is not flagged
+c     Assume (x,y) are valid
+c     Allow extrapolation above surface/below grid bottom,
+c     based on layer most close to x,y,z
+c     acc_width, layer_width includes current dslm
+c-------------------------------------------------------
+      real, intent(in)  :: depth,x,y
+      real, intent(out) :: z 
+      integer           :: ix, iy, iz
+      real              :: sz
+c--------------------------------------------------
+c     Get parent cells
+      call cell_index((/x,y/),ix,iy)
+       
+      if (depth <= 0)  then                                  ! above surface (z=0.0)
+         z =  depth/layer_width(ix,iy,1)               ! z < 0.0
+      elseif (depth >= wdepth(ix,iy)) then           ! below grid bottom
+         sz = (depth - wdepth(ix,iy))/layer_width(ix,iy,nz)
+         z = sz + nz
+      else                                      ! within normal range: 0.0 < z < nz
+         do iz=1,nz ! cell association -> iz
+            if (acc_width(ix,iy,iz+1)>depth) exit
+         enddo
+         sz = (depth - acc_width(ix,iy,iz))/layer_width(ix,iy,iz) ! relative cell completion
+         z = real(iz) -1 + sz
+      endif
+    
+      end subroutine depth2z_single
+
+
+      subroutine depth2z_vec(depth,xyz)
+c-------------------------------------------------------
+c     vectorized vertical transformation: depth|xy -> z
+c     (if only lon/lat available, use geo2xyz
+c     assume output buffer xyz is sufficient (not checked)
+c-------------------------------------------------------
+      real, intent(in)    :: depth(:)  ! shape = (npos)
+      real, intent(inout) :: xyz(:,:)  ! shape = (3,npos)
+      integer           :: i
+c--------------------------------------------------
+      do i=1, size(depth)
+         call depth2z_single(depth(i), xyz(1,i), xyz(2,i), xyz(3,i))
+      enddo
+      end subroutine depth2z_vec
+
+
+      subroutine xyz2geo_single(x,y,z,lambda,phi,depth)
+c-------------------------------------------------------
+c     Geographical single coordinate transformations 
+c     xyz -> lat/lon/depth
+c     Notice: sub-bottom depth is not flagged
+c-------------------------------------------------------
+      real, intent(in)  :: x,y,z
+      real, intent(out) :: lambda,phi,depth
+c     --------------------------------------------------
+      call xy2lonlat_single(x,y,lambda,phi)
+      call z2depth_single(z,x,y,depth)
+      end subroutine xyz2geo_single
+      
+
+      subroutine xyz2geo_vec(xyz, geopos)
+c-------------------------------------------------------
+c     Geographical vectorized coordinate transformations xyz -> geopos
+c     where
+c        geopos(1,:) = lat
+c        geopos(2,:) = lon
+c        geopos(3,:) = depth
+c     Notice: sub-bottom depth is not flagged
+c-------------------------------------------------------
+      real, intent(in)  :: xyz(:,:)
+      real, intent(out) :: geopos(:,:)
+c     --------------------------------------------------
+      call xy2lonlat_vec(xyz(1:2,:), geopos(1:2,:))
+      call z2depth_vec(xyz, geopos(3,:))
+      end subroutine xyz2geo_vec    
+
+
+      subroutine geo2xyz_single(lambda,phi,depth,x,y,z)
+c-------------------------------------------------------
+c     geographical single coordinate transformation: 
+c     lat/lon/depth -> xyz 
+c     Notice: sub-bottom depth is not flagged
+c-------------------------------------------------------
+      real, intent(in)  :: lambda,phi,depth
+      real, intent(out) :: x,y,z
+c-------------------------------------------------------  
+      call lonlat2xy_single(lambda,phi,x,y)
+      call depth2z_single(depth,x,y,z)
+      end subroutine geo2xyz_single  
+
+
+      subroutine geo2xyz_vec(geopos,xyz)
+c-------------------------------------------------------       
+c     geographical vectorized transformation: geopos -> xyz 
+c     where
+c        geopos(1,:) = lat
+c        geopos(2,:) = lon
+c        geopos(3,:) = depth
+c     Notice: sub-bottom depth is not flagged
+c-------------------------------------------------------  
+      real, intent(in)  :: geopos(:,:)
+      real, intent(out) :: xyz(:,:)
+c-------------------------------------------------------     
+      call lonlat2xy_vec(geopos(1:2,:), xyz(1:2,:))
+      call depth2z_vec(geopos(3,:), xyz)
+      end subroutine geo2xyz_vec
+
+
+
+c########################################################################
+c########################################################################
+c#                 Tangent Space Transforms                             # 
+c########################################################################
+
+      subroutine get_jacobian(position, jacob)
+c------------------------------------------------------- 
+c     tanget space vectors in lon-lat-vertical representation 
+c     in units of meters at position 
+c     A displacement in grid coordinates dxyz(1:3) from position
+c     corresponds to the displacement 
+c       dR(1:3) =  matrixmultiply(jacob(1:3,1:3), dxyz(1:3))
+c     in meters in lon-lat-vertical coordinate representation
+c     In other words, tangent space vectors are coloumns of jacob
+c------------------------------------------------------- 
+      real, intent(in)   :: position(:) ! shape (3+) 
+      real, intent(out)  :: jacob(:,:)  ! shape (3+,3+)
+      real               :: x,y,z       ! Positions in xyz grid space
+      integer            :: ix,iy,iz    ! Rounded positions in xyz grid space
+      real               :: r,tmp           ! Temporary variables used in calculations
+      real               :: lon,lat     ! lon-lat at position
+c     --------------------------------------------------
+      x = position(1)
+      y = position(2)
+      call xy2lonlat(x,y,lon,lat)
+
+      jacob  = 0.0
+c     First the changes in longitude 
+      jacob(1,1:2)= -DX/DY/(1+(DX/DY*(x-XPOLE)/(y-YPOLE))**2)/
+     +      (y-YPOLE)**2*earth_radius*cos(lat*deg2rad)
+      jacob(1,1) = jacob(1,1)*(y-YPOLE)
+      jacob(1,2) = -jacob(1,2)*(x-XPOLE)
+c     Then the changes in latitude      
+      r =sqrt(DX**2*(x-XPOLE)**2 + DX**2 * (y-YPOLE)**2)
+      tmp = earth_radius/1000*(1+sin(PHINUL))  !earth_radius is in m, whereas DX, DY are in km
+      jacob(2,1:2) = -2 /tmp/(1+(r/tmp)**2)/r*earth_radius
+      jacob(2,1) = jacob(2,1)*DX**2*(x-XPOLE)
+      jacob(2,2) = jacob(2,2)*DY**2*(y-YPOLE)
+c     The vertical change depends on position, but this is calculated
+c     into the layer width array anyway 
+      call cell_index(position,ix,iy,iz)
+      jacob(3,3) = layer_width(ix,iy,iz)
+      end subroutine get_jacobian
+
+
+      subroutine d_xy2d_cart_single(position, xy)
+c------------------------------------------------------- 
+c     Tangent space transformation: d(xy)         -> d(Euclidian)
+c     where tangent space axes are oriented along Lambda/phi/down vectors
+c     Convert inplace xy in respective tangent spaces
+c     Do not check array dimension matches (trust carcoor)
+c     Do not touch z coordinate (if present)
+c------------------------------------------------------- 
+      real, intent(in)     :: position(:) ! real(2+) 
+      real, intent(inout)  :: xy(:)       ! real(2+) 
+      real                 :: j(3,3)      !Jacobian      
+      integer              :: i
+c     --------------------------------------------------
+      call get_jacobian(position,j)
+      xy(1:2) = xy(1)*j(1:2,1)+xy(2)*j(1:2,2)
+      if(size(xy)>2) then
+         xy(1:2)=xy(1:2)+xy(3)*j(1:2,3)
+      endif
+      end subroutine d_xy2d_cart_single
+
+
+      subroutine d_xyz2d_cart_single(position, xyz)
+c------------------------------------------------------- 
+c     Tangent space transformation: d(xyz)         -> d(Euclidian)
+c     where tangent space axes are oriented along Lambda/phi/down vectors
+c     Convert inplace xyz in respective tangent spaces
+c     Do not check array dimension matches (trust carcoor)
+c     Do not touch z coordinate (if present)
+c------------------------------------------------------- 
+      real, intent(in)     :: position(:) !  real(3+) 
+      real, intent(inout)  :: xyz(:)      !  real(3+) 
+      real                 :: j(3,3)      !Jacobian      
+      integer              :: i
+c     --------------------------------------------------
+      call get_jacobian(position,j)
+      xyz(1:3) = xyz(1)*j(1:3,1)+xyz(2)*j(1:3,2)+xyz(3)*j(1:3,3)
+      end subroutine d_xyz2d_cart_single
+
+
+      subroutine d_xyz2d_cart_vec(positions, xy)
+c------------------------------------------------------- 
+c     Vectorized version of d_xyz2d_cart_single
+c     Convert a  (small) grid vector displacements xyz(1:, number_of_vectors)
+c     to a Cartesian vector in tangent spaces position(1:, number_of_vectors)
+c     (inplace xyz) in respective tangent spaces
+c     Do not check array dimension matches (trust carcoor)
+c     Do not touch z coordinate (if present)
+c------------------------------------------------------- 
+      real, intent(in)     :: positions(:,:) ! shape (3+, npos) 
+      real, intent(inout)  :: xy(:,:)        ! shape (3+, npos) 
+      integer              :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(xy, 2)
+         call d_xyz2d_cart_single(positions(:,ipos), xy(:,ipos))     
+      enddo
+      end subroutine d_xyz2d_cart_vec
+
+
+      subroutine d_xy2d_cart_vec(positions, xy)
+c------------------------------------------------------- 
+c     Vectorized version of d_xy2d_cart_single
+c     Convert a  (small) grid vector displacements xy(1:, number_of_vectors)
+c     to a Cartesian vector in tangent spaces positions(1:, number_of_vectors)
+c------------------------------------------------------- 
+      real, intent(in)     :: positions(:,:) ! shape (2+, npos) 
+      real, intent(inout)  :: xy(:,:)        ! shape (2+, npos) 
+      integer              :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(xy, 2)
+         call d_xy2d_cart_single(positions(:,ipos), xy(:,ipos))     
+      enddo
+      end subroutine d_xy2d_cart_vec
+
+
+      subroutine d_cart2d_xyz_single(position, carcoor)
+c------------------------------------------------------- 
+c     Tangent space transformation: d(Euclidian)  -> d(xyz)
+c     where tangent space axes are oriented along Lambda/phi/down vectors
+c     position is xyz position is grid coordinates
+c     carcoor is the euclidian space variable to be converted
+c     Convert inplace carcoor in respective tangent spaces
+c     Do not check array dimension matches (trust carcoor)
+c     Extrapolation: 
+c        x,y  : Not allowed
+c        z    : Based on layer width of surface/bottom layers 
+c------------------------------------------------------- 
+      real, intent(in)     :: position(:) ! real(3+) 
+      real, intent(inout)  :: carcoor(:)   ! real(3+) 
+      integer              :: ix,iy,iz
+      real                 :: lon, lat, phi, lambda
+      real                 :: dr, dlon, dlat, r, alpha
+c     --------------------------------------------------      
+c     Setup auxilarly variables
+      call cell_index(position,ix,iy,iz)
+      call xy2lonlat(position(1),position(2),lon,lat)
+      lambda=lon*deg2rad
+      phi=lat*deg2rad
+      alpha=YLONG*deg2rad
+      dlon=carcoor(1)/earth_radius/cos(phi)
+      dlat=carcoor(2)/earth_radius
+
+c     First calculate dz, that's the easy one
+      if(wet(position(1),position(2))) then
+           carcoor(3) = carcoor(3)/layer_width(ix,iy,iz)
+      else
+           carcoor(3) = 0 !If its on dry land, d_cart2dz is undefined
+      endif
+c     Calculate r and dr (in km), which are common to both dx and dy     
+      r=earth_radius/1000*cos(phi)*(1+sin(PHINUL))/(1+sin(phi))
+      dr=-earth_radius/1000*(1+sin(PHINUL))/(1+sin(phi))*dlat
+c     Now calculate the dx and dy terms
+      carcoor(1)=r/DX*cos(lambda-alpha)*dlon+sin(lambda-alpha)/DX*dr
+      carcoor(2)=r/DY*sin(lambda-alpha)*dlon-cos(lambda-alpha)/DY*dr
+      end subroutine d_cart2d_xyz_single
+
+
+      subroutine d_cart2d_xy_single(position, carcoor)
+c------------------------------------------------------- 
+c     Tangent space transformation: d(Euclidian)  -> d(xy)
+c     where tangent space axes are oriented along Lambda/phi/down vectors
+c     Convert inplace carcoor in respective tangent spaces
+c     Do not check array dimension matches (trust carcoor)
+c------------------------------------------------------- 
+      real, intent(in)     :: position(:)  ! real(2+) 
+      real, intent(inout)  :: carcoor(:)   ! real(2+) 
+      real                 :: pos(3),car(3)
+c     --------------------------------------------------
+      pos=0.
+      car=0.
+      pos(1:2)=position(1:2)
+      car(1:2)=carcoor(1:2)
+      call d_cart2d_xyz_single(pos,car)
+      carcoor(1:2)=car(1:2)
+      end subroutine d_cart2d_xy_single
+
+
+      subroutine d_cart2d_xy_vec(positions, carcoor)
+c------------------------------------------------------- 
+c     Vectorized version of d_cart2d_xy_single
+c     Convert a 3D Cartesian vector set carcoor(1:, number_of_vectors)
+c     in tangent spaces positions(1:, number_of_vectors) to an grid xy vector set
+c------------------------------------------------------- 
+      real, intent(in)     :: positions(:,:) ! shape (2+, npos) 
+      real, intent(inout)  :: carcoor(:,:)   ! shape (2+, npos) 
+      integer              :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(carcoor, 2)
+         call d_cart2d_xy_single(positions(:,ipos), carcoor(:,ipos))     
+      enddo
+      end subroutine d_cart2d_xy_vec
+
+
+      subroutine d_cart2d_xyz_vec(positions, carcoor)
+c------------------------------------------------------- 
+c     Vectorized version of d_cart2d_xyz_single
+c     Convert a 3D Cartesian vector set carcoor(1:, number_of_vectors)
+c     in tangent spaces positions(1:, number_of_vectors) to an grid xyz vector set 
+c     Do not check array dimension matches (trust carcoor)
+c------------------------------------------------------- 
+      real, intent(in)     :: positions(:,:) ! shape (3+, npos) 
+      real, intent(inout)  :: carcoor(:,:)   ! shape (3+, npos) 
+      integer              :: ipos
+c     --------------------------------------------------
+      do ipos = 1, size(carcoor, 2)
+         call d_cart2d_xyz_single(positions(:,ipos), carcoor(:,ipos))     
+      enddo
+      end subroutine d_cart2d_xyz_vec
+
+
+
+
+      subroutine close_physical_fields
+c-------------------------------------------------------
+c     Cleanup module
+c-------------------------------------------------------
+      write(*,*) "close_physical_fields(): deallocating" 
+      if (allocated(is_wet))       deallocate(is_wet) 
+c      if (allocated(any_wet))        deallocate(any_wet)
+      if (allocated(bottom_layer))   deallocate(bottom_layer)
+
+      write(*,*) "close_physical_fields: layer widths"
+      if (allocated(layer_width))    deallocate(layer_width)
+      if (allocated(acc_width))      deallocate(acc_width ) 
+      if (allocated(wdepth))         deallocate(wdepth)
+c
+      write(*,*) "close_physical_fields: cell sizes"
+c      if (allocated(xfacelen))       deallocate(xfacelen)
+c      if (allocated(yfacelen))       deallocate(yfacelen)
+c      if (allocated(cell_area))      deallocate(cell_area)
+
+      write(*,*) "close_physical_fields: currents"
+      if (allocated(u))              deallocate(u) 
+      if (allocated(v))              deallocate(v) 
+      if (allocated(w))              deallocate(w) 
+c      if (allocated(uwind))          deallocate(uwind) 
+c      if (allocated(vwind))          deallocate(vwind) 
+      write(*,*) "close_physical_fields: physical variables"
+      if (allocated(dslm))           deallocate(dslm)
+      if (allocated(temp))           deallocate(temp)
+      if (allocated(salty))          deallocate(salty)
+
+      write(*,*) "close_physical_fields: dellocate diffusivities etc"
+      if (allocated(hdiffus))          deallocate(hdiffus)
+      if (allocated(vdiffus))          deallocate(vdiffus)
+
+c      call close_turbulence()
+c      call close_water_pressure()
+
+      end subroutine close_physical_fields
+
+
+      subroutine check_ncdf(status)
+c-------------------------------------------------------
+c     Checks that NetCDF operations worked
+c-------------------------------------------------------
+          integer, intent ( in) :: status
+    
+          if(status /= nf90_noerr) then 
+             print *, trim(nf90_strerror(status))
+             stop "Stopped"
+          end if
+      end subroutine check_ncdf
+
+      subroutine gc_dist(ll1,ll2,d)
+c-------------------------------------------------------
+c     Calculate distance between two points on the surface 
+c     of earth using the great circle approximation.
+c     Input is lon/lat positions
+c     Return value, d, is distance in metres
+c     Earths radius used here is from constants.f
+c     Note that as the distances involved are relatively
+c     small, and therefore only a fraction of a radian of
+c     the earths circumference, a high degree of accuracy is
+c     required for dealing with the cosines. Hence, the
+c     variables used here are real(16), as opposed to the
+c     bog standard real(4) variables
+c-------------------------------------------------------
+      real, intent(in)     :: ll1(:),ll2(:)
+      real, intent(out)    :: d
+c      real, parameter      :: earthRadius=6371000    !earth radius in metres m
+      real(16)             :: cosdR1,cosdR2,lat1,lat2,lon1,lon2
+c     --------------------------------------------------
+c     Extract values and convert to radians
+      lon1=ll1(1)*deg2Rad
+      lat1=ll1(2)*deg2Rad
+      lon2=ll2(1)*deg2Rad
+      lat2=ll2(2)*deg2Rad
+c     Calculate distance      
+      cosdR1 =sin(lat1)*sin(lat2)
+      cosdR2 =cos(lat1)*cos(lat2)*cos(lon1-lon2)
+      d=earth_radius*acos(cosdR1+cosdR2)
+      end subroutine gc_dist
+     
+   
+      
+      end module
+      
+
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c$$$      PROGRAM test
+c$$$C     ifort -e90 physical_fields.f run_context.o input_parser.o time_tools.o dmidata_interface.o libtime/libtime77.a gribex/libgribex.a
+c$$$      use physical_fields
+c$$$      integer :: i,j,k, ic,ix,iy,iz
+c$$$      integer, parameter :: ns = 7
+c$$$      real :: pos(3,ns**3), uvw(3,ns**3),x,y,z
+c$$$c      real    :: spts(ns) = (/-0.7,  0.49, 0.51, 1.49,
+c$$$c     +                         1.51, 2.49, 2.51, 8.0/)
+c$$$  real    :: spts(ns) = (/1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1/)
+c$$$
+c$$$c     nx=2; ny=2; nz=2
+c$$$      nx=4; ny=4; nz=4
+c$$$
+c$$$      allocate( u(nx,ny,nz)         ) 
+c$$$      allocate( v(nx,ny,nz)         ) 
+c$$$      allocate( w(nx,ny,nz)         ) 
+c$$$      allocate( bottom_layer(nx,ny) ) 
+c$$$
+c$$$c$$$      u=0.
+c$$$c$$$      v=0.
+c$$$c$$$      w=0.
+c$$$c     u=3x+1  v=4y+2  w=5z+7
+c$$$      do ix=1,nx
+c$$$         do iy=1,ny
+c$$$            do iz=1,nz
+c$$$               u(ix,iy,iz) = 3*(ix+0.5) + 1
+c$$$               v(ix,iy,iz) = 4*(iy-0.5) + 2
+c$$$               w(ix,iy,iz) = 5*(iz-0.5) + 7
+c$$$            enddo
+c$$$         enddo
+c$$$      enddo
+c$$$      bottom_layer=nz
+c$$$c      call random_number(pos)
+c$$$c      pos(1,:) = pos(1,:)*1.5*nx - 1.0
+c$$$c      pos(2,:) = pos(2,:)*1.5*ny - 1.0
+c$$$c      pos(3,:) = pos(3,:)*1.5*nz - 1.0
+c$$$      ic=1
+c$$$      do i=1,ns
+c$$$         do j=1,ns
+c$$$            do k=1,ns
+c$$$               pos(:,ic) = (/spts(i), spts(j), spts(k)/)
+c$$$               ic = ic+1
+c$$$            enddo
+c$$$         enddo
+c$$$      enddo
+c$$$      
+c$$$      call interpolate_currents(pos,uvw)
+c$$$
+c$$$      do ic=1,ns**3
+c$$$         x = pos(1,ic)
+c$$$         y = pos(2,ic)
+c$$$         z = pos(3,ic)
+c$$$         write(*,33) x,y,z, uvw(1,ic)-(3*x+1), 
+c$$$     +                     uvw(2,ic)-(4*y+2), uvw(3,ic)-(5*z+7)
+c$$$ 33      format(6f8.3)
+c$$$      enddo
+c$$$
+c$$$      end PROGRAM 
+
+c     ------------ Modifications log from CVS ------------
+c $Log: NORWECOM.f,v $
+c Revision 1.20.2.9  2010-08-20 08:48:25  mpay
+c Improved handling of errors around dry land and system boundaries
+c
+c Revision 1.20.2.8  2010-01-27 11:21:15  mpay
+c Removed a debugging "stop" in the code that got forgotten
+c
+c Revision 1.20.2.7  2010-01-27 11:00:57  mpay
+c Implemented horizontal diffusion scheme by including directly (rather than sourcing) code from the horizontal turbulence plugin
+c
+c Revision 1.20.2.6  2009-10-31 04:17:19  mpay
+c Added CVS keywords to herring biology provider, NORWECOM oceanography provder, and her_main task provider as a test of the concept.
+c
+

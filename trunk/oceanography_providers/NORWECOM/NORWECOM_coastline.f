@@ -13,10 +13,10 @@ c     complex and subject to multiple versions, and thus has been split
 c     off from the rest of the grid-related functions. 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-      subroutine coastline_component_version() 
+      character*100 function coastline_component_version() 
 c     Writes the SVN revision number out for logging purposes
-      write(*,*) "Coastline comp: $Rev: 212 $"
-      end subroutine
+      coastline_component_version = "Coastline comp: $Rev: 212 $"
+      end function
 
 
       subroutine coast_line_intersection(geo1, geo2, cross_coast,

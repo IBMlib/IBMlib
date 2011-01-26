@@ -55,6 +55,7 @@ c     -------------------- public interface --------------------
       public :: is_land
       public :: coast_line_intersection
       public :: horizontal_range_check
+      public :: get_pbi_version
 
 c     -------------------- overloaded methods --------------------  
 
@@ -119,6 +120,11 @@ c     ===================================================
 c########################################################################
 c#                           General Methods                            # 
 c########################################################################
+      character*100 function main_component_version() 
+c     Writes the SVN revision number out for logging purposes
+      main_component_version = "Main comp     : $Rev: 231 $"
+      end function
+
 
       subroutine init_physical_fields(time)
 c     ---------------------------------------------------
@@ -133,11 +139,11 @@ c     ---------------------------------------------------
       type(clock), intent(in),optional :: time
 c     ---------------------------------------------------
 c.....Display version numbers for reference
-      write(*,*) "NORWECOM Oceanography provider versions:"
-      write(*,*) "Main comp     : $Rev: 231 $"
-      call grid_component_version()
-      call interpolator_component_version()
-      call coastline_component_version()
+      write(*,*) "NORWECOM pbi component versions:"
+      write(*,*) trim(main_component_version())
+      write(*,*) trim(grid_component_version())
+      write(*,*) trim(interpolator_component_version())
+      write(*,*) trim(coastline_component_version())
 
 c.....Set clock if present     
       if (present(time)) master_clock = time
@@ -703,6 +709,14 @@ c########################################################################
       include 'NORWECOM_grid.f'  !Grid relatied transformations and functions
       include 'NORWECOM_interpolators.f' !Interpolation functions and public accessors
       include 'NORWECOM_coastline.f' !Coastline intersection 
+
+      character*200 function get_pbi_version()  
+      get_pbi_version =  "NORWECOM pbi. " //
+     +  trim(main_component_version()) //", " //
+     +  trim(grid_component_version()) //", "//
+     +  trim(interpolator_component_version()) // ", "//
+     +  trim(coastline_component_version())
+      end function
 
       end module
       

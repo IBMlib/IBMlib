@@ -24,10 +24,10 @@ c     coast). Alternative schemes can be imagined, but this is the
 c     simplest to implement in the meantime
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-      subroutine interpolator_component_version()
+      character*100 function interpolator_component_version()
 c     Writes the SVN revision number out for logging purposes
-      write(*,*) "Interpolators : $Rev: 231 $"
-      end subroutine interpolator_component_version
+      interpolator_component_version = "Interpolators : $Rev: 231 $"
+      end function interpolator_component_version
 
 c########################################################################
 c########################################################################

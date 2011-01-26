@@ -27,10 +27,10 @@ c     Orientations:
 c       Unsure - how are the velocities stored? Check
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
-      subroutine grid_component_version() 
+      character*100 function grid_component_version() 
 c     Writes the SVN revision number out for logging purposes
-      write(*,*) "Grid comp     : $Rev: 218 $"
-      end subroutine
+      grid_component_version =  "Grid comp     : $Rev: 218 $"
+      end function
 
 c########################################################################
 c########################################################################

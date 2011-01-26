@@ -13,4 +13,9 @@ backward_filename   = disperse_backwards.txt
 emitbox = 2005 01 15 0     2005 01 15  0   4 55 0.5   4 55 0.5  100
 
 ! ------------ Configure flow fields --------------
-surface_vel = 0.1 45
+surface_vel = 0.1 45 ! current speed and current angle to WE axis
+bottom_vel  = 0.1 45 ! no shear
+hdiffus     = 10.0
+vdiffus     = 0.01
+!
+     

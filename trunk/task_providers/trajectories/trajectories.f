@@ -100,8 +100,6 @@ c     ------------   setup output files  ------------
      +                  "traj_output_frequency",opt_freq)
          call setup_output_from_file(trajs,par_ens,simulation_file,
      +      "trajectory_fname","traj_var")
-      else
-         opt_freq = 0
       endif
 
 c     =====================  main time loop =====================
@@ -123,8 +121,10 @@ c        -------- release new tracers and record new tracers  --------
 c        -------- propagate tracers  --------
          call update_particles(par_ens, time_step)
 c        -------- write trajectories -------- 
-         if(MOD(istep,opt_freq)==0 .and. write_traj)  then
-            call write_frame(trajs,par_ens)  
+         if(write_traj)  then
+            if(MOD(istep,opt_freq)==0)  then
+               call write_frame(trajs,par_ens)  
+            endif
          endif
          
 c        -------- loop control       --------

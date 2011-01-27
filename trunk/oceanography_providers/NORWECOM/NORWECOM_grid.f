@@ -103,7 +103,7 @@ c     ----------------------------------------------------------------
       end subroutine get_horiz_corners 
       
 
-      logical function data_range_check(xyz)
+      logical function grid_range_check(xyz)
 c     ------------------------------------------------------
 c     Check xyz wrt. interpolation ranges in grid space:
 c           0.5 <= x < nx-1
@@ -127,21 +127,41 @@ c     ------------------------------------------------------
         if  (xyz(3) < 0.0)   cross(3) = -1
         if  (xyz(3) > nz)     cross(3) =  1
       endif
-      data_range_check = .not.any(cross.ne.0)
-      end function data_range_check
+      grid_range_check = .not.any(cross.ne.0)
+      end function grid_range_check
+
+
+      logical function geo_range_check(geo)
+c     ------------------------------------------------------
+c     Checks whether a geo position (lon, lat, depth)
+c     is within the range of the grid or not. Checks for
+c     positions above the surface and below the bottom
+c     in addition to the more standard horizontal checks
+c     The actual check is farmed out to grid_range_check
+c     ------------------------------------------------------
+      real,    intent(in)  :: geo(3)  !3+
+      real    :: xyz(3)
+c     ------------------------------------------------------
+      call lonlat2xy(geo(1:2),xyz(1:2))
+      geo_range_check = grid_range_check(xyz(1:2))
+      if(geo_range_check) then  !Only check the vertical if the horizontal is ok
+         call depth2z(geo(3),xyz(1:2),xyz(3))
+         geo_range_check = grid_range_check(xyz)
+      endif
+      end function geo_range_check
 
 
       logical function horizontal_range_check(ll)
 c     ------------------------------------------------------
 c     Public interface that checks whether a geo position (lon, lat)
 c     is within the range of the grid or not
-c     The actual check is farmed out to data_range_check
+c     The actual check is farmed out to grid_range_check
 c     ------------------------------------------------------
       real,    intent(in)  :: ll(:)
       real    :: xy(size(ll))
 c     ------------------------------------------------------
       call lonlat2xy(ll,xy)
-      horizontal_range_check = data_range_check(xy(1:2))
+      horizontal_range_check = grid_range_check(xy(1:2))
       end function horizontal_range_check
 
 
@@ -223,86 +243,76 @@ c     --------------------------------------------------
       end subroutine xy2lonlat
 
 
-      subroutine geo2xyz(geo,xyz)
+      subroutine depth2z(depth,xy,z)
 c-------------------------------------------------------
-c     geographical single coordinate transformation: 
-c     lon/lat/depth -> xyz 
-c     Assert that lot, lat are within the valid range
-c     Notice: sub-bottom depth is not flagged
-c     Allow extrapolation above surface/below grid bottom,
-c     based on layer most close to x,y,z
-c     acc_width, layer_width includes current dslm
+c     geographical single coordinate transformation at
+c     a given xy position (usually obtained first from
+c     lonlat2xy) ie
+c     depth | xy -> z 
+c     Assert that xy is a valid range
+c     Interpolation /extrapolation functionality is maintained
+c     for historical consistency. However, this may be removed
+c     in the future
 c-------------------------------------------------------
-      real, intent(in)  :: geo(:)
-      real, intent(out) :: xyz(:)
+      real, intent(in)  :: depth,xy(:)
+      real, intent(out) :: z
       integer           :: ix, iy, iz
       real              :: sz
 c--------------------------------------------------
-c     First do the lat, lon conversion      
-      call lonlat2xy(geo,xyz)
-
 c     Get parent cells
-      call cell_index((/xyz(1),xyz(2)/),ix,iy)
+      call cell_index(xy(1:2),ix,iy)
 
 c     Are we on land? If so, then that's it - set the z dim
 c     to a very small but positive number  and exit. 
       if(land(ix,iy)) then
-        xyz(3) = 1e-16
+        z = 1e-16
         return
       endif
 
 c     Else transform the vertical coordinates
-      if (geo(3) <= 0)  then                                  ! above surface (z=0.0)
-         xyz(3) =  geo(3)/layer_width(ix,iy,1)               ! z < 0.0
-      elseif (geo(3) >= bath(ix,iy)) then           ! below grid bottom
-         sz = (geo(3) - bath(ix,iy))/layer_width(ix,iy,nz)
-         xyz(3) = sz + nz
+      if (depth <= 0)  then                                  ! above surface (z=0.0)
+         z =  depth/layer_width(ix,iy,1)               ! z < 0.0
+      elseif (depth >= bath(ix,iy)) then           ! below grid bottom
+         sz = (depth - bath(ix,iy))/layer_width(ix,iy,nz)
+         z = sz + nz
       else                                      ! within normal range: 0.0 < z < nz
          do iz=1,nz ! cell association -> iz
-            if (acc_width(ix,iy,iz+1)>geo(3)) exit
+            if (acc_width(ix,iy,iz+1)>depth) exit
          enddo
-         sz = (geo(3) - acc_width(ix,iy,iz))/layer_width(ix,iy,iz) ! relative cell completion
-         xyz(3) = real(iz) -1 + sz
+         sz = (depth - acc_width(ix,iy,iz))/layer_width(ix,iy,iz) ! relative cell completion
+         z = real(iz) -1 + sz
       endif
-      end subroutine geo2xyz  
+      end subroutine depth2z  
 
 
-      subroutine xyz2geo(xyz,lld)
+      subroutine z2depth(z,xy,depth)
 c-------------------------------------------------------
-c     Geographical single coordinate transformations 
-c     xyz -> lat/lon/depth
-c     Validity of x,y is asserted 
-c     Notice: sub-bottom depth is not flagged
+c     geographical single coordinate transformation at
+c     a given xy position (usually obtained first from
+c     lonlat2xy) ie
+c     z | xy -> depth
+c     Assert that xy is a valid range
+c     Interpolation /extrapolation functionality is maintained
+c     for historical consistency. However, this may be removed
+c     in the future
 c-------------------------------------------------------
-      real, intent(in)  :: xyz(:)
-      real, intent(out) :: lld(:)
-      real              :: dpth, z, sz 
+      real, intent(in)  :: z,xy
+      real, intent(out) :: depth
+      real              ::  sz 
       integer           :: ix, iy, iz
       logical           :: rangeOK
 c--------------------------------------------------
-c      Range checking disabled for consistency with geo2xyz
-c      rangeOK = data_range_check(xyz)
-c      if (.not. rangeOK) then
-c         write(*,*) "xyz :",xyz
-c         call abort_run("xyz2geo","invalid xy coordinate")
-c      endif
-c     First do the horizontal coordinates
-      call xy2lonlat(xyz(1:2),lld(1:2))
-c     Get parent cell 
-      call cell_index(xyz,ix,iy,iz)
 c     Now interpolate/extrapolate as necessary
-      z=xyz(3)
       if (z<=0.0) then      ! above surface (z<0.0), extrapolate from first layer
-         dpth = z*layer_width(ix,iy,1)  ! depth < 0 as z<0
+         depth = z*layer_width(ix,iy,1)  ! depth < 0 as z<0
       elseif (z>=nz) then ! below grid bottom
          sz    =  z - real(nz)
-         dpth = bath(ix,iy) + sz*layer_width(ix,iy,nz)
+         depth = bath(ix,iy) + sz*layer_width(ix,iy,nz)
       else     ! z is inside valid range
          sz    = z-floor(z) 
-         dpth = acc_width(ix,iy,iz) + sz*layer_width(ix,iy,iz)
+         depth = acc_width(ix,iy,iz) + sz*layer_width(ix,iy,iz)
       endif
-      lld(3) =dpth
-      end subroutine xyz2geo
+      end subroutine z2depth
 
       
       subroutine get_jacobian(xyz, jacob)

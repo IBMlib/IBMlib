@@ -31,7 +31,7 @@ c     Writes the SVN revision number out for logging purposes
 
 c########################################################################
 c########################################################################
-c#                    Public Accessor Methods                           # 
+c#                    Interpolation Routines                            # 
 c########################################################################
 
       subroutine interpolate_currents(geo, vels, status)
@@ -70,27 +70,25 @@ c     ----------------------------------------------------------------
       real, intent(out)    :: vels(:)
       integer, intent(out) :: status
       real              :: uvw(3) 
-      integer           :: ix,iy,iz,nexteast,nextnorth,nextlow,ibot
-      integer           :: nextrp, nintp, idum(3),iunit
+      integer           :: ix,iy,iz,ibot,ixyz(3)
       real              :: sx,sy,sz,xyz(3)
 c     ----------------------------------------------------------------
-c     Check bounds - if out of bounds return to calling function
-      if (horizontal_range_check(geo) ) then
-         status=0 !In range 
-      else
-         status=1  !Trying to interpolate out of bounds
+c     Check validity of position for interpolation
+      call check_interp_validity(geo,xyz,ixyz,status)
+      if (status/=0) then
          vels= NaN
          return    !so just return nothing here
       endif
 c     No further bounds checks are performed beyond this point
 c     Now we now that we are within the range of values
-c     and can use direct lookups
+c     and can use direct array lookups 
 
-c.....determine integer cell associations of point, constrained to 1 <= i <= n
-c     i.e. the indices of the cell in which position is to be found 
-      call geo2xyz(geo,xyz)
-      call cell_index(xyz,ix,iy,iz)
-      ibot = bottom_layer(ix,iy)       ! For NORWECOM, this always equals nz, as it is terrain following
+c.....extract cell indices 
+c     For NORWECOM, this always equals nz, as it is terrain following
+      ix=ixyz(1)
+      iy=ixyz(2)
+      iz=ixyz(3)
+      ibot = bottom_layer(ix,iy)       
 
 c.....determine relative intracell coordinate s, constrained to 0 < s < 1 
 c     we have already checked whether the variable is in or out of range
@@ -112,112 +110,26 @@ c     cell indices satisfy 1 <= (ix,iy,iz) <= (nx-1,ny-1,ibot)
 c.....resolve vector components from being  oriented 
 c     along the NORWECOM grid to oriented along lon, lat
       call resolve_vector(xyz,uvw,vels)
-
       end subroutine interpolate_currents 
 
 
-      subroutine interpolate_turbulence(geo, k, status)
-c     ----------------------------------------------------------------
-c     Interpolate module turbulence data 
-c
-c                 hdiffus(nx,ny,nz) -> k(1:2)
-c                 vdiffus(nx,ny,nz+1) -> k(3)
-c 
-c     on position (in grid coordinates)
-c     hdiffus/vdiffus are assumed up to date (no update invoked)
-c     The output buffer k(:) is assumed sufficiently large (not checked)  
-c     All hard work is done by the turbulence interpolator
-c     ----------------------------------------------------------------
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: k(:)
-      integer, intent(out) :: status
-c     ----------------------------------------------------------------------------
-      call turbulence_interpolator(geo, k,.FALSE., status)
-      end subroutine interpolate_turbulence
-
-
-      subroutine interpolate_turbulence_deriv(geo, dk, status)
-c     ----------------------------------------------------------------
-c     Interpolation derivatives of module turbulence data with respect to 
-c     scaled coordinates (NOT Cartesian coordinates)
-c
-c              (d/dx, d/dy) hdiffus(nx,ny,nz)   -> dk(1:2)
-c              (d/dz)       vdiffus(nx,ny,nz+1) -> dk(3)
-c 
-c     at position  (in grid coordinates)
-c     hdiffus/vdiffus are assumed up to date (no update invoked)
-c     All hard work is done by the turbulence interpolator
-c     ----------------------------------------------------------------
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: dk(:)
-      integer, intent(out) :: status
-c     ----------------------------------------------------------------------------
-      call turbulence_interpolator(geo,dk,.TRUE., status)
-      end subroutine interpolate_turbulence_deriv 
-
-
-      subroutine interpolate_temp (geo, r, status) 
-c     ----------------------------------------------------------------------------
-c     Temperature is measured at the centre of the grid cell i.e.
-c     the temperature of the ith, jth cell is at (i-0.5,j-0.5)
-c     Function is wrapper to the cell-centered interpolation routine
-c     ----------------------------------------------------------------------------
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: r
-      integer, intent(out) :: status
-      real, pointer        :: dat(:,:,:)
-c     ----------------------------------------------------------------------------
-      dat => temp
-      call interpolate_CC_data(geo, dat,r, status)
-      end subroutine 
-
-
-      subroutine interpolate_salty(geo, r, status)
-c     ----------------------------------------------------------------------------
-c     Salinity is measured on the centre of the grid cell i.e.
-c     the salinity of the ith, jth cell is at (i-0.5,j-0.5)
-c     Function is wrapper to the cell-centered interpolation routine
-c     ----------------------------------------------------------------------------
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: r
-      integer, intent(out) :: status
-      real, pointer        :: dat(:,:,:)
-c     ----------------------------------------------------------------------------
-      dat => salinity
-      call interpolate_CC_data(geo,dat, r,status)
-      end subroutine 
-
-
-      subroutine interpolate_wind(ll, r2, status)
-c     ----------------------------------------------------------------------------
-c     NORWECOM does not provide wind. Therefore throw error if called
-c     ----------------------------------------------------------------------------
-      real, intent(in)     :: ll(:)
-      real, intent(out)    :: r2(:)
-      integer, intent(out) :: status
-c     ----------------------------------------------------------------------------
-      status=1
-      r2=NaN
-      call abort("interpolate_wind","No wind provided in NORWECOM")
-      end subroutine 
-
-
       subroutine interpolate_wdepth(ll, r, status) 
-c     ----------------------------------------------------------------------------
-c     Interpolation of total water depth r at geo position (lon,lat) corresponding
-c     to z coordinates. Replaces direct array access, hides coordinate transform
-c     return result in meters
-c     NORWECOM bottom is treated as being jagged, therefore no interpolation
-c     ----------------------------------------------------------------------------
+c     ----------------------------------------------------------------
+c     Interpolation of total water depth r at geo position (lon,lat) 
+c     corresponding to z coordinates. Replaces direct array access, 
+c     hides coordinate transform return result in meters
+c     NORWECOM bottom is treated as being jagged, 
+c     therefore no interpolation
+c     ----------------------------------------------------------------
       real, intent(in)     :: ll(:)
       real, intent(out)    :: r
       integer, intent(out) :: status
       real                 :: xy(2)
       integer              :: ix,iy
-c     --------------------------------------------------      
+c     ----------------------------------------------------------------
 c     Check data range - return NaN if out of range
       call lonlat2xy(ll,xy)
-      if(data_range_check(xy(1:2))) then
+      if(grid_range_check(xy)) then
          status=0
       else
          status=1   !Out of range
@@ -254,25 +166,13 @@ c     ----------------------------------------------------------------
       integer           :: ixyz(3),cnr000(3), cnr111(3),i,j
       real              :: vc(8),xyz(3),sxyz(3)
 c     ----------------------------------------------------------------
-c     Check bounds - if out of bounds return to calling function
-c     Not further bounds checks are performed beyond this point
-      if (horizontal_range_check(geo)) then
-         status=0 !In range 
-      else
-         status=1  !Trying to interpolate out of bounds
-         res=NaN
-         return    !so just return NaN here
+c     Check validity of position for interpolation
+      call check_interp_validity(geo,xyz,ixyz,status)
+      if (status/=0) then
+         res= NaN
+         return    !so just return nothing here
       endif
-c     Now we now that we are within the range of values
-c     and can use direct lookups
-c     Check wet/dry - if cell is dry, return
-      call geo2xyz(geo,xyz)
-      call cell_index(xyz,ixyz(1),ixyz(2),ixyz(3))
-      if (land(ixyz(1),ixyz(2))) then
-         status=2  !In range but Dry point
-         res=NaN
-         return    !so just return NaN here
-      endif
+c     No further bounds checks are performed beyond this point
 c     Cell is assumed to be wet from hereon 
 c     retrieve corner positions of cube enclosing xyz 
       call get_CC_cube(xyz,cnr000,cnr111,sxyz)
@@ -312,25 +212,13 @@ c     ------locals------
       real              :: invdistmat(2,2)
       real, pointer     :: dat(:,:,:)
 c     ----------------------------------------------------------------
-c     Check bounds - if out of bounds return to calling function
+c     Check validity of position for interpolation
+      call check_interp_validity(geo,xyz,ixyz,status)
+      if (status/=0) then
+         r= NaN
+         return    !so just return nothing here
+      endif
 c     No further bounds checks are performed beyond this point
-      if (horizontal_range_check(geo)) then
-         status=0 !In range 
-      else
-         status=1  !Trying to interpolate out of bounds
-         r =NaN    
-         return    !so just return NaN here
-      endif
-c     Now we now that we are within the range of values
-c     and can use direct lookups
-c     Check wet/dry - if cell is dry, return
-      call geo2xyz(geo,xyz)
-      call cell_index(xyz,ixyz(1),ixyz(2),ixyz(3))
-      if (land(ixyz(1),ixyz(2))) then
-         status=2  !In range but Dry point
-         r =NaN    
-         return    !so just return NaN here
-      endif
 c     Cell is assumed to be wet from hereon 
 c     
 c.....Determine horizontal diffusivity interpolation cube
@@ -388,6 +276,101 @@ c     system in the desired units m^2/s / m
       end subroutine turbulence_interpolator
 
 
+c########################################################################
+c########################################################################
+c#                 Wrappers to Interpolators                            # 
+c########################################################################
+
+      subroutine interpolate_turbulence(geo, k, status)
+c     ----------------------------------------------------------------
+c     Interpolate module turbulence data 
+c
+c                 hdiffus(nx,ny,nz) -> k(1:2)
+c                 vdiffus(nx,ny,nz+1) -> k(3)
+c 
+c     on position (in grid coordinates)
+c     hdiffus/vdiffus are assumed up to date (no update invoked)
+c     The output buffer k(:) is assumed sufficiently large (not checked)  
+c     All hard work is done by the turbulence interpolator
+c     ----------------------------------------------------------------
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: k(:)
+      integer, intent(out) :: status
+c     ----------------------------------------------------------------
+      call turbulence_interpolator(geo, k,.FALSE., status)
+      end subroutine interpolate_turbulence
+
+
+      subroutine interpolate_turbulence_deriv(geo, dk, status)
+c     ----------------------------------------------------------------
+c     Interpolation derivatives of module turbulence data with respect to 
+c     scaled coordinates (NOT Cartesian coordinates)
+c
+c              (d/dx, d/dy) hdiffus(nx,ny,nz)   -> dk(1:2)
+c              (d/dz)       vdiffus(nx,ny,nz+1) -> dk(3)
+c 
+c     at position  (in grid coordinates)
+c     hdiffus/vdiffus are assumed up to date (no update invoked)
+c     All hard work is done by the turbulence interpolator
+c     ----------------------------------------------------------------
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: dk(:)
+      integer, intent(out) :: status
+c     ----------------------------------------------------------------
+      call turbulence_interpolator(geo,dk,.TRUE., status)
+      end subroutine interpolate_turbulence_deriv 
+
+
+      subroutine interpolate_temp (geo, r, status) 
+c     ----------------------------------------------------------------
+c     Temperature is measured at the centre of the grid cell i.e.
+c     the temperature of the ith, jth cell is at (i-0.5,j-0.5)
+c     Function is wrapper to the cell-centered interpolation routine
+c     ----------------------------------------------------------------
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+      real, pointer        :: dat(:,:,:)
+c     ----------------------------------------------------------------
+      dat => temp
+      call interpolate_CC_data(geo, dat,r, status)
+      end subroutine 
+
+
+      subroutine interpolate_salty(geo, r, status)
+c     ----------------------------------------------------------------
+c     Salinity is measured on the centre of the grid cell i.e.
+c     the salinity of the ith, jth cell is at (i-0.5,j-0.5)
+c     Function is wrapper to the cell-centered interpolation routine
+c     ----------------------------------------------------------------
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+      real, pointer        :: dat(:,:,:)
+c     ----------------------------------------------------------------
+      dat => salinity
+      call interpolate_CC_data(geo,dat, r,status)
+      end subroutine 
+
+
+      subroutine interpolate_wind(ll, r2, status)
+c     ----------------------------------------------------------------
+c     NORWECOM does not provide wind. Therefore throw error if called
+c     ----------------------------------------------------------------
+      real, intent(in)     :: ll(:)
+      real, intent(out)    :: r2(:)
+      integer, intent(out) :: status
+c     ----------------------------------------------------------------
+      status=1
+      r2=NaN
+      call abort("interpolate_wind","No wind provided in NORWECOM")
+      end subroutine 
+
+c########################################################################
+c########################################################################
+c#                      Helper Functions                                # 
+c########################################################################
+
       subroutine get_data_octet(dat,ixyz,i0,i1,octet)
 c     ----------------------------------------------------------------
 c     Extracts the data points at the corners of the cube defined by i0
@@ -432,4 +415,43 @@ c     retrieve data points at the corners
       octet(7) = dat(i1(1), i1(2), i0(3))
       octet(8) = dat(i1(1), i1(2), i1(3))
       end subroutine 
+
+
+      subroutine check_interp_validity(geo,xyz,ixyz,status)
+c     ------------------------------------------------------
+c     Checks whether attempting an interpolation at geo position 
+c     (lon, lat, depth) is valid or not. ie whether that cell
+c     position is wet. Function is designed to provide a common
+c     basis for the interpolation functions 
+c     The actual checking is farmed out elsewhere
+c     ------------------------------------------------------
+      real,    intent(in)  :: geo(3)  !3+
+      integer, intent(out) :: ixyz(3),status
+      real,    intent(out) :: xyz(3)
+c     ------------------------------------------------------
+c     Check horizontal bounds - if out of bounds return to calling function
+      call lonlat2xy(geo(1:2),xyz(1:2))
+      if (grid_range_check(xyz(1:2)) ) then
+         status=0 !In range 
+      else
+         status=1  !Trying to interpolate out of bounds
+         return    !so just return here
+      endif
+c     Check vertical bounds - if out of bounds return to calling function
+      call depth2z(geo(3),xyz(1:2),xyz(3))
+      if (grid_range_check(xyz) ) then
+         status=0 !In range 
+      else
+         status=1  !Trying to interpolate out of bounds
+         return    !so just return here
+      endif
+c     Now we know that we are within the range of values
+c     and can use direct lookups
+c     Check wet/dry - if cell is dry, no interpolation posssible so return
+      call cell_index(xyz,ixyz(1),ixyz(2),ixyz(3))
+      if (land(ixyz(1),ixyz(2))) then
+         status=2  !In range but Dry point
+         return    !so just return here
+      endif
+      end subroutine check_interp_validity
 

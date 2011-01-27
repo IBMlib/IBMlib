@@ -660,8 +660,9 @@ c     Populate the hdiffus array
 
       !Deviation from NORWECOM source code
       !Unit conversions. DX and DY in our setup are in km, but we
-      !want hdiffus in m^/2. Therefore multiple by 1000, twice
-      hdiffus = hdiffus* 1000* 1000
+      !want hdiffus in m^/2. Unit analysis of the above expression shows it gives
+      !hdiffus in units of km.m/s. Therefore multiple by 1000 m/km to get m^2/s
+      hdiffus = hdiffus* 1000
       !/End deviation
 C 
 C     Extend the diffusivities to the boundary grid cells.

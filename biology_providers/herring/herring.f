@@ -27,6 +27,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use physical_fields
       use run_context, only: ctrlfile => simulation_file
       use input_parser
+      use output
 
       implicit none
       private     
@@ -53,6 +54,12 @@ c     -----------------------------------------------
       public :: update_particle_state
       public :: delete_state_attributes 
       public :: write_state_attributes
+
+      interface get_property
+        module procedure get_prop_state
+      end interface
+      public :: get_property
+      public :: get_metadata_state
       public :: get_particle_version
 
 c     =================================================
@@ -209,6 +216,7 @@ c     ----------------------------------
       case ("PASSIVE") 
         !----- "passive" scheme ------
         !Particles have no active behaviour
+        v_vert = 0.0
       case ("ABOVE_60M")
         !----- "Above_60m" scheme ------
         !Particles that fall below 60m swim upwards at a swimming
@@ -216,6 +224,8 @@ c     ----------------------------------
         call get_tracer_position(space, xyz)
         if(xyz(3)>60) then
             v_vert=-5.0e-3         ! m/s
+        else 
+            v_vert =0.0
         endif
       case ("DVM")
         !----- "DVM" schemes ------
@@ -307,5 +317,54 @@ c     -----------------
       subroutine write_state_attributes(state)
       type(state_attributes), intent(in) :: state 
       end subroutine 
+
+
+      subroutine get_prop_state(state,var,bucket,status)
+c     ------------------------------------------------------------  
+      type(state_attributes),intent(in) :: state
+      type(variable),intent(in) :: var
+      type(polytype), intent(out) :: bucket
+      integer, intent(out) :: status
+c     ------------------------------------------------------------  
+      status=0  !Variable is present
+      select case (get_name(var))
+      case ("tracerID")
+        call construct(bucket,"tracerID",state%tracerID)
+      case ("sourceBox")
+        call construct(bucket,"sourceBox",state%sourceBox)
+      case ("length")
+        call construct(bucket,"length",state%length)
+      case ("tempInt")
+        call construct(bucket,"tempInt",state%tempInt)
+      case default
+        status=1   !Cannont find variable name
+      end select
+      end subroutine
+
+
+      subroutine get_metadata_state(var_name,var,status)
+c     ------------------------------------------------------------  
+      character(*), intent(in) :: var_name
+      type(variable),intent(out) :: var
+      integer, intent(out) :: status
+c     ------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (var_name)
+       case ("tracerID")
+         call construct(var,"tracerID","tracer ID number",
+     +     units="-",fmt="(i6)",type="int")
+       case ("sourceBox")
+         call construct(var,"sourceBox","source box ID",
+     +     units="-",fmt="(i6)",type="int")
+       case ("length")
+         call construct(var,"length","particle length",
+     +     units="mm",fmt="(f6.2)",type="real")
+       case ("tempInt")
+         call construct(var,"tempInt","temperature integral",
+     +     units="deg C.day",fmt="(f6.2)",type="real")
+      case default
+        status=1  !Cannot find variable
+      end select
+      end subroutine get_metadata_state
 
       end module

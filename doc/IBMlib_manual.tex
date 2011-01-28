@@ -52,7 +52,9 @@
 
 
 
-\title{IBMlib concept description\\
+\title{{\Huge IBMlib} \\
+       \vspace{2mm}
+       {\Large A generic tool for aquatic individual-based modelling}\\
        \vspace{5mm}
  \small{Global version of code: \svnRev \\
  SVN revision of this manual: $ $Revision$ $  \\
@@ -79,12 +81,12 @@
 
 \chapter{Overall concepts}
 
-IBMlib is a particle simulation toolbox intended research purposes.
+IBMlib is a particle simulation toolbox intended for research purposes.
 The core vision of IBMlib is to provide a light weight environment
 that easily allows to combine existing/new biological modules with 
 existing/new physical data sets.
-IBMlib provides and supports simple core functionality and provides
-templates for developments.
+IBMlib provides and supports simple core functionality and provide
+templates for new developments.
 The IBMlib implementation concept is shown in Figure \ref{IBMlib:concept}
 % ----------------------------------------------------------------------------
 \begin{figure}[p]   % [tbhp]
@@ -101,19 +103,19 @@ particle tracking. IBMlib\_core accesses the physical environment via the
 physical interface; this interface can be linked to any data source that is
 able to access the physical environment. The biological properties is specified in 
 particle state module that provides the particle state interface to IBMlib; 
-this amounts to specifying e.g. how biological tracer grow and swim, if relevant.
+this amounts to specifying e.g. how biological particles grow and behave, if relevant.
 The particle state module can also describe passive particles and other 
 idealized types. Finally the task interface contrals what IBMlib is actually going 
 to do, e.g. a forward simulation or a data dump or any customized run type.
-Alltogether, IBMlib\_core and optional modules for physical environment, biological 
-properties and tasks constitutes IBMlib; when an actual physical, biological 
-and task has been selected, we refer to it as an IBMlib configuration.
-
-online/offline mode
+When an actual physical, biological 
+and task module has been selected, we refer to it as an IBMlib configuration.
+The setup is able to run offline (i.e. reading physical and biological fields from a database)
+and is being prepared for online simulations (i.e. running contemporarely and coupled with 
+physical circulation and ecosystem models) using variuos coupler schemes.
 
 \chapter{License issues}
 
-currently none, likely GPL in future
+Currently unspecified, likely GPL in future
 
 \chapter{Installation}
 
@@ -122,12 +124,11 @@ currently none, likely GPL in future
 IBMlib is currently set up to a Linux environment, however
 there should be no fundamental problems to port IBMlib to
 other OS environments.
-
-\section{System resources and requirements}
-
+The minimal system resources required are:
 \begin{itemize}
   \item Fortran 90 compiler. All performance code is written in Fortran 90.
-  \item Gmake. All makefiles are written for and tested on gmake; other
+  \item Gmake. All objects are build from source code by makefiles.
+        All makefiles are written for and tested with gmake; other
         make implementations may be used, but this may require 
         minor adaptation to makefiles
   \item Python. Fortran modules are scanned for use associations with a 
@@ -136,53 +137,117 @@ other OS environments.
 
 \end{itemize}
 Depending on which sub modules for physical environment, biological
-properties and tasks constitutes are selected additional system resources
+properties and task  are selected additional system resources
 may be required (e.g. NetCDF and HDF) - this should be available from the 
-automatic documentation of the sub modules.
+automatic documentation of the sub modules. Further the usage of 
+postprocessing tools for visualization and data analysis may require 
+further system resources, e.g. R and MatLab.  
 
-\section{Configuration}
+\section{Obtaining IBMlib sources} 
 
-You configure IBMlib by selecting sub modules for physical environment, biological
-properties and task. In the Makefile, look for make variables
-{\tt PHYSICAL\_FIELDS\_DIR,  PARTICLE\_STATE\_DIR,  TASK\_DIR} and point these
-to the directories corresponding to the desired sub modules. 
+IBMlib are usualyy distributed in either two ways:
+\begin{enumerate}
+  \item A tarball. Place the tarball 
+        (referring to this with filename {\tt ibmlib.tgz}) in a desired
+        directory (referring to this with directory name {\tt IBMLIB\_DIR}).
+        The type on the command line:
+        \[ tar \ xvfz \ ibmlib.tgz
+        \]
+        to inflate the tarball. 
+        Now IBMlib is ready for configuration, see Sec. \ref{build:IBMlib} below.
+  \item Via SVN source control. You need a login to 
+        obtain  sources via SVN. The IBMlib repository is currently hosted by 
+        DTU. To get the latest version type on the command line in {\tt IBMLIB\_DIR}:
+        \[ svn \ \ co  \ \ svn://svn.gbar.dtu.dk/asch/IBM\_Phoenix/trunk
+        \]  
+        Now IBMlib is ready for configuration, see Sec. \ref{build:IBMlib} below.
+        To obtain a specific revision use the  {\tt -r} option to svn.
+\end{enumerate}   
 
-By default, the offline version builds into the executable {\tt  ibmrun}; if you want it
-to be called something else, set the make variable {\tt EXECUTABLE} as desired   
+\section{Building an IBMlib configuration}   \label{build:IBMlib}
 
-\section{Building an IBMlib configuration} 
+\begin{enumerate}
+  \item Configuring IBMlib.  This basically amounts to placing/editing
+        two files in the IBMlib base directory {\tt IBMLIB\_DIR}
+        (where the Makefile is):
+        \begin{itemize}
+           \item {\bf config.mk}. This is the {\it logical} configuration
+                 of IBMlib, which is platform independent. In {\tt config.mk}
+                 you select sub modules for physical environment, biological
+                 properties and task. These are read by the Makefile. This is done by 
+                 stating the file directory, where these modules is. More specifically,
+                 you assign the the variables 
+                 {\tt PHYSICAL\_FIELDS\_DIR,  PARTICLE\_STATE\_DIR,  TASK\_DIR}
+                 in which file directory the module is. The Makefile reads this
+                 from {\tt config.mk} and takes care of the rest
+                 By default, the offline version builds into the executable {\tt  ibmrun}; 
+                 if you want it to be called something else, set the make variable 
+                 {\tt EXECUTABLE} as desired. 
+                 In directory {\tt Setups/Configurations/Generic} you may find examples
+                 on files that can be copyed to {\tt config.mk} and modified as desired.
+           \item {\bf compiler\_defaults.mk}. Here you specify the F90 compiler you wish to
+                 use to compile IBMlib, as well as the compilation flag that should be applied.
+                 In directory {\tt Setups/Compilers} you may find examples
+                 on files that can be copyed to {\tt compiler\_defaults.mk} and modified 
+                 as desired. For each compiler, there are different compilation flag sets
+                 corresponding to what you may want to do, e.g. debugging (slower,safer) 
+                 or production runs (faster, optimized, with no unnecessary runtime checks)
+        \end{itemize}
+        Additionally, you may augment {\bf common\_rules.mk} if you add customized
+        components requiring special make rules to build. To ease the configuration 
+        step, there are configuration scripts in {\tt Setups/ComboScripts} that does the 
+        two steps for you. Just type
+        \[ Setups/ComboScripts/script\_name
+        \]
+        in  {\tt IBMLIB\_DIR} to configure IBMlib corresponding to $script\_name$.
+        This is identical to the usual {\tt ./configure} in Linux source packages.
+        In this way you can quickly setup your favorite configuration without typing 
+        arguments to {\tt ./configure}.
+           
+    \item Building IBMlib. When IBMlib is configured as above, you simply type
+          \[ make
+          \]
+          on the command line in  {\tt IBMLIB\_DIR}.
+          Then the selected IBMlib configuration is build into the executable name
+          given as {\tt EXECUTABLE} in {\tt config.mk}.
+          This executable may be copied to somewhere in the standard executable 
+          search PATH, if it should be installed as an application. 
 
-When the makefile is configured, you simply type
-[ make
-]
-on the command line, which produces and executable {\tt ibmrun} 
-(or another target name specified in make variable {\tt EXECUTABLE}).
-This executable may be copied to somewhere in the standard executable search PATH, if
-it should be installed as an application.
+    \item Testing IBMlib. IBMlib comes along with a automatized test suite
+          that basically test the integrity of the IBMlib version you are trying to
+          compile. To invoke it, you simply type
+          \[ make \ test
+          \]
+          on the command line in in {\tt IBMLIB\_DIR}. 
+          If you are developing modules to IBMlib, you will find additional auxillary
+          tests useful in the development phase, as well as auxillary analysis components.
+          {\tt IBMLIB\_DIR/test\_suite}. 
 
+    \end{enumerate}      
+       
 \section{Running an IBMlib configuration}
 
 When the executable is build, you simply type
-[ ibmrun [<arguments>]
-]
+\[ ibmrun \ [\langle arguments \rangle]
+\]
 on the command line. Often a file with simulation parameters is required 
 as argument after ibmrun; the task sub modules should document which arguments 
 and options they require and support.
 
 \section{Simulation files}
 
-When IBMlib is used in a standard task configuration, it expects you 
-to provide an input file on the command line like
-[ ibmrun <inputfile> [ >  <outputfile>]
-]
+When IBMlib is used in a standard task configuration, like a basic simulation, 
+it expects you to provide an input file on the command line like
+\[ ibmrun \ \langle inputfile \rangle \ [ \ > \  \langle outputfile \rangle]
+\]
 All parts of the compiled IBMlib configuration will try to 
 read most input data from this file in a standard task configuration.
-Reading is distributed, meaning that different parts of IBMlib
+File reading is distributed, meaning that different parts of IBMlib
 reads this file independently of the other parts.
 The simulation input file is based on
 a tagged input ASCII format containing lines as 
 \begin{equation}
-tag = value [value*] \nonumber
+tag = value \ [value*] \nonumber
 \end{equation}
 tag is a character identifier terminated at first occurence of 
 the separator $=$. value of the tag is what follows the separator to the end of that 
@@ -190,21 +255,24 @@ line and anything can appear here. If the value is a vector, each item in the ve
 is separated by spaces (but stay on same line).
 IBMlib does not check that all parameters are read.
 The same tag may appear many several times - e.g. a particle emission box,
-in other cases the tag should be unique, e.g. the patricle time step. In this case
+in other cases the tag should be unique, e.g. the particle time step. In this case
 the first occurence is picked, the rest is ignored.
-The following rules also apply for the markup:
+The following rules also apply for the input file markup:
 \begin{itemize}
   \item Comments: everything after (and including) " !" is skipped
-  \item Empty lines and spaces:   just ignored
-  \item Malformed lines: just ignored (e.g. if you forgot "=")
-  \item Everything after "=" is considered part of the value for tag
+  \item Empty lines and spaces are just ignored
+  \item Malformed lines are just ignored (e.g. if you forgot "=")
+  \item Everything after "=" is considered part of the value(s) for tag.
+        Values need not to be of the same elementary data type, you may
+        e.g. mix letters and numbers. The documentation should specify what is
+        expected for tag.
   \item Required tag (or value) is missing. This will generate a runtime
-        error, SLAM will stop, unless a default applied to the tag.
-  \item Order of tags does not matter. 
+        error, IBMlib will stop, unless a default applies to the tag.
+  \item The order of the tags does not matter. 
 \end{itemize}  
 
-This input format is convenient for scripting, where upper-level  
-scripts generates input files. The input is read once
+The input format is convenient for scripting, where upper-level  
+scripts generates input files. The input is read once and cached
 when the simulation is started.
 The following are mandatory input parameters:
 
@@ -225,21 +293,24 @@ The following are mandatory input parameters:
         releasing larvae/eggs. The first three numbers are the spatial lower SW corner of the release box
         given as (longitude,latitude,vertical position), the next three numbers are the spatial upper 
         NE corner of the release box given as (longitude,latitude,vertical position).
-        The vertical position can be spcified as absolute depth (counted negative below the water surface)
-        or as relative depth $z$:$ 0 < z < 1$. 
+        The vertical position can be spcified as either:
+        \begin{itemize}
+            \item absolute depth: specify the depth below the water surface as a negative number.
+            \item relative depth$z$:$ 0 < z < 1$. 
         $z=0$ corresponds to the sea surface, 
         $z=1$ corresponds to the sea bed.
+        \end{itemize}
         Biological particles are released uniformly in time and space with in space-time window
         specified, so that the total number of particles released adds up to the integer given as 
         number 15. All other parameters following number 15 in emit box are passed to the biological module.
-        There can be an "e", which means sandeel eggs are released by this emitbox; the can be an "l"
-        which means sandeel larvae are released by this emitbox - in the latter case, a number giving 
-        the inital length (in mm) of the released sandeel larvae should be provided.
+        %There can be an "e", which means sandeel eggs are released by this emitbox; the can be an "l"
+        %which means sandeel larvae are released by this emitbox - in the latter case, a number giving 
+        %the inital length (in mm) of the released sandeel larvae should be provided.
 \end{itemize}
 \subsection{Particle\_tracking module}
 \begin{itemize}
   \item {\em advec\_intg\_method}. The integration algortihm for time forward integration
-        of advected sandeel larvae (options are euler (Euler forward) or rk2/rk4 (Runge-Kutta 2 or 4)).
+        of advected particles (options are euler (Euler forward) or rk2/rk4 (Runge-Kutta 2 or 4)).
 \end{itemize}
 
 \subsection{Example on minimal input file}
@@ -510,10 +581,12 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
    anycross is returned true else false (i.e. the line between xyz1 and xyz2 is all in water). 
    If anycross is true, the following vectors are computed:
    xyzref is the modified final position, if step from xyz1 to xyz2 is reflected
-   in the coast line. xyzhit is the first position where the line from xyz1 to xyz2 
+   in the coast line. xyzhit is the {\em first} position where the line from xyz1 to xyz2 
    crosses a coast line. 
    If anycross is false xyzref and xyzhit is not computed but assigned an interface
-   dependent dummy value.
+   dependent dummy value. The particle tracking algorithm uses the elemental 
+   subroutine {\tt coast\_line\_intersection}
+   to generate multiple-reflection paths, if xyzref is a position on land.
 
 \end{itemize}
 
@@ -550,7 +623,8 @@ the particle\_state interface:
 This is an F90 derived type of arbitrary content
 describing/logging all aspects of the particle beyond
 generic spatio-temporal properties, e.g. all biological
-properties goes here.
+properties goes here. For syntactical reasons Fortran 90 does not allow 
+a user-defined type to be empty.
 
 \item {\tt  init\_particle\_state() }  
 
@@ -564,8 +638,9 @@ pointers and allocatable arrays.
 \item {\tt  subroutine init\_state\_attributes(state, space, time\_dir,             
       initdata, emitboxID)} 
 
-Initialize an instances of particle\_state instances 
-(associated with space attributes space) possibly also space attributes
+Initialize an instances of particle\_state 
+(associated with space attributes space) and possibly also set 
+certain space attributes
 (like boundary conditions and mobility). time\_dir is a signed real;
 time\_dir > 0 is forward simulation, time\_dir < 0 is reverse time
 simulation (initialization generally depends on time direction).
@@ -621,10 +696,10 @@ must be associated with a separate directory under directory {\tt task\_provider
 
 \begin{itemize}
 
-    \item {\tt d\_cart2d\_xy(xy, r2) } Convert a small Cartesian displacement vector r2 (meters)
+    \item {\tt dcart2dxy(xy, r2) } Convert a small Cartesian displacement vector r2 (meters)
            inplace in tangent space at xy to a displacement vector in (longitude,latitude,depth).
 
-    \item {\tt d\_xy2d\_cart(xy, r2) } Convert a small displacement vector in (longitude,latitude,depth)
+    \item {\tt dxy2dcart(xy, r2) } Convert a small displacement vector in (longitude,latitude,depth)
            inplace in tangent space at xy to a Cartesian displacement vector (meters).
 
 
@@ -632,7 +707,7 @@ must be associated with a separate directory under directory {\tt task\_provider
 for xy an xyz may be provided (only xy is transformed)
 to get the Jacobian at xyz: \newline
 jacobian = (/1,1/) \newline
-call d\_xy2d\_cart(xyz, jacobian)\newline
+call dxy2dcart(xyz, jacobian)\newline
 
 we will add a convenience subroutine: get\_jacobian ...
 
@@ -660,34 +735,49 @@ we will add a convenience subroutine: get\_jacobian ...
 
 %%====================================================================
 
-\section{The general module interface}
+\chapter{Code development guide lines}
 
-
-\chapter{Code design principles and standards}
+\section{Design principles and standards}
 
 \begin{itemize}
-  \item maximal privatization of module/derived type content
-  \item always use ``implicit none''
-  \item Each module should have ``private'' as default scope 
-  \item fixed format layout (start at col 7, end at max 72)
-  \item meaningfull names for variables, but not too long
-  \item extensive in-code documantation and in-code change log
-  \item light weight subroutines: do not bundle too much functionality
-        together, keep it simple
-  \item prefer subroutines over functions (easier to trace) 
+  \item Core code is in strict standard conforming Fortran 90.
+  \item Code design should adhere to object-oriented standards
+        to the extend that it is supported by Fortran 90.
+  \item Maximal privatization of module/derived type content.
+        Each module should have ``private'' as default scope 
+  \item Always use ``implicit none''
+  \item Fixed format layout (start at col 7, end at max 72)
+  \item Meaningfull names for variables, but not too long
+  \item Extensive in-code documantation and in-code change log
+        should be provided at addition/changes.
+  \item Light weight subroutines: do not bundle too much functionality
+        together, keep it simple. 
+  \item Prefer subroutines over functions (easier to trace) 
   \item Each module should have a private declaration 
         \hbox{``integer, parameter :: verbose = 0''}
-        allowing for debugging when verbose > 0
-  \item one-module-one-file: only one module in each file
-  \item module name and file name must correspond for all
+        allowing for debugging when verbose $>$ 0
+  \item One-module-one-file: only one module in each file fortran file.
+        Otherwise it is more complex to handle with make.
+  \item Module name and file name must correspond for all
         modules (i.e. amodule.f $\rightarrow$ amodule.mod + amodule.o).
         However, task, oceanography and biology providers are 
         excepted from this rule as only exceptions
 \end{itemize}
-self test
 
-cvs \newline
-
+\section{Version tracking with SVN}
+\begin{itemize}
+  \item After changes and before SVN commit:
+        \begin{itemize}
+           \item Modifications should be tested before SVN commit
+           \item IBMlib must be able to complete
+                 \[ make \ test
+                 \]  
+                 before SVN commit (otherwise your changes indirectly broke something).
+        \end{itemize}
+  \item Each commit should be accompanied by sufficient 
+        documentation to trace and understand changes.
+   
+\end{itemize}
 
 
 

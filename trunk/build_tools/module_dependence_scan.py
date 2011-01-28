@@ -2,9 +2,9 @@
 # -----------------------------------------------------------------
 #  Module dependencies scan 
 # ---------------------------------------------
-# $Rev$
-# $LastChangedDate$
-# $LastChangedBy$ 
+# $Rev: 147 $
+# $LastChangedDate: 2010-11-19 00:33:57 +0100 (Fri, 19 Nov 2010) $
+# $LastChangedBy: mpay $ 
 #
 # Quick'n'dirty scanning of module "use" associations of Fortran90
 #

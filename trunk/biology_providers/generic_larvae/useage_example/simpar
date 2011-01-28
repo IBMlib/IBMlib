@@ -1,0 +1,63 @@
+!----------------------------------------------------------------------------
+!                 Main simulation control file 
+!----------------------------------------------------------------------------
+
+! --------------- Timing details --------------------------------------------
+start_time  =  2005 08 21 00000   !  year  month  day  second_of_day
+end_time    =  2005 08 30 00000   !  year  month  day  second_of_day
+time_step   = 200     ! seconds
+
+! --------------- Particle tracking parameters -------------------------------
+advec_intg_method  = rk4    !  euler/rk2/rk4
+
+! --------------- biological parameters ---------------
+release_scheme = range 0 50                  ! none / fixed <depth> / range <upper> <lower> 
+growth_mdl     = temp 0.037 0.011            ! none / temp <Tcoef> <offset> 
+vert_behaviour = dvm 10 40                   ! none / above <depth> / DVM <day depth> <night depth>
+swim_mdl       = fixed 0.010                 ! fixed <m/s>
+
+! --------------- Misc --------------------------------------------------------
+random_seed =  42 42          !  force random seed to something,um, meaningful
+
+! --------------- File I/O config ---------------------------------------------
+! Specify up to three different output files
+! <release_dat_fname>   ASCII file listing the release state of each particle
+! <trajectory_fname>    NetCDF file listing the value of key 
+!                       variables as a function of time
+! <final_state_fname>   ASCII file listing the value of chosen
+!                       variables at completion of simulation
+! If a file name is missingi or commented out, then that file is not written
+! The variables contained in each file can be specified by creating a set of tags,
+! one for each output variable, called "release_var", "traj_var" and "final_state_var"
+! respectively. Configuration options for this variables can also be specified: the NETCDF
+! variables take "var_type" and "variable_range" as optional arguments, the ASCII types takes
+! the output format string as optional arguments
+!------------------------------------------------------------------------------
+release_dat_fname      = release_dat.txt
+release_var = tracerID
+release_var = POSIX
+release_var = lat
+release_var = lon
+release_var = depth
+release_var = size
+trajectory_fname       = depth_trajectories.nc 
+traj_output_frequency  = 18   !write particle positions every n time steps: 1 for every
+traj_var    = depth NF90_SHORT -1 1000
+final_state_fname      = final_state.txt
+final_state_var = tracerID 
+final_state_var = POSIX
+final_state_var = lat
+final_state_var = lon
+final_state_var = depth
+final_state_var = size
+
+!--------------- Larvae source locations --------------------------------------
+!     time window   : t1 < t2 (direction not relevant here)
+!     positions     : xmin xmax == longitude [degrees]
+!                     ymin ymax == latitude  [degrees]
+!                     zmin zmax == relative to depth   (0=surf < zmin < zmax < 1=bottom) 
+!     n             : number of particles released at each point
+!     ini_size      : initial particle size
+!-------------------------------------------------------------------------
+!                   t1                 t2                 xmin    ymin zmin   xmax    ymax zmax   n  
+emitbox  = 2005 08 21 00000   2005 08 21 00000   -4.0000 58.0000 1   -1.0000 60.2000 1   100 10 

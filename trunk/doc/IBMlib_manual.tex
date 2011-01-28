@@ -183,11 +183,11 @@ IBMlib are usualyy distributed in either two ways:
                  By default, the offline version builds into the executable {\tt  ibmrun}; 
                  if you want it to be called something else, set the make variable 
                  {\tt EXECUTABLE} as desired. 
-                 In directory {\tt Setups/Configurations/Generic} you may find examples
+                 In directory {\tt setups/configurations/generic} you may find examples
                  on files that can be copyed to {\tt config.mk} and modified as desired.
            \item {\bf compiler\_defaults.mk}. Here you specify the F90 compiler you wish to
                  use to compile IBMlib, as well as the compilation flag that should be applied.
-                 In directory {\tt Setups/Compilers} you may find examples
+                 In directory {\tt setups/compilers} you may find examples
                  on files that can be copyed to {\tt compiler\_defaults.mk} and modified 
                  as desired. For each compiler, there are different compilation flag sets
                  corresponding to what you may want to do, e.g. debugging (slower,safer) 
@@ -195,9 +195,9 @@ IBMlib are usualyy distributed in either two ways:
         \end{itemize}
         Additionally, you may augment {\bf common\_rules.mk} if you add customized
         components requiring special make rules to build. To ease the configuration 
-        step, there are configuration scripts in {\tt Setups/ComboScripts} that does the 
+        step, there are configuration scripts in {\tt setups/combo\_scripts} that does the 
         two steps for you. Just type
-        \[ Setups/ComboScripts/script\_name
+        \[ setups/combo\_scripts/script\_name
         \]
         in  {\tt IBMLIB\_DIR} to configure IBMlib corresponding to $script\_name$.
         This is identical to the usual {\tt ./configure} in Linux source packages.

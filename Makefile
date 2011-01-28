@@ -97,7 +97,7 @@
 	
 # Set environment variables for build
 export IBMLIB_DIR   = $(shell pwd)
-export BUILD_TOOLS  = $(IBMLIB_DIR)/BuildTools
+export BUILD_TOOLS  = $(IBMLIB_DIR)/build_tools
 export VPATH        = $(IBMLIB_DIR)  # make search path for src/obj    
 export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared between makefiles
 

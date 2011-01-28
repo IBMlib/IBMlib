@@ -476,7 +476,7 @@ c result = 1   for   date1 > date2
       end subroutine write_time_period
 
 
-      function is_light(aclock,pos,zenith)
+      function is_light(aclock,pos,zen)
 c     -------------------------------------------------------------------------
 c     A wrapper to day_bounds subroutine that takes a date/time in the form of a
 c     clock type together with a lat/long and returns a logical 
@@ -488,15 +488,19 @@ c     -------------------------------------------------------------------------
       type(clock), intent(in) :: aclock
       real, intent(in) :: pos(:)
       logical :: is_light
-      real, optional :: zenith
+      real, optional :: zen
 c     ----- locals -----
       integer :: day, month, year, secs, localOffset
-      real    :: lat, lon
+      real    :: lat, lon, zenith
       real    :: sunrise, sunset 
       logical :: neverrise, neverset
 c     -------------------------------------------------------------------------
       !Zenith angle defaults to civil sunrise,sunset, ie 96.0 degrees
-      if(.NOT. present(zenith)) zenith= 96.0
+      if(.NOT. present(zen)) then
+        zenith= 96.0
+      else
+        zenith = zen
+      endif
       !Get the day bounds for the given day and position
       call get_date_from_clock(aclock,year,month,day)
       call get_second_in_day(aclock,secs)

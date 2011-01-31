@@ -9,7 +9,7 @@
 #
 #  Invoking test sets:
 #
-#    1) It is recommended to apply Setups/Compilers/FC/compiler_defaults_safe.mk
+#    1) It is recommended to apply setups/compilers/FC/compiler_defaults_safe.mk
 #       as $(IBMLIB_DIR)/compiler_defaults.mk
 #    2) In $(IBMLIB_DIR) invoke: make fulltest
 #    3) In this directory invoke: make fulltest or any TESTNAME

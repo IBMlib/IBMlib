@@ -9,13 +9,13 @@ situation where it should be used
    The file config.mk tells which modules should be used for
    PHYSICAL_FIELDS, PARTICLE_STATE and TASK
 
-   There are a set of examples in directory Setups/Configurations
+   There are a set of examples in directory setups/configurations
 
 2) Select a compiler by copying a file compiler_defaults.mk  into the 
    base directory (where this file is). compiler_defaults.mk
    contains defaults compiler/link flags
    
-   There are a set of examples in the directory /Setups/Compilers
+   There are a set of examples in the directory setups/compilers
 
 3) Build the code by typing 
      make 
@@ -24,9 +24,9 @@ situation where it should be used
 
 If a standard setup is applied steps 1-2 above can be accelerated
 by running a standard script doing steps 1-2. 
-There are some examples in Setups/ComboScripts.
+There are some examples in setups/combo_scripts.
 Run these in the base directory (where this file is) e.g. type:
-   Setups/ComboScripts/quick_ifort_minimal
+   setups/combo_scripts/quick_ifort_minimal
 at the command line
 
 

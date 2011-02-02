@@ -31,10 +31,14 @@ release_dat_fname      = release_dat.txt
 release_var = lat
 release_var = lon
 release_var = depth
+
 trajectory_fname       = trajectories.nc 
-traj_output_frequency  = 1296   !write particle positions every n time steps: 1 for every
+traj_output_frequency  = 5   !write particle positions every n time steps: 1 for every
+traj_output_range      = 2005 08 21 43200   2005 08 22 00000   !range of times in which to write
+write particle positions every n time steps: 1 for every
 traj_var    = lat NF90_SHORT -90 90    !Full range, to demonstrate useage 
 traj_var    = lon NF90_SHORT -180 180
+
 final_state_fname      = final_state.txt
 final_state_var = tracerID 
 final_state_var = lat

@@ -973,7 +973,7 @@ CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 
       program test_it
 c     ------------------------------------------------------------------------
-c     Compile & run:  ifort -e90 coast_line_intersection_hash_tables_square_lattice.f; a.out
+c     Compile & run:  ifort -e90 coast_line_intersection_hash_tables_general_mesh.f; a.out
 c     ------------------------------------------------------------------------
 c     Plot results in R       
 c     dat <- read.table("fort.10");

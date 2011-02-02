@@ -27,7 +27,7 @@ c     ----- static coast line auxillary tables for fast classification -----
       contains 
 
       
-      subroutine configure_coastal_hash_tables()
+      subroutine configure_coastal_hash_tables()  ! COPY2 -> regular_lonlat_grid.f
 c     ------------------------------------------ 
 c     Analyze coastal configuration based on wetmask and
 c     generate static coastal hash tables
@@ -204,6 +204,7 @@ c
       fac2 = (/-2,   -2/)
       xy   = (/nx+0.5, ny+0.5/)
       corners_coastlines(nx+1,ny+1,:) = xy2lonlat(xy + fac2*facial_tol)
+
 c     -----------------------------
       contains  ! local subroutines
 c     -----------------------------
@@ -234,7 +235,7 @@ c
 
 
 
-      subroutine coast_line_intersection(geo1, geo2,cross_coast,georef,  ! -> regular_lonlat_grid.f
+      subroutine coast_line_intersection(geo1, geo2,cross_coast,georef,  ! COPY2 -> regular_lonlat_grid.f
      +                                   geohit) 
 c     ------------------------------------------ 
 c     Trajectory tracking variant
@@ -485,7 +486,7 @@ c
 
 
 
-      logical function check_coastal_proximity(geo,ixf,iyf,ityp)
+      logical function check_coastal_proximity(geo,ixf,iyf,ityp) ! COPY2 -> regular_lonlat_grid.f
 c----------------------------------------------
 c     Test whether geo is within the coastal perimeter
 c     Do not modify geo
@@ -551,7 +552,7 @@ c
          
      
 
-      logical function at_coast_line(geo)             ! -> regular_lonlat_grid.f
+      logical function at_coast_line(geo)             ! COPY2 -> regular_lonlat_grid.f
 c----------------------------------------------
 c     Just return the main result whether geo
 c     geo is numerically on a coast line and
@@ -566,7 +567,7 @@ c----------------------------------------------
 
 
       
-      logical function repel_from_coast_line(geo)   ! -> regular_lonlat_grid.f
+      logical function repel_from_coast_line(geo)   !  COPY2 -> regular_lonlat_grid.f
 c----------------------------------------------
 c     Internal function that places geo(1:2) outside 
 c     the coastal perimeter, if tested inside. 
@@ -598,7 +599,7 @@ c
 
 
       
-      logical function check_coastal_osculation(geo,georef,geohit) ! -> regular_lonlat_grid.f
+      logical function check_coastal_osculation(geo,georef,geohit) ! COPY2 -> regular_lonlat_grid.f
 c     ----------------------------------------------------------- 
 c     Auxillary function that chacks whether geo is in the coastal proximity
 c     i.e. at the coastal line within a predefined tolerence
@@ -628,22 +629,27 @@ c     -----------------------------------------------------------
 
 
 
+      LOGICAL function is_land(xy)        ! COPY2 -> regular_lonlat_grid.f
+c     ------------------------------------------ 
+c     return is_land = .false. at horizontal range violation
+c     ------------------------------------------ 
+      real, intent(in) :: xy(:)
+      real             :: wdepth
+      integer          :: status
+      integer          :: ixc,iyc
+c     ------------------------------------------ 
+c     avoid probing wetmask at range violation
 
-      logical function is_land(geo)                  ! update -> regular_lonlat_grid.f
-c     ------------------------------------------------------
-c     Check whether geo (lon,lat,depth) corresponds to a wet position or not by
-c     looking up in the wet array
-c     Dec 08, 2010: include coast line in land definition
-c     ASC: fixed wetmask type + grid indices lookup
-c     ------------------------------------------------------
-      real,    intent(in) :: geo(:)
-      integer             :: ixc,iyc
-c     ------------------------------------------------------
-      call get_horiz_ncc(geo,ixc,iyc)
-      is_land = .false. ! default wet
-      if ((ixc<1).or.(iyc<1).or.(ixc>nx).or.(iyc>ny)) return 
-      is_land = ((wetmask(ixc,iyc) == 0).or.at_coast_line(geo)) ! valid array access
-      end function is_land
+      if (horizontal_range_check(xy)) then ! range OK
+         call get_horiz_ncc(xy,ixc,iyc)
+         is_land = ((wetmask(ixc,iyc)==0).or.at_coast_line(xy))
+      else
+         is_land = .false.
+      endif    
+c     ------------------------------------------
+      end function
+
+
 
 
 c     >>>>>>>>>>>>>>>>>>>>>>>> <<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -651,7 +657,7 @@ c     >>>>>>>>>> particle_tracking.f:begin    <<<<<<<<<<<<
 c     >>>>>>>>>>>>>>>>>>>>>>>> <<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
-      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)  ! update to particle_tracking.f 
+      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)  ! COPY2 ->  particle_tracking.f 
 c-------------------------------------------------------------------------
 c     Compute key points of multiple horizontal coastal reflection path
 c     by iterative application of coast_line_intersection primitive
@@ -737,6 +743,50 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     paste-in auxillaries
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
+
+      LOGICAL function horizontal_range_check(xy)    ! paste-in dummy
+c     ------------------------------------------
+c     Return .true. if cell association of xy
+c     0 < (ix,iy) < (nx,ny) is obeyed
+c     upper limit (i<n): require data coverage on both
+c     sides of an interior point
+c     ------------------------------------------ 
+      real, intent(in) :: xy(:)
+      integer          :: ix,iy
+      real             :: sx,sy
+c     ------------------------------------------ 
+      call get_horiz_grid_coordinates(xy,ix,iy,sx,sy)
+      horizontal_range_check = (0<ix).and.(ix<nx)
+     +                    .and.(0<iy).and.(iy<ny)
+c     ------------------------------------------ 
+      end function
+
+
+      subroutine get_horiz_grid_coordinates(xy,ix,iy,sx,sy) ! paste-in dummy
+c     ------------------------------------------------------
+c     From the lon/lat vector xy (which may include the z component)
+c     determine the cell association (ix,iy) where the node of the cell is the
+c     lower left corner point, so that [ix:ix+1, iy:iy+1[ maps to cell (ix,iy)
+c     i.e. a corner centered convention.
+c     0 < (sx,sy) < 1 is the intra cell cooridnates. 
+c     Grid origo (ix,iy) = (x,y) = (1,1) is associated with (lambda1,phi1)
+c     Do not flag grid range violations, so that 
+c     0 < (ix,iy) <= (nx,ny) is not enforced 
+c     (horizontal_range_check uses this function to check grid range violations)
+c     ------------------------------------------------------
+      real, intent(in)     :: xy(:)
+      integer, intent(out) :: ix,iy
+      real, intent(out)    :: sx,sy
+      real                 :: dx1,dy1
+c     ------------------------------------------------------
+      dx1 = (xy(1)-lambda1)/dlambda
+      dy1 = (xy(2)-phi1)   /dphi
+      ix  = 1 + int(dx1)    ! truncate decimals to get lon cell
+      iy  = 1 + int(dy1)    ! truncate decimals to get lat cell
+      sx  = dx1 - int(dx1)  ! intra cell coordinate 0<sx<1
+      sy  = dy1 - int(dy1)  ! intra cell coordinate 0<sy<1
+c     ------------------------------------------------------
+      end subroutine get_horiz_grid_coordinates
 
 
       subroutine get_horiz_ncc(geo,ixc,iyc) !,xc,yc)   ! paste-in dummy
@@ -902,7 +952,7 @@ c     ------------------
 c     ---- Bee test ----
 c     ------------------
       geo1 = (/2.0, 53.0, 0.0/)
-      stability = 8   ! log10 of number of steps
+      stability = 6   ! log10 of number of steps
       call get_horiz_ncc(geo1,ixc,iyc)     
       !Surround the point with dry cells
       wetmask   = 0 ! 0 dry, 1 wet

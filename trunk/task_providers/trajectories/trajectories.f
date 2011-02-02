@@ -45,9 +45,11 @@ c     ------------ declarations ------------
       type(netcdf_output_file) :: trajs
       integer :: i, idum4(4), istep, last,old_last,seed_size
       integer, allocatable :: seed(:)
-      integer :: opt_freq
+      integer :: opt_freq,i8(8)
       real    :: time_step
       logical :: write_traj,write_release,write_final
+      logical :: write_traj_rng
+      type(time_period) :: write_period
 
 c     ------------   Initialise config file   ------------
       call tic(stopwatch)
@@ -85,6 +87,7 @@ c     ------------   setup particle ensemble(s) ------------
 
 c     ------------   setup output files  ------------   
       write_traj = count_tags(simulation_file,"trajectory_fname")/=0
+      write_traj_rng=count_tags(simulation_file,"traj_output_range")/=0
       write_release = count_tags(simulation_file,"release_dat_fname")/=0
       write_final = count_tags(simulation_file,"final_state_fname")/=0
       if(write_release) then
@@ -100,6 +103,13 @@ c     ------------   setup output files  ------------
      +                  "traj_output_frequency",opt_freq)
          call setup_output_from_file(trajs,par_ens,simulation_file,
      +      "trajectory_fname","traj_var")
+      endif
+      if(write_traj_rng) then
+         call read_control_data(simulation_file, 
+     +                  "traj_output_range",i8)
+         call set_period(write_period,i8)
+         write(*,*) "Writing trajectory data during period:"
+         call write_time_period(write_period)
       endif
 
 c     =====================  main time loop =====================
@@ -123,7 +133,11 @@ c        -------- propagate tracers  --------
 c        -------- write trajectories -------- 
          if(write_traj)  then
             if(MOD(istep,opt_freq)==0)  then
+            if(.not. write_traj_rng) then
                call write_frame(trajs,par_ens)  
+            else if(time_inside_period(current_time,write_period)) then
+               call write_frame(trajs,par_ens)  
+            endif
             endif
          endif
          

@@ -27,5 +27,5 @@ FORCE:
 #     calling makefiles
 #     EXTRES = -x time_tools -x run_context
 
-time_tools.mod geometry.mod constants.mod run_context.mod  input_parser.mod  netcdf.mod:
+time_tools.mod geometry.mod constants.mod array_tools.mode run_context.mod  input_parser.mod  netcdf.mod:
 	@echo "update of" $@ "suppressed"

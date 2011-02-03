@@ -210,31 +210,33 @@ c --- Read vertical behaviour scheme
       endif
 
 c --- Read swim model - but only if there is some vertical behaviour involved
-      if(do_vertical .and. count_tags(ctrlfile,"swim_mdl")==0) then
-         call abort_run("init_particle_state","No swim_mdl is " //
-     +      "specified. This should be specified to use active " //
-     +      "vertical behaviour")
-      else
-         !Read in parameters
-         call read_control_data(ctrlfile,"swim_mdl",strbuf)
-         strbuf=adjustl(strbuf)
-         call toupper(strbuf)
-         write(*,*) "swim_mdl = '", trim(strbuf),"'"
-         !Split variables as required
-         call tokenize(strbuf, start, nwords)
-         read(strbuf(start(1):),*) swim_mdl_name
-         select case(swim_mdl_name)
-         case ("FIXED")
-           !Active velocity is fixed at some constant value
-           swim_mdl =1
-           call check_nparams("swim_mdl","FIXED",1,nwords-1)
-           read(strbuf(start(2):),*) swim_params(1)
-           write(*,*) "Swiming speed = ",swim_params(1)
-         case default
-           call abort_run("init_particle_start","Swimming model "
-     +        " '" //trim(swim_mdl_name) //"' is unknown.")
-           stop 
-         end select
+      if(do_vertical) then  !need a swim model
+         if(count_tags(ctrlfile,"swim_mdl")==0) then
+            call abort_run("init_particle_state","No swim_mdl is " //
+     +         "specified. This should be specified to use active " //
+     +         "vertical behaviour")
+         else
+            !Read in parameters
+            call read_control_data(ctrlfile,"swim_mdl",strbuf)
+            strbuf=adjustl(strbuf)
+            call toupper(strbuf)
+            write(*,*) "swim_mdl = '", trim(strbuf),"'"
+            !Split variables as required
+            call tokenize(strbuf, start, nwords)
+            read(strbuf(start(1):),*) swim_mdl_name
+            select case(swim_mdl_name)
+            case ("FIXED")
+              !Active velocity is fixed at some constant value
+              swim_mdl =1
+              call check_nparams("swim_mdl","FIXED",1,nwords-1)
+              read(strbuf(start(2):),*) swim_params(1)
+              write(*,*) "Swiming speed = ",swim_params(1)
+            case default
+              call abort_run("init_particle_start","Swimming model "
+     +           " '" //trim(swim_mdl_name) //"' is unknown.")
+              stop 
+            end select
+         endif
       endif
       end subroutine init_particle_state
 

@@ -63,7 +63,7 @@ c     -------------------- module data --------------------
       character*999 :: hydroDBpath ! hydrographic data sets
       character*1, parameter ::  path_separator = "/"   ! UNIX/Linux separator
       real, parameter :: NaN = 0.0 / 0.0
-      integer, parameter :: verbose = 0   ! Zero for off
+      integer, parameter :: verbose = 0   ! Zero for all off. 1 for update timing only. 2 for all
 
 c     Time pieces
 c     We are forced to make an ugly hack here, as our time library can't handle times before
@@ -331,11 +331,13 @@ c     -----------------------------------------------------
 c     First if we are forcing the update, lets jump straight there
       if(present(force))  then
       if(force) then
-        write(*,*) "Forcing update..."
+        call logmsg(2,"Forcing update...")
         call update_daily_physical_fields(ctime)
         call update_hourly_physical_fields(ctime)
         call update_derived_variables()
-        call toc(stopwatch,"Physical_fields update complete :") 
+        if(verbose>=1) then
+          call toc(stopwatch,"Physical_fields update complete :") 
+        endif
         return
       endif
       endif 
@@ -344,9 +346,7 @@ c.....Decide whether an update of the daily fields is needed or not
       updated=.FALSE.
       call get_period_length_sec(ctime,cur_daily_fields,offset)
       if(abs(offset) > 43200)  then
-        write(*,*) "Updating daily fields...."
-        write(*,*) "Offset between daily fields and current time:",
-     &       offset,"secs"
+        call logmsg(2,"Updating daily fields....")
         call update_daily_physical_fields(ctime)
         updated = .TRUE.
       endif
@@ -355,9 +355,7 @@ c.....Now decide whether an update of the hourly fields is needed or not,
 c     using similar logic
       call get_period_length_sec(ctime,cur_hourly_fields,offset)
       if(abs(offset) > 1800 ) then
-        write(*,*) "Updating hourly fields...."
-        write(*,*) "Offset between hourly fields and current time:",
-     &    offset,"secs"
+        call logmsg(2,"Updating hourly fields....")
         call update_hourly_physical_fields(ctime)
         updated = .TRUE.
       endif
@@ -366,7 +364,9 @@ c.....If fields were updated then update dependent variables
       if (updated) then
         call update_derived_variables()
         !How long did it all take?
-        call toc(stopwatch,"Physical_fields update complete :") 
+        if(verbose>=1) then
+          call toc(stopwatch,"Physical_fields update complete :") 
+        endif
       endif
       
       end subroutine update_physical_fields
@@ -417,7 +417,8 @@ c     checking it agrees with result from NetCDF files
           call set_clock_from_clock(cur_daily_fields,ctmp)
       endif
 c     Confirm update
-      write(*,*) "New daily fields : ",get_datetime(cur_daily_fields)
+      call logmsg(2, "New daily fields : "
+     &                  //get_datetime(cur_daily_fields))
  
       end subroutine update_daily_physical_fields
 
@@ -488,7 +489,8 @@ c     checking it agrees with result from NCDF files
           call set_clock_from_clock(cur_hourly_fields,ctmp)
       endif
 c     Confirm update
-      write(*,*) "New hourly fields : ",get_datetime(cur_hourly_fields)
+      call logmsg(2,"New hourly fields : "
+     +             //get_datetime(cur_hourly_fields))
 
       end subroutine update_hourly_physical_fields
 
@@ -514,7 +516,8 @@ c     Setup filename
       write(ncfilename,801) trim(adjustl(hydroDBpath)),
      &        path_separator,prefix,year
  801  format(3a,i4,".nc")
-      write(*,*) "Loading ",varName," data from: ",trim(ncfilename)
+      call logmsg(2,"Loading "//varName//" data from: "
+     +      //trim(ncfilename))
 c     Now open the file
       call check_ncdf(nf90_open(ncfilename,nf90_nowrite,ncid))
       call check_ncdf(nf90_inq_varid(ncid,varName,varid))
@@ -583,7 +586,7 @@ c     -----------------------------------------------------
 c     Initiates a recalculation of derived variables the
 c     flow fields have been updated
 c     -----------------------------------------------------
-      write(*,*) "Updating derived variables...."
+      call logmsg(2,"Updating derived variables....")
       call update_w()
       call update_horizontal_turbulence()
       end subroutine update_derived_variables
@@ -640,7 +643,7 @@ c     Smagorinsky parameters for horizontal diffusion
 c     local variables
       integer                 :: I,J,K, KB
 c     ---------------------------------------------------------------------------
-      write(*,*) "update_horizontal_turbulence: entered."
+      call logmsg(2,"update_horizontal_turbulence: entered.")
 c     Setup KB counter to match NORWECOM code
       KB = NZ +1  !Number of sigma  layers +1 
 c     Populate the hdiffus array
@@ -701,7 +704,13 @@ c     for consistency and reference
 !!C
       end subroutine update_horizontal_turbulence
 
-
+      subroutine logmsg(level,msg)
+      integer, intent(in) :: level
+      character(*), intent(in) :: msg
+      if(verbose>=level) then
+         write(*,*) trim(msg)
+      endif
+      end subroutine 
 
 c########################################################################
 c########################################################################

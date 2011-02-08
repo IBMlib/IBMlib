@@ -26,6 +26,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      +          interpolate_currents_cc => interpolate_currents  ! use face-centered local
 
       use geometry
+      use array_tools
       use run_context, only: simulation_file
       use time_tools           ! import clock type
       use input_parser
@@ -57,7 +58,7 @@ c      public :: interpolate_wind    ! currently unused
 
 c     -------------------- module data --------------------  
       
-      
+      real,parameter :: molecular_diffusivity = 1.e-9 ! unit m2/s
 c
 c     ------ data frame handler ------
       
@@ -107,6 +108,7 @@ c     ------------------------------------------
 c     Do not trigger data load
 c     ------------------------------------------
       type(clock), intent(in),optional :: time
+      real                             :: rdum
 c     ------------------------------------------
       if (present(time)) master_clock = time
       write(*,*) trim(get_pbi_version()) 
@@ -115,11 +117,48 @@ c     ------------------------------------------
       write(*,*) "init_physical_fields: hydrographic database path =", 
      +           trim(hydroDBpath)
     
-      call read_grid_desc()
+      call read_grid_desc()   ! incl allocation of 3D arrays
 c.....Set reference offset for hydrographic data: 1900-01-01 00:00:00.
       call set_clock(ref_clock, 1900, 01, 01, 0)
 
       call reset_frame_handler()
+
+c
+c     ---- currently no horizontal turbulent diffusivity in data set ----
+c          set it to molecular diffusivity lower limit, if no values 
+c          are provided
+c
+c     resolved user provided constant horizontal_diffusivity (optional)  
+c    
+      if (count_tags(simulation_file, "horizontal_diffusivity")/=0) then
+         call read_control_data(simulation_file,
+     +                          "horizontal_diffusivity",rdum)
+         rdum = max(molecular_diffusivity, rdum) ! never exceed lover limit
+         write(*,563) "horizontal_diffusivity",rdum
+      else
+         rdum = molecular_diffusivity
+         write(*,564) "horizontal_diffusivity",rdum
+      endif
+      hdiffus = rdum
+c 
+c     resolved user provided constant vertical_diffusivity (optional)  
+c    
+      if (count_tags(simulation_file, "vertical_diffusivity")/=0) then
+         call read_control_data(simulation_file,
+     +                          "vertical_diffusivity",rdum)
+         rdum = max(molecular_diffusivity, rdum) ! never exceed lover limit
+         write(*,563) "vertical_diffusivity",rdum
+      else
+         rdum = molecular_diffusivity
+         write(*,564) "vertical_diffusivity",rdum
+      endif
+      vdiffus = rdum
+c
+ 563  format("init_physical_fields: read const ",a,"=", e12.5," m2/s")
+ 564  format("init_physical_fields: using const",a,"=", e12.5," m2/s")
+      
+
+
 
       end subroutine init_physical_fields
 
@@ -176,7 +215,7 @@ c.....grid scale/dimensions (held globally in module regular_lonlat_grid)
 
       write(*,*) "read_grid_desc: allocate grid arrays: begin"
 
-      call init_regular_lonlat_grid()  ! 
+      call init_regular_lonlat_grid()  ! incl allocation of 3D arrays
 
 c     --- allocate specific auxillary arrays ---      
 
@@ -575,14 +614,15 @@ c
 
 c     3) postprocess data, suncronize auxillary fields, pad holes
 c      
-c     ---- currently no horizontal turbulent diffusivity: set to
-c          molecular diffusivity lower limit ~ 1.e-9 m2/s   ---
+c     ---- currently no turbulent diffusivity in data set: 
+c          for now, this is read from input file in init_physical_fields
+c          and vdiffus/hdiffus is set to this value
+c
 c          NB: horizontal derivatives NOT implemented
 c          when spatially non constant hdiffus are applied,
 c          interpolate_turbulence_deriv must be updated
 c
-      vdiffus = 1.e-9
-      hdiffus = 1.e-9   
+c  
 c
 c     4) replace fill values for (u,v,w), because boundary faces are given the fill value
 c        and boundary faces are needed for interpolation. Implicit boundary condition is 

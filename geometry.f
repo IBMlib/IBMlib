@@ -80,15 +80,15 @@ c     ----------------------------------------------------------
       real, intent(in)     :: x0(*),x1(*),y0(*),y1(*)
       real, intent(out)    :: s,t
       logical, intent(out) :: cross
-      real                 :: vx(2),vy(2),lvx2,lvy2,det
+      real                 :: vx(2),vy(2),sum_vx,sum_vy,det
       real,parameter       :: s_parallel = 1.e20
       real,parameter       :: s_undef    = 2.e20
 c     ----------------------------------------------------------
-      vx    = x1(1:2)-x0(1:2)
-      vy    = y1(1:2)-y0(1:2)
-      lvx2  = sum(vx*vx)
-      lvy2  = sum(vy*vy)
-      if ((lvx2 < 1.e-12).or.(lvy2 < 1.e-12)) then ! angle undef
+      vx     = x1(1:2)-x0(1:2)
+      vy     = y1(1:2)-y0(1:2)
+      sum_vx = sum(abs(vx))
+      sum_vy = sum(abs(vy))
+      if ((sum_vx < 1.e-12).or.(sum_vx < 1.e-12)) then ! angle undef
          s = s_undef
          t = s_undef
          cross=.false.

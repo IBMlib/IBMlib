@@ -158,10 +158,10 @@ c     ------------------------------------------
 
 
 
-      subroutine interpolate_cc_3Dgrid_data(xyz,array,deriv,result,
+      subroutine interpolate_cc_3Dgrid_data(geo,array,deriv,result,
      +                                      status)
 c     -------------------------------------------------------------------- 
-c     Interpolate on grid of corner centered data 3D array on point xyz.
+c     Interpolate on grid of corner centered data 3D array on point geo.
 c     Apply appropriate extrapolations near boundaries or return padvalue
 c     For points 0 < z <ccdepth(., ., 1) and ccdepth(., ., ibot) < z < wd
 c     the surface/bottom layer value is used, i.e. the value is assumed 
@@ -184,7 +184,7 @@ c                   Return result = padval for deriv = 0
 c    
 c     tested: deriv=0,3
 c     --------------------------------------------------------------------
-      real, intent(in)     :: xyz(:),array(:,:,:)
+      real, intent(in)     :: geo(:),array(:,:,:)
       integer, intent(in)  :: deriv  ! 0=value; (1,2,3) = along (x,y,z)
       real, intent(out)    :: result
       integer, intent(out) :: status
@@ -198,15 +198,15 @@ c
       logical             :: valid(4)
       real, pointer       :: zgrid(:)
 c     --------------------------------------------------------------------
-      if (.not.horizontal_range_check(xyz)) then
+      if (.not.horizontal_range_check(geo)) then
           result = padval
           if (deriv>0) result = 0 
           status = 1
           return
       endif
 
-      call interpolate_wdepth(xyz,depth,idum)
-      if ((xyz(3)<-htol).or.(xyz(3)>depth+htol)) then
+      call interpolate_wdepth(geo,depth,idum)
+      if ((geo(3)<-htol).or.(geo(3)>depth+htol)) then
          status = 2                ! signal vertical out-of-bound
          result = padval           ! derivative interpolation
          if (deriv>0) result = 0   ! value interpolation
@@ -219,7 +219,7 @@ c         col2  (ix0,iy1)
 c         col3  (ix1,iy0)  
 c         col4  (ix1,iy1)
 c
-      call get_location_in_mesh(xyz,ix,iy,sx,sy)
+      call get_location_in_mesh(geo,ix,iy,sx,sy)
 c
       ix0 = min(max(ix,  1),nx)  ! cover grid edges
       ix1 = min(max(ix+1,1),nx)  ! cover grid edges
@@ -234,7 +234,7 @@ c
       hweight(3) = (  sx  )*(1.0-sy)
       hweight(4) = (  sx  )*(  sy  )
 
-      z          = xyz(3)  ! short hand
+      z          = geo(3)  ! short hand
       status     = 0       ! assume interpolation possible
       valid      = .false. ! default for dry/out-of-bounds pillars
       fz         = 0.      ! default for dry/out-of-bounds pillars
@@ -314,11 +314,11 @@ c
 
 
 
-      subroutine interpolate_cc_2Dgrid_data(xy,array,deriv,result,
+      subroutine interpolate_cc_2Dgrid_data(geo,array,deriv,result,
      +                                      status)
 c     --------------------------------------------------------------------
-c     Interpolate grid of corner centered data 2D array on point xy
-c     with data points at integer valued xy
+c     Interpolate grid of corner centered data 2D array on point geo
+c     with data points at integer valued geo
 c
 c     deriv = 0 gives value, deriv = (1,2) gives derivative along (x,y)
 c     Currently, only deriv = 0, until other derivatives 
@@ -328,7 +328,7 @@ c     Return status:
 c       status = 0: interior interpolation performed
 c       status = 1: horizontal range violation, set result = padval
 c     --------------------------------------------------------------------
-      real, intent(in)     :: xy(:),array(:,:)
+      real, intent(in)     :: geo(:),array(:,:)
       integer, intent(in)  :: deriv  ! 0=value; deriv = (1,2) gives derivative along (x,y)
       real, intent(out)    :: result
       integer, intent(out) :: status
@@ -337,13 +337,13 @@ c
       real              :: vc(4),sx,sy
       real, parameter   :: padval = 0. ! later move to argument list
 c     --------------------------------------------------------------------
-       if (.not.horizontal_range_check(xy)) then
+       if (.not.horizontal_range_check(geo)) then
           result = padval
           status = 1
           return
       endif
 c
-      call get_location_in_mesh(xy,ix,iy,sx,sy)
+      call get_location_in_mesh(geo,ix,iy,sx,sy)
 c      
       ix0 = min(max(ix,    1),nx)  ! cover boundary layers
       ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
@@ -368,32 +368,32 @@ c     --------------------------------------------------------------------
 
 
 
-      subroutine interpolate_currents(xyz, r3, status)
+      subroutine interpolate_currents(geo, r3, status)
 c     ------------------------------------------ 
 c     ------------------------------------------ 
-      real, intent(in)     :: xyz(:)
+      real, intent(in)     :: geo(:)
       real, intent(out)    :: r3(:)
       integer, intent(out) :: status
       integer              :: statu, statv, statw
 c     ------------------------------------------
-      call interpolate_cc_3Dgrid_data(xyz,u,0,r3(1),statu)
-      call interpolate_cc_3Dgrid_data(xyz,v,0,r3(2),statv)
-      call interpolate_cc_3Dgrid_data(xyz,w,0,r3(3),statw)
+      call interpolate_cc_3Dgrid_data(geo,u,0,r3(1),statu)
+      call interpolate_cc_3Dgrid_data(geo,v,0,r3(2),statv)
+      call interpolate_cc_3Dgrid_data(geo,w,0,r3(3),statw)
       status  = max(statu, statv, statw) ! in the unextected case taht they differ ...
 c     ------------------------------------------ 
       end subroutine interpolate_currents
 
 
-      subroutine interpolate_turbulence(xyz, r3, status)
+      subroutine interpolate_turbulence(geo, r3, status)
 c     ------------------------------------------ 
 c     ------------------------------------------ 
-      real, intent(in)     :: xyz(:)
+      real, intent(in)     :: geo(:)
       real, intent(out)    :: r3(:)
       integer, intent(out) :: status
       integer              :: statv,stath
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(xyz,hdiffus,0,r3(1),stath)
-      call interpolate_cc_3Dgrid_data(xyz,vdiffus,0,r3(3),statv)
+      call interpolate_cc_3Dgrid_data(geo,hdiffus,0,r3(1),stath)
+      call interpolate_cc_3Dgrid_data(geo,vdiffus,0,r3(3),statv)
       r3(2)   = r3(1) ! horizontal isotropy
       status  = max(statv,stath) ! in the unextected case taht they differ ...
 c     ------------------------------------------ 
@@ -401,17 +401,17 @@ c     ------------------------------------------
 
  
 
-      subroutine interpolate_turbulence_deriv(xyz, r3, status)
+      subroutine interpolate_turbulence_deriv(geo, r3, status)
 c     ------------------------------------------ 
 c     Currently do not support horizontal derivatives
 c     ------------------------------------------ 
-      real, intent(in)     :: xyz(:)
+      real, intent(in)     :: geo(:)
       real, intent(out)    :: r3(:)
       integer, intent(out) :: status
       integer              :: statv,stath
       
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(xyz,vdiffus,3,r3(3),statv)
+      call interpolate_cc_3Dgrid_data(geo,vdiffus,3,r3(3),statv)
       r3(1:2) = 0. ! Currently do not support horizontal derivatives
       status  = statv 
 c     ------------------------------------------    
@@ -422,72 +422,64 @@ c     ------------------------------------------
 
 
 
-      subroutine interpolate_temp (xyz, r, status) 
+      subroutine interpolate_temp (geo, r, status) 
 c     ------------------------------------------ 
 c     ------------------------------------------ 
-      real, intent(in)     :: xyz(:)
+      real, intent(in)     :: geo(:)
       real, intent(out)    :: r
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(xyz,temp,0,r,status)
+      call interpolate_cc_3Dgrid_data(geo,temp,0,r,status)
 c     ------------------------------------------ 
       end subroutine 
 
 
 
-      subroutine interpolate_zooplankton (xyz, r, status) 
+      subroutine interpolate_zooplankton (geo, r, status) 
 c     ------------------------------------------ 
 c     ------------------------------------------ 
-      real, intent(in)     :: xyz(:)
+      real, intent(in)     :: geo(:)
       real, intent(out)    :: r(:)
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(xyz,zoo,0,r(1),status)
+      call interpolate_cc_3Dgrid_data(geo,zoo,0,r(1),status)
 c     ------------------------------------------ 
       end subroutine 
 
 
 
-      subroutine interpolate_wdepth(xy, r, status) 
+      subroutine interpolate_wdepth(geo, r, status) 
 c     ------------------------------------------ 
-c     Multiply wetmask to ensure piecewise linear coastlines
+c     Multiply by is_land to ensure piecewise linear coastlines
 c     defined by wdepth=0 
-c
-c     NOTE: multiplying with wetmask is an implicit hardcoding
-c           of the box coastal geometry; more generally, should be
-c           filtered with a call to is_land()
 c     ------------------------------------------ 
-      real, intent(in)     :: xy(:) 
+      real, intent(in)     :: geo(:) 
       real, intent(out)    :: r
-      integer, intent(out) :: status
-      integer           :: ixc,iyc
+      integer, intent(out) :: status    
 c     ------------------------------------------ 
-      call interpolate_cc_2Dgrid_data(xy,wdepth,0,r,status)
-      call get_horiz_ncc(xy,ixc,iyc)
-      r = r*wetmask(ixc,iyc)
+      call interpolate_cc_2Dgrid_data(geo,wdepth,0,r,status)
+      if (is_land(geo)) r=0.0
 c     ------------------------------------------ 
       end subroutine 
 
 
 
-
-
-      LOGICAL function is_wet(xyz)
+      LOGICAL function is_wet(geo)
 c     ------------------------------------------ 
 c     Probe wdepth
 c     return is_wet = .true. at horizontal range violation
 c     accept points at sea surface/bottom as wet (htol)
 c     ------------------------------------------ 
-      real, intent(in) :: xyz(:) 
+      real, intent(in) :: geo(:) 
       real             :: wd
       integer          :: status
 c     ------------------------------------------ 
-      call interpolate_wdepth(xyz, wd, status) 
+      call interpolate_wdepth(geo, wd, status) 
       if (status==1) then
          is_wet = .true.
          return
       elseif (status==0) then
-         if ((xyz(3)>-htol).and.(xyz(3)<wd+htol)) then
+         if ((geo(3)>-htol).and.(geo(3)<wd+htol)) then
             is_wet = .true.
          else
             is_wet = .false.

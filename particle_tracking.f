@@ -68,7 +68,7 @@ c...............................................................
       integer, parameter :: rk4   = 30
 
 
-      integer, parameter :: verbose = 0    ! control output volume of certain subroutines
+      integer :: verbose = 0    ! control output volume of certain subroutines (0=silent)
 
 
       integer, parameter, public :: BC_reflect = 0 ! handle to invoke reflecting boundary conditions
@@ -132,6 +132,7 @@ c.... Define public operator set  ..............................
       
       public :: init_particle_tracking
       public :: close_particle_tracking
+      public :: set_verbose_particle_tracking ! for debugging
 
       public :: update_tracer_position
       public :: add_advection_step
@@ -205,6 +206,15 @@ c     ---------------------------------------------------
 c------------------------------------------------------------
 c------------------------------------------------------------
       end subroutine close_particle_tracking
+
+
+      subroutine set_verbose_particle_tracking(ival)
+c------------------------------------------------------------
+c     Runtime setting of verbose for debugging
+c------------------------------------------------------------
+      integer,intent(in) :: ival
+      verbose = ival
+      end subroutine set_verbose_particle_tracking
 
 
       subroutine checkstat(istat, who)
@@ -840,83 +850,157 @@ c
 
 
 
-      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit1)  ! update to particle_tracking.f 
+
+      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit0)  
 c-------------------------------------------------------------------------
 c     Compute key points of multiple horizontal coastal reflection path
 c     by iterative application of coast_line_intersection primitive
 c     when trying to move from (valid, wet) s0 to new position s1
-c     If a coast line is crossed retrun anycross == .true.
+c     If a coast line is crossed return anycross == .true.
 c     Then sref is the (multiple) horizontal coastal reflected end point
-c     which is valid and wet. shit1 is the point of (first) coastal intersection
-c     If anycross == .false. (sref, shit1) is undefined
+c     which is guarentied wet. shit0 is the point of (first) coastal intersection
+c     and shit0 is guarentied wet.
+c     If anycross == .false. (sref, shit0) are left undefined (unaltered)
+c     multiple_reflection_path has same interface as coast_line_intersection
+c   
+c     ASC 10Feb2011: improved verbose logging + race condition trap
+c                    fixed exit condition bug for higher reflections
+c                    added trace to enable debugging + transparency
 c-------------------------------------------------------------------------
       real,intent(in)      :: s0(3), s1(3)
       logical,intent(out)  :: anycross
-      real,intent(out)     :: sref(3), shit1(3)
+      real,intent(out)     :: sref(3), shit0(3)
 
-      real                 :: start(3), sfin(3), shit(3)
-      integer              :: iter
-      integer, parameter   :: max_reflections = 5 ! otherwise time step too long ...
+      integer, parameter   :: max_reflections = 20 ! otherwise time step too long ...
+      real                 :: refs(3,max_reflections) ! first index = fastest 
+      real                 :: hits(3,max_reflections) ! first index = fastest 
+      logical              :: isla, latercross
+      real                 :: ds  
+      integer              :: i,k
+      real, parameter      :: race_limit = 1.0e-5  ! step limit for flagging race condition
 c---------------------------------------------------------------
       if (verbose>0) write(*,*) " multiple reflection analysis begin"
 
-      iter  = 0
-      call coast_line_intersection(s0, s1, anycross, sref, shit1)
+      i  = 1
+      call coast_line_intersection(s0,s1,anycross,refs(:,i),hits(:,i))
 
       if (verbose>0) then
          if (anycross) then 
-            write(*,422) iter, s0(1:2), s1(1:2), sref(1:2), shit1(1:2)  
-            write(*,*) "is_land(reflected point) = ", is_land(sref)
-            write(*,*) "continue multiple reflection analysis"
+            write(*,422) i,s0(1:2),s1(1:2),refs(1:2,i),hits(1:2,i) 
+            write(*,*) "coastal reflection detected"
+            isla = is_land(sref)
+            if (isla) then
+               write(*,*) "reflected point point dry: "//
+     +                    "continue multiple reflection analysis"
+            else
+               write(*,*) "reflected point point wet: "//
+     +                    " multiple reflection analysis end"
+            endif ! isla
          else
-            write(*,423) iter, s0(1:2), s1(1:2)
-            write(*,*)"wet reflection: multiple reflection analysis end"
+            write(*,423) i, s0(1:2), s1(1:2)
+            write(*,*)"final point point wet: "//
+     +                "multiple reflection analysis end"
          endif
       endif ! verbose
 
-      if (.not.anycross) return
+      if (.not.anycross) return  ! (sref, shit0) undefined
       
 c
 c     --- we hit the coast line, start multiple reflection analysis
-c         (this means (sref, shit1) are defined and anycross == .true.)
+c         (this means (sref, shit0) are defined and anycross == .true.)
+c         
 c
-      iter  = 1
-      shit  = shit1  ! save first coastal hit
-c     note: is_land = .false. at horizontal range violation
-c     The loop below computes the final reflection, sref
-c     In most cases we will not enter the while loop, because sref is a wet point
+      latercross = .true.    ! enter multi loop and keep anycross == .true. as exit condition
+      shit0      = hits(:,1) ! first hit defined when anycross == .true.
 c
-      do while (anycross .and. 
-     +          is_land(sref).and.
-     +          (iter <= max_reflections))
-         start = shit
-         sfin  = sref
-         call coast_line_intersection(start, sfin, anycross, sref, shit)
-         if (.not.anycross) sref=sfin ! roll back, in case sref is overwritten
+c     Recursively apply coast_line_intersection to (hit,reflect) pairs to 
+c     end up with a sub path that does not cross the coast line (which
+c     implies that reflect is wet, because hit is wet). Note that it is not 
+c     sufficient to check that reflect is wet, because step may jump 
+c     over land (wet-to-wet)
+c
+      do while (latercross .and. (i < max_reflections)) ! left-to_right evaluation
+         i  = i + 1       
+         call coast_line_intersection(hits(:,i-1),refs(:,i-1),
+     +                                latercross, refs(:,i),hits(:,i)) 
+
          if (verbose>0) then
-            if (anycross) then 
-               write(*,422) iter, start(1:2), sfin(1:2), 
-     +                      sref(1:2), shit(1:2)
-               write(*,*) "is_land(reflected point) = ", is_land(sref)
+            if (latercross) then 
+               write(*,422) i, hits(1:2,i-1), refs(1:2,i-1), 
+     +                      refs(1:2,i), hits(1:2,i)
+               write(*,*) "is_land(ref point) = ", is_land(refs(1:2,i))
             else
-               write(*,423) iter, start(1:2), sfin(1:2)
+               write(*,423) i, hits(1:2,i-1), refs(1:2,i-1)
             endif
          endif ! verbose
-
-         iter  = iter + 1
       enddo
-      if (iter > max_reflections) then
-         write(*,*) "multiple_reflection_path: max_reflections exceeded"
+c
+c     If multi reflection loop was timed out, check for race condition
+c     If race condition is detected set sref = shit (last wet point on trajectory)
+c     When timed out the set (hits(1:max_reflections), refs(1:max_reflections))
+c     are defined, because step = max_reflections resulted in latercross = .true.
+c
+      if (i >= max_reflections) then 
+         sref = hits(:,max_reflections) ! last wet point in analysis
+         k  = max_reflections
+         ds = sum(abs(hits(1:2,k)-hits(1:2,k-1))) 
+         sref = hits(:,max_reflections) ! last wet point in analysis
+         if (verbose>0) then
+            write(*,*) "multiple reflection analysis: "//
+     +                 "race condition trapped"
+            write(*,*) "multiple reflection analysis: "//
+     +                 "return sref = last coastal hit = ", sref
+            write(*,*) "race condition parameter ds = ", ds
+         endif
+         return  ! max_reflections exceeded exit point
+      endif
+c
+c     If latercross == .false. last tested sub path (hits(i-1), refs(i-1))
+c     was all in water and therefore refs(i-1) is the final reflection
+c
+      if (.not.latercross) then ! 
+         sref = refs(:,i-1)
+      else
+         write(*,*) "multiple_reflection_path: unexpected"
          stop
       endif
- 
+
+      if (is_land(sref)) then
+         write(*,*) "multiple_reflection_path: assertion failed"
+         write(*,*) "unexpected dry test: island(sref) = ",is_land(sref)
+         stop ! no plan B
+      endif
+
       if (verbose>0) write(*,*) " multiple reflection analysis end"
 
- 422  format("step ", i3, " :", 2f7.2, " ->", 2f7.2, " : ref=",
-     +        2f7.2, " hit=", 2f7.2)    
- 423  format("step ", i3, " :", 2f7.2, " ->", 2f7.2, " : no cross")
-c-----------------------------------------------------------
-      end subroutine
+ 422  format("multiref step ", i3, " :", 2f11.6, " ->", 2f11.6, 
+     +       " : crossed coast   ref=", 2f11.6, " hit=", 2f11.6)    
+ 423  format("multiref step ", i3, " :", 2f11.6, " ->", 2f11.6, 
+     +       " : no cross")
+
+c     ------------------------
+      contains
+c     ------------------------
+
+      subroutine write_trace(last_valid)
+c     ---- uses scope of multiple_reflection_path ----
+      integer, intent(in) :: last_valid
+      integer             :: j
+      write(*,*) "multiple_reflection_path: trace"
+      write(*,*) "starting point s0 = ", s0, " is_land=", is_land(s0)
+      write(*,*) "ending   point s1 = ", s1, " is_land=", is_land(s1)
+      write(*,*) "any coastal crossing on path s0->s1:", anycross
+      write(*,*) "step       hit_point        dry?"//
+     +               "       ref_point        dry?"
+      do j=1, last_valid
+         write(*,432) j, hits(1:2,j), is_land(hits(1:2,j)), 
+     +                   refs(1:2,j), is_land(refs(1:2,j))
+      enddo
+ 432  format(i3, " :", 2f11.6, l4, 2x, 2f11.6, l4)
+           
+
+      end subroutine write_trace ! internal to multiple_reflection_path
+      end subroutine multiple_reflection_path
   
 
 

@@ -236,6 +236,7 @@ c     Writes the data contained in bucket to a single point in a netcdf file
       integer, intent(in),optional :: t_start,p_start
 c     ------locals ------
       integer, allocatable :: start(:),cnt(:)
+      integer :: status
 c------------------------------------------------------------        
       !Decide whether we are writing 1D or 2D data
       if(present(t_start) .and. present(p_start)) then
@@ -257,15 +258,22 @@ c------------------------------------------------------------
       !Writing depends in the first instance on the data type
       select case(get_type(bucket))
       case ("real")
-         call check( nf90_put_var(ncid, varid,
-     +     (/get_data_real(bucket)/), start=start,count=cnt))
+         status= nf90_put_var(ncid, varid,
+     +     (/get_data_real(bucket)/), start=start,count=cnt)
       case ("int")
-         call check( nf90_put_var(ncid, varid,
-     +     (/get_data_int(bucket)/),  start=start,count=cnt))
+         status = nf90_put_var(ncid, varid,
+     +     (/get_data_int(bucket)/),  start=start,count=cnt)
       case default
         call abort_run("write_point_netcdf()","Data of type '" //
      +   trim(get_type(bucket))// "' is not currently handled.")
       end select
+      !Check write status. If no error, continue. If data is not 
+      !representable (nf90_erange), then do nothing and continue - 
+      !this is equivalent to writing an NA
+      if(status/=nf90_noerr.and.status/=nf90_erange ) then
+         call check(status)
+         stop 
+      endif
       !Tidy up to finish with
       deallocate(start)
       deallocate(cnt)
@@ -390,6 +398,7 @@ c     -------------------------------------------------------
       integer, intent ( in) :: status
 c     --------------------------  
       if(status /= nf90_noerr) then 
+         write(*,*) "NF90 error code : ",status
          write(*,*) trim(nf90_strerror(status))
          stop 
       end if

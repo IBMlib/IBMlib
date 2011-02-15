@@ -14,8 +14,11 @@
 # compiler settings   
 export FC        = ifort
 export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR) -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
-
 export FPPFLAGS  = -fpp 
+
+MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
+FCFLAGS += $(addprefix -I$(IBMLIB_DIR)/,$(MODDIRS))  
+
 
 # linker settings
 LINKFLAGS = -i4

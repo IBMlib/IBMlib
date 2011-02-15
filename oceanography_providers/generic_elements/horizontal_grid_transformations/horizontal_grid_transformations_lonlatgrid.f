@@ -3,6 +3,10 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Provider of horizontal grid transformation interface
 c     for regular lon-lat grid 
 c     
+c     $Rev: $
+c     $LastChangedDate:  $
+c     $LastChangedBy: $ 
+c      
 c     Coordinate conventions for grid space: 
 c       * mesh points at integer value grid coordinates, 
 c         first mesh point at (1,1) in grid space
@@ -22,6 +26,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real :: dphi            ! set via init_horiz_grid_transf
 
       public :: init_horiz_grid_transf   ! canonical name too long ...
+      public :: close_horiz_grid_transf  ! canonical name too long ...
       public :: horizontal_range_check
       public :: get_horiz_grid_coordinates
       public :: get_horiz_geo_coordinates
@@ -48,12 +53,32 @@ c     ----------------
 c     ------------------------------------------
       real, intent(in) :: l1,p1,dl,dp
 c     ------------------------------------------
-      lambda1 = l1
-      phi1    = p1
-      dlambda = dl
-      dphi    = dp
+      write(*,*) "initialize interface horizontal_grid_transformations"
+      write(*,*) "grid type = regular lon-lat"
+      write(*,*) "implementation = "//
+     +           "horizontal_grid_transformations_lonlatgrid"
+      write(*,232) lambda1, dlambda
+      write(*,233) phi1,    dphi    
+ 232  format("init_horiz_grid_transf: lambda1 = ",f12.7,
+     +                      " dlambda = ",f12.7," degrees")  
+ 233  format("init_horiz_grid_transf: phi1    = ",f12.7,
+     +                      " dphi    = ",f12.7," degrees") 
+ 
+      lambda1 = l1 ! set module data
+      phi1    = p1 ! set module data
+      dlambda = dl ! set module data
+      dphi    = dp ! set module data
+      
       end subroutine init_horiz_grid_transf
       
+
+
+      subroutine close_horiz_grid_transf() 
+c     ------------------------------------------
+c     Empty for this grid type
+c     ------------------------------------------
+      end subroutine close_horiz_grid_transf
+
 
 
       LOGICAL function horizontal_range_check(geo)

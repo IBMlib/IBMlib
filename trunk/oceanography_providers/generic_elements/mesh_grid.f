@@ -5,6 +5,10 @@ c     mesh is perpendicular to the horizontal and the
 c     horizontal grid are a mesh (without further restrictions)
 c     This includes sigma and z-grid with open/closed surface
 c     
+c     $Rev: $
+c     $LastChangedDate:  $
+c     $LastChangedBy: $ 
+c            
 c     This module hosts data arrays, add vertical issues to horizontaal to get 3D
 c     and proivide 2D/3D interpolation
 c
@@ -15,7 +19,8 @@ c     * host nz
 c     * host 3D data arrays
 c
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      use horizontal_representation   ! injects nx,ny
+      use horizontal_representation       ! injects nx,ny
+      use horizontal_grid_transformations 
       use time_tools                  ! import clock type
       use constants
       use array_tools                 ! search_sorted
@@ -80,7 +85,7 @@ c     --- 2D grids ---
       real,allocatable,public     :: wdepth (:,:)      ! current depth at cell-center, including dslm [m]
       integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
 
-
+      public :: wetmask          ! hosted by horizontal_representation
 
 c     ===================================================
                             contains
@@ -90,6 +95,11 @@ c     ===================================================
       subroutine init_mesh_grid()
 c     ------------------------------------------------------
 c     Assumes (nx,ny,nz) has been set by client module
+c     Notice that module horizontal_grid_transformations must
+c     be initialized directly from the top level physical_fields
+c     by calling init_horiz_grid_transf(<args>), since the
+c     specific arguments args depends directly on the grid type
+c     The top level physical_fields should also directly import this module
 c     ------------------------------------------------------
       write(*,*) "init_mesh_grid: allocate grid arrays: begin" 
 

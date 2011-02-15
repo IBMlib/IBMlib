@@ -15,6 +15,11 @@ c     characterized by wdepth=0 piecewise lines
 c
 c     Uses site installation of NetCDF
 c
+c     Configurations: 
+c       Rev 273-284 are based on grid data engine
+c       ../generic_elements/regular_lonlat_grid.f
+c       Rev 285- are based on the mesh_grid generalization
+c
 c     TODO:  
 c     Currently turbulence + deriv is fixed to zero - update
 c       test interpolations
@@ -22,8 +27,9 @@ c       validate w sign
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
-      use regular_lonlat_grid, 
+      use mesh_grid, 
      +          interpolate_currents_cc => interpolate_currents  ! use face-centered local
+      use horizontal_grid_transformations
 
       use geometry
       use array_tools
@@ -117,7 +123,8 @@ c     ------------------------------------------
       write(*,*) "init_physical_fields: hydrographic database path =", 
      +           trim(hydroDBpath)
     
-      call read_grid_desc()   ! incl allocation of 3D arrays
+      call read_grid_desc()   ! incl allocation of 3D arrays and init_horiz_grid_transf
+
 c.....Set reference offset for hydrographic data: 1900-01-01 00:00:00.
       call set_clock(ref_clock, 1900, 01, 01, 0)
 
@@ -176,15 +183,19 @@ c     Read grid definition which is contained in file
 c     given as tag grid_desc in the simulation file simulation_file
 c     Allocate grid arrays in this subroutine. 
 c
-c     grid dimensions:         nx,ny,nz
-c     grid coordinate map:     lambda1, dlambda; phi1, dphi
+c     Set principal grid parameters:
 c
-c     grid point (ix,iy) = (1,1) is at (lambda1,phi1)
+c       horizontal grid dimensions: nx,ny (exported by module horizontal_representation)
+c       vertical grid dimensions:   nz    (exported by module mesh_grid)
+c       grid coordinate map:        lambda1, dlambda; phi1, dphi (passed to horizontal_grid_transformations)
+c
+c       grid point (ix,iy) = (1,1) is at (lambda1,phi1)
 c     ---------------------------------------------------
       character*999        :: gd_fname
       type(control_file)   :: grid_ctrlfile
       integer              :: ix,iy,iz,ihit,idx,nwet,nacc,nbott
       real                 :: wd0
+      real                 :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
 c     ---------------------------------------------------
       call read_control_data(simulation_file, "grid_desc", gd_fname)
       write(*,229) "read_grid_desc: reading grid description from: ", 
@@ -213,10 +224,13 @@ c.....grid scale/dimensions (held globally in module regular_lonlat_grid)
      +                      " dphi    = ",f12.7," degrees")  
      
 
+      write(*,*) "read_grid_desc: horizontal initialization"
+      call init_horiz_grid_transf(lambda1, phi1, dlambda, dphi)
+
+
       write(*,*) "read_grid_desc: allocate grid arrays: begin"
-
-      call init_regular_lonlat_grid()  ! incl allocation of 3D arrays
-
+      call init_mesh_grid()  ! incl allocation of 3D arrays
+      
 c     --- allocate specific auxillary arrays ---      
 
 c     --- 3D grids ---
@@ -359,8 +373,9 @@ c     ------------------------------------------
       if (allocated(layer_width))  deallocate( layer_width )
       if (allocated(layer_faces))  deallocate( layer_faces )
 
-      call close_regular_lonlat_grid()
+      call close_mesh_grid()
       call reset_frame_handler()
+      call close_horiz_grid_transf()
 c     ------------------------------------------
       end subroutine 
 
@@ -714,7 +729,7 @@ c     ------------------------------------------
       
 c.....transform to continuous node-centered grid coordinates
 c     and check ranges for this staggering
-      call get_ncc_coordinates(xyz,x,y,z)
+      call get_grid_coordinates(xyz,x,y,z)
       statu = 0
       statv = 0 
       statw = 0

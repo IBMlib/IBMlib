@@ -7,6 +7,10 @@ c     without having to change modules above this. Therefore exported
 c     array wetmask should only be used to signal, whether data points on grid
 c     are wet/dry      
 c     
+c     $Rev: $
+c     $LastChangedDate:  $
+c     $LastChangedBy: $ 
+c
 c     Coast line topography: 
 c         the node centered cells of the lon-lat grid may be wet/dry
 c         i.e. the coast line is constituted by NS/EW conected line segments
@@ -74,7 +78,12 @@ c     is specific to the particular horizontal
 c     No parts of this initialization depends on whether 
 c     module horizontal_grid_transformations has been initialized (check)
 c     ------------------------------------------------------
+      write(*,*) "init_horizontal_representation: "//
+     +           "coast_line_intersection algorithm = staywet"
+      write(*,*) "init_horizontal_representation: allocating wetmask"
+
       allocate( wetmask(nx,ny)    )  
+
       end subroutine init_horizontal_representation
        
 

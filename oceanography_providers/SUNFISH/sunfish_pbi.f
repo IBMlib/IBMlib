@@ -34,7 +34,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use geometry
       use array_tools
       use run_context, only: simulation_file
-      use time_tools           ! import clock type
+      use time_services           ! import clock type and time handling
       use input_parser
       use netcdf   ! use site installation
 
@@ -44,8 +44,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       public :: init_physical_fields     
       public :: close_physical_fields
-      public :: get_master_clock
-      public :: set_master_clock
+      public :: get_master_clock   ! from time_services
+      public :: set_master_clock   ! from time_services
       public :: update_physical_fields
       public :: interpolate_turbulence
       public :: interpolate_turbulence_deriv
@@ -116,7 +116,7 @@ c     ------------------------------------------
       type(clock), intent(in),optional :: time
       real                             :: rdum
 c     ------------------------------------------
-      if (present(time)) master_clock = time
+      if (present(time)) call set_master_clock(time)
       write(*,*) trim(get_pbi_version()) 
 
       call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
@@ -387,14 +387,16 @@ c     ------------------------------------------
       logical                          :: update
       character(len=tag_lenght)        :: tag
       integer                          :: h1900
+      type(clock), pointer             :: aclock
 c     ------------------------------------------  
       if (present(time)) then
          call set_master_clock(time)
       elseif (present(dt)) then
-         call add_seconds_to_clock(master_clock, dt)
+         aclock => get_master_clock()
+         call add_seconds_to_clock(aclock, dt)
       endif
 c
-      call resolve_corresp_dataset(master_clock, tag, h1900)
+      call resolve_corresp_dataset(aclock, tag, h1900)
       call update_dataset(tag, h1900)
 c     ------------------------------------------       
       end subroutine update_physical_fields

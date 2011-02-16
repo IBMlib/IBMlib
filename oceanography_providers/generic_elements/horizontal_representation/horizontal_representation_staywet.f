@@ -161,8 +161,8 @@ c
       real                 :: direct(size(geo1)), reflect(size(geo1))
       integer              :: ix,iy,ix1,iy1,ix2,iy2,istep,maxsteps
 c     ---------------------------------------------------- 
-      call get_horiz_ncc(geo1,ix1,iy1)  ! resolve start point cell
-      call get_horiz_ncc(geo2,ix2,iy2)  ! resolve end point cell
+      call get_horiz_ncc_index(geo1,ix1,iy1)  ! resolve start point cell
+      call get_horiz_ncc_index(geo2,ix2,iy2)  ! resolve end point cell
 c
 c     Test assertion that geo1 is wet. 
 c     Do not resolve geohit/georef if geo1 is dry
@@ -546,7 +546,7 @@ c     ------------------------------------------
       integer          :: ixc,iyc
 c     ------------------------------------------ 
       if (horizontal_range_check(geo)) then ! range OK
-         call get_horiz_ncc(geo,ixc,iyc)
+         call get_horiz_ncc_index(geo,ixc,iyc)
          is_land = (wetmask(ixc,iyc)==0)
       else
          is_land = .false.

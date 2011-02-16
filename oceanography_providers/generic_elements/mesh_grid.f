@@ -36,7 +36,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_turbulence_deriv
       public :: interpolate_currents
       public :: interpolate_temp
-c      public :: interpolate_salty   ! currently unused
+      public :: interpolate_salty   ! currently unused
 c      public :: interpolate_wind    ! currently unused
       public :: interpolate_zooplankton
       public :: interpolate_wdepth
@@ -68,6 +68,7 @@ c     --- 3D grids ---
       real,allocatable,public :: v(:,:,:)          ! v of current [m/s] (positive north)       
       real,allocatable,public :: w(:,:,:)          ! w of current [m/s] (positive down)   
       real,allocatable,public :: temp(:,:,:)       ! Water temp. [Celcius]
+      real,allocatable,public :: salinity(:,:,:)   ! Salinity. [psu]
       real,allocatable,public :: vdiffus(:,:,:)    ! vertical   diffusivity [m**2/s]              
       real,allocatable,public :: hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
       real,allocatable,public :: dslm(:,:)         ! current sea surface elevation over reference [m]
@@ -102,7 +103,8 @@ c     ------------------------------------------------------
       allocate( v(nx,ny,nz)       )   
       allocate( w(nx,ny,nz)       )   
       allocate( temp(nx,ny,nz)    )  
-      allocate( vdiffus(nx,ny,nz) )                      
+      allocate( salinity(nx,ny,nz))  
+      allocate( vdiffus(nx,ny,nz+1) )                      
       allocate( hdiffus(nx,ny,nz) ) 
       allocate( zoo(nx,ny,nz)     ) 
       allocate( ccdepth(nx,ny,nz) )  
@@ -129,6 +131,7 @@ c     ------------------------------------------------------
       if (allocated(v))            deallocate( v )
       if (allocated(w))            deallocate( w )
       if (allocated(temp))         deallocate( temp )
+      if (allocated(salinity))     deallocate( salinity )
       if (allocated(vdiffus))      deallocate( vdiffus )
       if (allocated(hdiffus))      deallocate( hdiffus )
       if (allocated(dslm))         deallocate( dslm )
@@ -204,7 +207,7 @@ c         col2  (ix0,iy1)
 c         col3  (ix1,iy0)  
 c         col4  (ix1,iy1)
 c
-      call get_location_in_mesh(geo,ix,iy,sx,sy)
+      call get_surrounding_box(geo,ix,iy,sx,sy)
 c
       ix0 = min(max(ix,  1),nx)  ! cover grid edges
       ix1 = min(max(ix+1,1),nx)  ! cover grid edges
@@ -328,7 +331,7 @@ c     --------------------------------------------------------------------
           return
       endif
 c
-      call get_location_in_mesh(geo,ix,iy,sx,sy)
+      call get_surrounding_box(geo,ix,iy,sx,sy)
 c      
       ix0 = min(max(ix,    1),nx)  ! cover boundary layers
       ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
@@ -419,6 +422,17 @@ c     ------------------------------------------
       end subroutine 
 
 
+      subroutine interpolate_salty (geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      call interpolate_cc_3Dgrid_data(geo,salinity,0,r,status)
+c     ------------------------------------------ 
+      end subroutine 
+
 
       subroutine interpolate_zooplankton (geo, r, status) 
 c     ------------------------------------------ 
@@ -496,7 +510,7 @@ c     ------------------------------------------
       real              :: layerw
 c     ------------------------------------------ 
       call get_horiz_grid_coordinates(geo,x,y)
-      call get_horiz_ncc(geo,ixc,iyc) 
+      call get_horiz_ncc_index(geo,ixc,iyc) 
 c     --- locate vertical cell ---
       this_col => acc_width(ixc, iyc, :) ! range = 1:nz+1
       call search_sorted_list(geo(3), this_col, izc) ! 0<=izc<=nz+1

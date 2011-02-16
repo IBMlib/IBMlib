@@ -17,7 +17,7 @@ export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR)
 export FPPFLAGS  = -fpp 
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
-FCFLAGS += $(addprefix -I$(IBMLIB_DIR)/,$(MODDIRS))  
+FCFLAGS += $(addprefix -I,$(MODDIRS))  
 
 
 # linker settings

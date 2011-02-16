@@ -13,15 +13,16 @@ c     This module hosts data arrays, add vertical issues to horizontaal to get 3
 c     and proivide 2D/3D interpolation
 c
 c     * provide interpolate_X
-c     * provide time services
 c     * provide is_wet
 c     * host nz
 c     * host 3D data arrays
-c
+c     
+c     LOG: 
+c       stripped out time components (deal only with space/data) ASC Feb 16, 2011
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use horizontal_representation       ! injects nx,ny
       use horizontal_grid_transformations 
-      use time_tools                  ! import clock type
+   
       use constants
       use array_tools                 ! search_sorted
 
@@ -30,10 +31,6 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       public :: init_mesh_grid   ! init  this module
       public :: close_mesh_grid  ! close this module
-
-
-      public :: get_master_clock
-      public :: set_master_clock
       
       public :: interpolate_turbulence
       public :: interpolate_turbulence_deriv
@@ -54,8 +51,6 @@ c     ---------- other exports ----------
       public :: get_grid_coordinates     ! formerly named get_ncc_coordinates
 
 c     -------------------- module data --------------------  
-      
-      type(clock), target,public :: master_clock
 
       integer, parameter :: verbose = 0  ! debugging output control
       real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
@@ -146,26 +141,6 @@ c     ------------------------------------------------------
       call close_horizontal_representation()
 
       end subroutine close_mesh_grid
-
-
-
-      function   get_master_clock()
-c     ------------------------------------------ 
-      type(clock), pointer :: get_master_clock
-c     ------------------------------------------ 
-      get_master_clock => master_clock
-c     ------------------------------------------ 
-      end function 
-
-      subroutine set_master_clock(time)
-c     ------------------------------------------ 
-      type(clock), intent(in) :: time
-c     ------------------------------------------ 
-      master_clock = time ! local copy
-c     ------------------------------------------ 
-      end subroutine 
-
-
 
 
       subroutine interpolate_cc_3Dgrid_data(geo,array,deriv,result,

@@ -10,7 +10,7 @@
 #       Rev 285- are based on the mesh_grid generalization
 #
 ############################################################
-LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o sunfish_pbi.o 
+LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o sunfish_pbi.o 
 
 physical_fields.a: dependences.mk $(LOCAL_OBJ) 
 	ar rcs physical_fields.a $(LOCAL_OBJ)
@@ -26,6 +26,9 @@ horizontal_grid_transformations.f:
 
 horizontal_representation.f:
 	ln -sf  ../generic_elements/horizontal_representation/horizontal_representation_staywet.f horizontal_representation.f
+
+time_services.f:
+	ln -sf ../generic_elements/time_services.f
 
 mesh_grid.f:
 	ln -sf ../generic_elements/mesh_grid.f  # same name

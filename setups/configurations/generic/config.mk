@@ -10,13 +10,13 @@
 # -----------------------------------------------------------------
 EXECUTABLE          = ibmrun
 #
-PHYSICAL_FIELDS_DIR = oceanography_providers/linear_field
+PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/linear_field
 #PHYSICAL_FIELDS_DIR = oceanography_providers/POLCOMS+ERSEM
 #PHYSICAL_FIELDS_DIR = oceanography_providers/SUNFISH
 #
-PARTICLE_STATE_DIR  = biology_providers/passive
+PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/passive
 #PARTICLE_STATE_DIR  = biology_providers/sandeel_simple
 # 
 #TASK_DIR            = task_providers/test
-TASK_DIR            = task_providers/basic_simulation
+TASK_DIR            = $(IBMLIB_DIR)/task_providers/basic_simulation
 #

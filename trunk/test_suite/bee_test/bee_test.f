@@ -53,7 +53,6 @@ c     Initialise the bee
          call random_number(r2)
          angle = 8*atan(1.0)*r2(2)
          dgeo  = r2(1)*rjump*(/cos(angle), sin(angle), 0.0/)
-         write(*,*) dgeo
 
          !Make the step
          call add_constrained_step(bee,dgeo,

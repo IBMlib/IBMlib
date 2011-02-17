@@ -293,7 +293,7 @@ c     ------------------------------------------
 c     avoid probing wetmask at range violation
 
       if (horizontal_range_check(geo)) then ! range OK
-         call get_horiz_ncc(geo,ixc,iyc)
+         call get_horiz_ncc_index(geo,ixc,iyc)
          call get_horiz_grid_coordinates(geo,xy)
          is_land = ((wetmask(ixc,iyc)==0).or.at_coast_line(xy))
       else
@@ -359,8 +359,8 @@ c
       real                 :: direct(size(geo1)), reflect(size(geo1))
       integer              :: ix,iy,ix2,iy2,istep,maxsteps
 c     ---------------------------------------------------- 
-      call get_horiz_ncc(geo1,ix,iy)    ! resolve start point cell
-      call get_horiz_ncc(geo2,ix2,iy2)  ! resolve end point cell
+      call get_horiz_ncc_index(geo1,ix,iy)    ! resolve start point cell
+      call get_horiz_ncc_index(geo2,ix2,iy2)  ! resolve end point cell
 c
 c     Test assertion that geo1 is wet
 c

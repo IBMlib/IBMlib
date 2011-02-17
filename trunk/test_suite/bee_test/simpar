@@ -1,0 +1,11 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+hydroDBpath  = /data/hydroDB/NORWECOM
+bath_file    = /data/hydroDB/NORWECOM/STbio_daily2004.nc
+
+advec_intg_method  = rk4    !  euler/rk2/rk4
+start_geo         = 5 55.5 0       !lon, lat, depth
+stability         = 2                !Number of steps = 10^stability
+write_traj        = 1                !0 = don't write, all others write
+step_size         = 1000         !step size [m]

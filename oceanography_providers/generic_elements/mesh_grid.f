@@ -181,6 +181,17 @@ c
       if(present(pad_zoo))      padval_zoo      = pad_zoo
       if(present(pad_wdepth))   padval_wdepth   = pad_wdepth
       
+      write(*,*) "init_mesh_grid: Padding values "
+      write(*,*) "padval_u       :", padval_u
+      write(*,*) "padval_v       :", padval_v
+      write(*,*) "padval_w       :", padval_w
+      write(*,*) "padval_temp    :", padval_temp
+      write(*,*) "padval_salinity:", padval_salinity
+      write(*,*) "padval_vdiffus :", padval_vdiffus
+      write(*,*) "padval_hdiffus :", padval_hdiffus
+      write(*,*) "padval_dslm    :", padval_dslm
+      write(*,*) "padval_zoo     :", padval_zoo
+
       end subroutine init_mesh_grid
        
 
@@ -582,7 +593,7 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       call interpolate_cc_2Dgrid_data(geo,wdepth,0,padval_wdepth,
      +                                r,status)
-      if (is_land(geo)) r=0.0
+c      if (is_land(geo)) r=0.0
 c     ------------------------------------------ 
       end subroutine 
 

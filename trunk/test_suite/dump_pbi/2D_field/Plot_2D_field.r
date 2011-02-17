@@ -4,11 +4,13 @@ rm(list=ls())
 #library(lattice)
 
 #Load data
-dat <- read.table("2D_fields.txt",header=TRUE)
+dat.raw <- read.table("2D_fields.txt",header=TRUE)
+dat <- dat.raw
 var.name <- colnames(dat)[3]
 colnames(dat)[3] <- "var"
+dat$var[is.na(dat$var)] <- -999
 mat <- xtabs(var ~ lon+lat,dat)
-mat[mat==0] <- NA
+mat[mat==-999] <- NA
 dat <- subset(dat,!is.na(dat$var))
 
 if(nrow(dat) == 0) stop("No data in output fields.")
@@ -18,9 +20,9 @@ if(nrow(dat) == 0) stop("No data in output fields.")
 pdf(sprintf("%s_2D_fields.pdf",var.name),width=210/25.4,height=210/25.4,pointsize=14)
 
 #Filled contours
-filled.contour(as.numeric(rownames(mat)),as.numeric(colnames(mat)),mat,nlevels=25,
-  color.palette=terrain.colors,xlab="Longitude",ylab="Latitude",main=var.name,
-  zlim=range(pretty(dat$var)))
+filled.contour(as.numeric(rownames(mat)),as.numeric(colnames(mat)),mat,nlevels=50,
+  color.palette=rainbow,xlab="Longitude",ylab="Latitude",main=var.name,
+  zlim=range(pretty(mat)))
 
 
 #Visualise field using lattice

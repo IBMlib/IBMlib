@@ -24,6 +24,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ------------ declarations ------------      
       type(clock),target  :: start_time
       real    :: xy1(2), xy2(2),xyz(3),dx,dy,res3(3),res,dxy(2) 
+      real    :: depth
       integer :: n_lat,n_lon, i,j,istat,idum4(4),iunit 
       character(99) :: output_var
       
@@ -39,9 +40,10 @@ c     Init fields
       call update_physical_fields()
       call read_control_data(simulation_file, "xy1", xy1)
       call read_control_data(simulation_file, "xy2", xy2)
+      call read_control_data(simulation_file, "depth", depth)
       call read_control_data(simulation_file, "output_var", output_var)
-      call read_control_data(simulation_file, "n_lon", n_lat)
-      call read_control_data(simulation_file, "n_lat", n_lon)
+      call read_control_data(simulation_file, "n_lat", n_lat)
+      call read_control_data(simulation_file, "n_lon", n_lon)
       output_var = adjustl(output_var)   ! Get rid of hangers on
       call toupper(output_var)
 
@@ -53,7 +55,7 @@ c     ------------   test interface  ------------
       open(unit=iunit,file="2D_fields.txt")
       write(iunit,*) "lon lat " // trim(output_var)
       dxy=xy2-xy1
-      xyz(3) =0
+      xyz(3) =depth
       do i=1,n_lat
         do j=1,n_lon
           xyz(1) = xy1(1) + dxy(1)*(i-1)/(n_lat-1)
@@ -74,6 +76,12 @@ c     ------------   test interface  ------------
             res = res3(1)
           case ("VDIF")
             call interpolate_turbulence(xyz,res3,istat)
+            res = res3(3)
+          case ("HDER")
+            call interpolate_turbulence_deriv(xyz,res3,istat)
+            res = res3(1)
+          case ("VDER")
+            call interpolate_turbulence_deriv(xyz,res3,istat)
             res = res3(3)
           case ("DEPT")
             call interpolate_wdepth(xyz,res,istat)

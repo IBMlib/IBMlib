@@ -22,9 +22,10 @@ c     ----------------------------------------------------------------
       logical :: write_traj 
       real    :: angle,r2(2)
       real    :: rjump   ! Bee jump range
-      real    :: stability
+      real    :: stability,frac
       type(spatial_attributes) :: bee
-      integer :: istep, write_int
+      integer :: write_int
+      integer(kind=8) :: disp_freq,loops,istep
 c     ----------------------------------------------------------------
 
 c     Initialise modules
@@ -43,12 +44,17 @@ c     Read from the ctrlfile
         write(*,*) "Writing trajectory...."
         write_traj=.TRUE.
       endif
-      
+      disp_freq = nint(10**(stability-3),8)  
+      loops = nint(10**stability,8) 
 
 c     Initialise the bee
       call set_tracer_position(bee,start_geo)
      
-      do istep = 1, nint(10**stability)
+      do istep = 1, loops 
+         if(mod(istep,disp_freq)==0) then
+            frac= real(istep)/real(loops)*100
+            write(*,'(f5.1,a)') frac,"% complete."
+         endif
          !Setup the step
          call random_number(r2)
          angle = 8*atan(1.0)*r2(2)

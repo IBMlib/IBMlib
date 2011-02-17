@@ -54,6 +54,7 @@ c     -------------------- module data --------------------
 
       integer, parameter :: verbose = 0  ! debugging output control
       real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
+      real               :: padval       ! what to return when all else fails
 
 c
 c     ------ grid dimensions:   ------
@@ -88,7 +89,7 @@ c     ===================================================
 c     ===================================================
 
                       
-      subroutine init_mesh_grid()
+      subroutine init_mesh_grid(padding)
 c     ------------------------------------------------------
 c     Assumes (nx,ny,nz) has been set by client module
 c     Notice that module horizontal_grid_transformations must
@@ -96,6 +97,8 @@ c     be initialized directly from the top level physical_fields
 c     by calling init_horiz_grid_transf(<args>), since the
 c     specific arguments args depends directly on the grid type
 c     The top level physical_fields should also directly import this module
+c     ------------------------------------------------------
+      real, intent(in), optional:: padding
 c     ------------------------------------------------------
       write(*,*) "init_mesh_grid: allocate grid arrays: begin" 
 
@@ -116,6 +119,9 @@ c     --- 2D grids ---
       allocate( wdepth(nx,ny)     ) 
       allocate( bottom_layer(nx,ny) )
       write(*,*) "init_mesh_grid: allocate grid arrays: OK"
+
+c     -------Set default padval --------
+      if(present(padding)) padval=padding
 
       call init_horizontal_representation()
 
@@ -177,8 +183,6 @@ c     --------------------------------------------------------------------
       real, intent(out)    :: result
       integer, intent(out) :: status
 c      
-      real, parameter     :: padval = 0. ! later move to argument list
-c
       integer             :: ix,iy,iz,i,idum,ibot,ix0,ix1,iy0,iy1
       real                :: z,sx,sy,sz,depth,fbar,fup,flow
       integer             :: cx(4), cy(4), pad_mask(4)
@@ -323,7 +327,6 @@ c     --------------------------------------------------------------------
 c      
       integer           :: ix,iy,ix0,ix1,iy0,iy1
       real              :: vc(4),sx,sy
-      real, parameter   :: padval = 0. ! later move to argument list
 c     --------------------------------------------------------------------
        if (.not.horizontal_range_check(geo)) then
           result = padval

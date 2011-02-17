@@ -5,8 +5,8 @@ ln -sf  setups/compilers/ifort/compiler_defaults.mk
 #
 cat>config.mk<<EOF
 EXECUTABLE          = ibmrun
-PHYSICAL_FIELDS_DIR = oceanography_providers/linear_field
-PARTICLE_STATE_DIR  = biology_providers/passive
-TASK_DIR            = task_providers/basic_simulation
+PHYSICAL_FIELDS_DIR = \$(IBMLIB_DIR)/oceanography_providers/linear_field
+PARTICLE_STATE_DIR  = \$(IBMLIB_DIR)/biology_providers/passive
+TASK_DIR            = \$(IBMLIB_DIR)/task_providers/basic_simulation
 EOF
 #

@@ -33,6 +33,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       implicit none
       private
 
+c     ----------Standard Interface ----------------
       public :: init_horiz_grid_transf   ! canonical name too long ...
       public :: close_horiz_grid_transf  ! canonical name too long ...
       public :: horizontal_range_check
@@ -41,16 +42,22 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: get_surrounding_box
       public :: get_horiz_ncc_index
       public :: get_horiz_ncc_corners
-
       interface get_horiz_grid_coordinates
          module procedure get_horiz_grid_coor_scalar
          module procedure get_horiz_grid_coor_vector
       end interface
-      
       interface get_horiz_geo_coordinates
          module procedure get_horiz_geo_coor_scalar
          module procedure get_horiz_geo_coor_vector
       end interface
+
+c     ----------Extras interface ----------------
+      public ::  get_jacobian
+      public ::  get_inv_jacobian
+      public ::  resolve_vector
+      public ::  grid_range_check
+      public ::  get_cell_index_from_xy
+      public ::  get_CC_cube
 
 c     full grid dimensions, including grid specifier
       integer, public,parameter::  nx=160
@@ -217,27 +224,37 @@ c     --------------------------------------------------------
 c     ------------------------------------------------------
 c     Public interface that checks whether a geo position (lon, lat, possibly z)
 c     is within the range of the grid or not
-c     Check is made wrt. interpolation ranges in grid space:
-c           0.5 <= x < nx-1
-c           0.5 <= y < ny-1
-c     which is the relevant range for interpolation of all parameters
-c     Within this range position xyz is always bracketed in each
-c     direction, allowing interpolation
-c     return .true. if xyz is interior to above ranges, else .false.
-c     For safety, we define on the line as out
+c     Check is farmed out to grid_range_check
 c     ------------------------------------------------------
       real,    intent(in)  :: geo(:)
       real    :: xyz(size(geo))
-      integer :: cross(2)
 c     ------------------------------------------------------
       call get_horiz_grid_coordinates(geo,xyz)
-      cross  = 0
-      if  (xyz(1) < 0.5)    cross(1) = -1
-      if  (xyz(1) >= nx-1.0) cross(1) =  1
-      if  (xyz(2) < 0.5)    cross(2) = -1
-      if  (xyz(2) >= ny-1.0) cross(2) =  1
-      horizontal_range_check = .not.any(cross.ne.0)
+      horizontal_range_check = grid_range_check(xyz)
       end function horizontal_range_check
+
+
+      logical function grid_range_check(xy)
+c     ------------------------------------------------------
+c     Check xyz wrt. interpolation ranges in grid space:
+c           0.5 <= x < nx-1
+c           0.5 <= y < ny-1
+c     which is the relevant range for interpolation of all parameters
+c     Within this range position xy is always bracketed in each
+c     direction, allowing interpolation
+c     return .true. if xy is interior to above ranges, else .false.
+c     For safety, we define on the line as out
+c     ------------------------------------------------------
+      real,    intent(in)  :: xy(:)
+      integer :: cross(2)
+c     ------------------------------------------------------
+      cross  = 0
+      if  (xy(1) < 0.5)    cross(1) = -1
+      if  (xy(1) >= nx-1.0) cross(1) =  1
+      if  (xy(2) < 0.5)    cross(2) = -1
+      if  (xy(2) >= ny-1.0) cross(2) =  1
+      grid_range_check = .not.any(cross.ne.0)
+      end function grid_range_check
 
 
       subroutine get_surrounding_box(geo,ix,iy,sx,sy)
@@ -261,28 +278,64 @@ c     ------------------------------------------------------
       call get_horiz_grid_coordinates(geo,x,y)
       ix = nint(x)
       iy = nint(y)
-      sx  = x - ix +0.5   ! intra cell coordinate 0<sx<1
-      sy  = y - iy +0.5   ! intra cell coordinate 0<sy<1
+      sx  = x - real(ix) +0.5   ! intra cell coordinate 0<sx<1
+      sy  = y - real(iy) +0.5   ! intra cell coordinate 0<sy<1
 c     ------------------------------------------------------
       end subroutine get_surrounding_box
 
 
+      subroutine get_CC_cube(xyz,ixyz0,ixyz1,sxyz)
+c     ----------------------------------------------------------------
+c     Returns the indices of the corners corners of a 1x1x1 cube in 
+c     grid space that encloses the point xyz. The corner indices can
+c     thus be used in a lookup function to get data for 
+c     interpolation. Also return sxyz, the relative position
+c     of the point xyz within that cube (0 <= s <= 1)
+c     Both land and surface/bottom breaking are handled elsewhere
+c     ----------------------------------------------------------------
+      real, intent(in)    :: xyz(:)
+      integer, intent(out) :: ixyz0(:), ixyz1(:)
+      real, intent(out) :: sxyz(:)
+c     ----------------------------------------------------------------
+c     determine corners around which to interpolate
+      ixyz0  = nint(xyz)   !SW corner ie (0,0,0)
+      ixyz1   = ixyz0 + 1  !NE corner ie (1,1,1)
+c     determine locatin relative to corners (0 <= s <= 1)
+      sxyz    = xyz-real(ixyz0)+0.5
+      end subroutine get_CC_cube
 
-      subroutine get_horiz_ncc_index(geo,ixc,iyc) !,xc,yc)
+
+      subroutine get_horiz_ncc_index(geo,ixc,iyc) 
 c     ------------------------------------------ 
 c     Resolve the indices of the node-centered grid cell containing geo
+c     Actual calculation is farmed out
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      integer, intent(out) :: ixc,iyc
+      real  :: xy(2)
+      integer :: ixy(2)
+c     ------------------------------------------ 
+      call get_horiz_grid_coordinates(geo,xy)
+      call get_cell_index_from_xy(xy,ixy)
+      ixc=ixy(1)
+      iyc=ixy(2)
+      end subroutine get_horiz_ncc_index
+
+
+      subroutine get_cell_index_from_xy(xy,ixy)
+c     ------------------------------------------ 
+c     Resolve the indices of the node-centered grid cell 
+c     containing the grid coordinates, xy
 c     Notice that (ixc,iyc) is not the same as (ix,iy)
 c     in get_surrounding_box(geo,ix,iy,sx,sy) above
 c     no range check
 c     ------------------------------------------ 
-      real, intent(in)     :: geo(:)
-      integer, intent(out) :: ixc,iyc
-      real  :: x,y
+      real, intent(in)     :: xy(:)
+      integer, intent(out) :: ixy(:)
 c     ------------------------------------------ 
-      call get_horiz_grid_coordinates(geo,x,y)
-      ixc = ceiling(x)
-      iyc = ceiling(y)
-      end subroutine get_horiz_ncc_index
+      ixy(1)=ceiling(xy(1))
+      ixy(2)=ceiling(xy(2))
+      end subroutine get_cell_index_from_xy
 
 
       subroutine get_horiz_ncc_corners(ixc,iyc,c00,c01,c10,c11)
@@ -304,6 +357,112 @@ c     ------------------------------------------
       c11(2) = iyc 
 c     ------------------------------------------ 
       end subroutine get_horiz_ncc_corners
+
+
+      subroutine get_jacobian(xy, jacob)
+c------------------------------------------------------- 
+c     2D jacobian for the transformation from grid space to
+c     lon-lat-vertical representation 
+c     A displacement in grid coordinates dxy from position xyz
+c     corresponds to the displacement 
+c       dll = jacob %*% dxy
+c     in lon-lat coordinate representation
+c     Expressions for the individual elements of the jacobian
+c     are given as Equation 17 in the NORWECOM oceanography
+c     provider documentation
+c     Validity of the xyz range is not checked
+c------------------------------------------------------- 
+      real, intent(in)   :: xy(:) ! shape (2+) 
+      real, intent(out)  :: jacob(:,:)  ! shape (2+,2+)
+      real               :: x,y      ! Positions in xyz grid space
+      integer            :: ix,iy    ! Rounded positions in xyz grid space
+      real               :: d, g     ! Temporary variables used in calculations
+      real               :: lon,lat     ! lon-lat at position
+c     --------------------------------------------------
+c     Shorthand
+      x = xy(1)
+      y = xy(2)
+
+c     First the constants 
+      d =sqrt(DX**2*(x-XPOLE)**2 + DX**2 * (y-YPOLE)**2)
+      g = earth_radius/1000*(1+sin(PHINUL))  !earth_radius is in m, whereas DX, DY are in km
+c     Changes in latitude      
+      jacob(1,1:2)= DX*DY/(d**2)
+      jacob(1,1) = -jacob(1,1)*(y-YPOLE)
+      jacob(1,2) = jacob(1,2)*(x-XPOLE)
+c     Then the changes in latitude      
+      jacob(2,1:2) = -2 /(g*d*(1+(d/g)**2))
+      jacob(2,1) = jacob(2,1)*DX**2*(x-XPOLE)
+      jacob(2,2) = jacob(2,2)*DY**2*(y-YPOLE)
+      end subroutine get_jacobian
+
+
+      subroutine get_inv_jacobian(xy, invjacob)
+c------------------------------------------------------- 
+c     2D transformation from lon-lat-vertical representation to xyz grid-space
+c     A displacement in spherical coordinates dll from grid position xyz
+c     corresponds to the displacement 
+c       dxy = invjacob %*% dll
+c     in xyz grid coordinate representation
+c     Code uses get_jacobian function as its basis, evaluating the
+c     jacobian at position xyz, and then inverting the resultant matrix
+c     In this way, changes in get_jacobian propigate directly here
+c     Validity of the xyz range is not checked
+c------------------------------------------------------- 
+      real, intent(in)   :: xy(:) ! shape (2+) 
+      real, intent(out)  :: invjacob(2,2)  ! shape (2+,2+)
+      real               :: jacob(2,2),a,b,c,d
+c     --------------------------------------------------
+      call get_jacobian(xy,jacob)
+      a=jacob(1,1)
+      b=jacob(1,2)
+      c=jacob(2,1)
+      d=jacob(2,2)
+      invjacob(1,:) =(/d,-b/)
+      invjacob(2,:) =(/-c,a/)
+      invjacob = invjacob /(a*d-b*c)
+      end subroutine get_inv_jacobian
+
+
+      subroutine resolve_vector(xy,N,G)
+c------------------------------------------------------- 
+c     Handles the transformation from NORWECOM grid oriented
+c     vectors to geo grid oriented vectors
+c     Input: vector N located at NORWECOM grid position xyz,
+c       and with components N(1), N(2) and N(3) oriented along
+c       the NORWECOM axes x,y,z
+c     Output: vector G of the same magnitude as N, but represented
+c       instead in terms of the components G(1), G(2) and G(3) that
+c       are oriented parallel to the lon, lat, and depth axes
+c     The transformation between the two is given by 
+c       G = A %*% N
+c       A = J %*% B
+c     where J is the jacobiani, A is the transformation matrix and 
+c     B is a matrix that normalises the Jacobian. For more details, 
+c     see the NORWECOM oceanography provider documentation.
+c     Note that as the vertical axes in both NORWECOM and lon-lat-depth
+c     are coincident, this axis is essentially unchanged and thus we only
+c     need to deal with the horizontal axes.
+c     Validity of the xyz range is not checked
+c------------------------------------------------------- 
+      real, intent(in)   :: xy(:), N(:) ! shape (3+) 
+      real, intent(out)  :: G(:)  ! shape (3+)
+      real               :: J(2,2), B(2,2), A(2,2)
+c     --------------------------------------------------
+      call get_jacobian(xy,J)
+c     Calculate the normalisation matrix, B
+      B=0.0
+      B(1,1) = 1/sqrt(J(1,1)**2 + J(2,1)**2)
+      B(2,2) = 1/sqrt(J(1,2)**2 + J(2,2)**2)
+c     Calculate the transformation matrix, A
+      A = matmul(J,B)
+c     Now do the transformation
+      G(1:2) = matmul(A,N(1:2))
+      G(3) = N(3)   !No transform required 
+      end subroutine resolve_vector
+
+
+
 
       end module
 

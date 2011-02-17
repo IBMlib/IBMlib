@@ -19,12 +19,17 @@ c       * Test velocity vectors by comparison with ARIANE
 c       * Improve interpolations around coastline
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
-      use mesh_grid
+      use mesh_grid,
+     +   ncc_interpolate_currents  => interpolate_currents,
+     +   ncc_interpolate_turbulence=> interpolate_turbulence,
+     +   ncc_interp_turb_deriv     => interpolate_turbulence_deriv
       use time_services
       use horizontal_grid_transformations
       use run_context, only: simulation_file
       use netcdf
+      use array_tools
       use input_parser
+      use constants
       implicit none
       private                     ! default visibility
 
@@ -47,7 +52,10 @@ c     -------------------- public interface --------------------
       public :: horizontal_range_check
       public :: get_pbi_version
 
-c     -------------------- overloaded methods --------------------  
+c     -------------------- helper arrays ------------------  
+      logical,allocatable :: land(:,:)
+      real,allocatable    :: sigma_edges(:)
+      real,allocatable    :: sigma_lwidth(:)
 
 c     -------------------- module data --------------------  
       character*999 :: hydroDBpath ! hydrographic data sets
@@ -69,6 +77,7 @@ c     integer is the time, in POSIX time, where NORWECOM time units are based
 c     ===================================================
                          contains
 c     ===================================================
+      include "NORWECOM_interpolators.f"
 
       character*200 function get_pbi_version()  
       get_pbi_version =  "NORWECOM pbi. $Rev$ " 
@@ -84,7 +93,6 @@ c     ---------------------------------------------------
       integer              :: ncid, varid,ix,iy,iz,topo_fill
       integer,allocatable  :: intbath(:,:)
       type(clock), intent(in),optional :: time
-      real, allocatable ::  sigma_edges(:)  
 c     ---------------------------------------------------
 c.....Display version numbers for reference
       write(*,*) trim(get_pbi_version())
@@ -94,7 +102,7 @@ c.....Setup the grid.
       call init_horiz_grid_transf()
 
 c.....Initialise the mesh grid handler
-      call init_mesh_grid()
+      call init_mesh_grid(NaN)
 
 c.....Set clock if present     
       if (present(time)) call set_master_clock(time)
@@ -108,6 +116,7 @@ c.....Read input path
 c.....Read data from the bathmetry file
       allocate(intbath(nx,ny)) !Temporary integer bathymetry 
       allocate(sigma_edges(nz+1))
+      allocate(sigma_lwidth(nz))
       call read_control_data(simulation_file,"bath_file", bath_fname) 
       write(*,*) "init_physical_fields: bathymetry file = ",
      +    trim(adjustl(bath_fname))
@@ -122,25 +131,26 @@ c.....Read data from the bathmetry file
 
 c.....setup bathymetry query arrays                
 c     The NORWECOM grid is terrain following, so every point is wet, except those on land.
+      allocate(land(nx,ny))    !Array containing true/false for land
       bottom_layer =nz
       wetmask=1   !1 is wet, 0 is dry
+      land = .FALSE.
       wdepth = real(intbath)
       where(intbath==topo_fill )!Bathymetry is fill value for dry land. 
           wetmask=0         !Mark as dry 
+          land = .TRUE.
           bottom_layer=0    !bottom layer is the 0th layer
-          wdepth = NaN      !Set depth to NaN
+          wdepth = NaN      !Set depth to 0
       end where
       deallocate(intbath)
 
 c.....setup vertical grid auxillary arrays
       acc_width(:,:,1)=0.
       do iz=1,nz
+         sigma_lwidth(iz) = sigma_edges(iz+1)-sigma_edges(iz)
          ccdepth(:,:,iz)=wdepth*(sigma_edges(iz+1)+sigma_edges(iz))*0.5
          acc_width(:,:,iz+1)=wdepth*sigma_edges(iz+1)
       enddo 
-      deallocate(sigma_edges)
-
-c.....setup vertical grid auxillary arrays
       end subroutine init_physical_fields
       
       
@@ -148,6 +158,9 @@ c.....setup vertical grid auxillary arrays
 c-------------------------------------------------------
 c     Cleanup module
 c-------------------------------------------------------
+      deallocate(land)
+      deallocate(sigma_edges)
+      deallocate(sigma_lwidth)
       end subroutine close_physical_fields     
 
       
@@ -460,7 +473,7 @@ c     -----------------------------------------------------
          do iy=1,ny-1     ! w(:,ny,:) undefined
             wlow = 0.     ! sea bed boundary condition
             do iz = bottom_layer(ix,iy), 1, -1  ! bottom_layer>= 1
-               totwth = acc_width(ix,iy,iz+1)-acc_width(ix,iy,iz)
+               totwth = sigma_lwidth(iz)*wdepth(ix,iy)
                aoh = cell_area(ix,iy)/totwth
                dw  = yfacelen(ix,iy)  * u(ix,iy,iz) - 
      1               yfacelen(ix+1,iy)* u(ix+1,iy,iz) + 
@@ -559,19 +572,6 @@ c     for consistency and reference
       endif
       end subroutine 
 
-
-      subroutine interpolate_wind(ll, r2, status)
-c     ----------------------------------------------------------------
-c     NORWECOM does not provide wind. Therefore throw error if called
-c     ----------------------------------------------------------------
-      real, intent(in)     :: ll(:)
-      real, intent(out)    :: r2(:)
-      integer, intent(out) :: status
-c     ----------------------------------------------------------------
-      status=1
-      r2=NaN
-      call abort("interpolate_wind","No wind provided in NORWECOM")
-      end subroutine 
 
 
       end module

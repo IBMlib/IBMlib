@@ -54,7 +54,7 @@ c     -------------------- module data --------------------
 
       integer, parameter :: verbose = 0  ! debugging output control
       real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
-      real               :: padval       ! what to return when all else fails
+      real, parameter    :: default_padding = 0.0 ! used, if not specified by user
 
 c
 c     ------ grid dimensions:   ------
@@ -77,19 +77,34 @@ c     --- 3D grids ---
       real,allocatable,target,public :: ccdepth(:,:,:)    ! cell center depth water below surface [m]; pointer 
       real,allocatable,target,public :: acc_width(:,:,:)  ! accumulated water above this layer [m] dim=nz+1  
 
+      real   :: padval_u        = default_padding
+      real   :: padval_v        = default_padding          
+      real   :: padval_w        = default_padding         
+      real   :: padval_temp     = default_padding    
+      real   :: padval_salinity = default_padding
+      real   :: padval_vdiffus  = default_padding             
+      real   :: padval_hdiffus  = default_padding 
+      real   :: padval_dslm     = default_padding
+      real   :: padval_zoo      = default_padding
+
 c     --- 2D grids ---
       
       real,allocatable,public     :: wdepth (:,:)      ! current depth at cell-center, including dslm [m]
-      integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
 
-      public :: wetmask          ! hosted by horizontal_representation
+      integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
+      public                      :: wetmask           ! hosted by horizontal_representation
+
+      real   :: padval_wdepth   = default_padding 
 
 c     ===================================================
                             contains
 c     ===================================================
 
                       
-      subroutine init_mesh_grid(padding)
+      subroutine init_mesh_grid(padding,
+     +                     pad_u, pad_v, pad_w, pad_temp, pad_salinity, 
+     +                     pad_vdiffus, pad_hdiffus, pad_dslm, pad_zoo, 
+     +                     pad_wdepth)
 c     ------------------------------------------------------
 c     Assumes (nx,ny,nz) has been set by client module
 c     Notice that module horizontal_grid_transformations must
@@ -97,8 +112,23 @@ c     be initialized directly from the top level physical_fields
 c     by calling init_horiz_grid_transf(<args>), since the
 c     specific arguments args depends directly on the grid type
 c     The top level physical_fields should also directly import this module
+c   
+c     Pad value setup for grid interpolations at invalid points:
+c       1) If no pad values are provided, the compiled-in value default_padding 
+c       2) If the overall pad value padding is specified, this will overwrite 1)
+c       3) If specific pad values are provided, they will overwrite 1) and 2)
 c     ------------------------------------------------------
-      real, intent(in), optional:: padding
+      real, intent(in), optional :: padding ! overall value
+      real, intent(in), optional :: pad_u 
+      real, intent(in), optional :: pad_v            
+      real, intent(in), optional :: pad_w          
+      real, intent(in), optional :: pad_temp     
+      real, intent(in), optional :: pad_salinity 
+      real, intent(in), optional :: pad_vdiffus               
+      real, intent(in), optional :: pad_hdiffus  
+      real, intent(in), optional :: pad_dslm    
+      real, intent(in), optional :: pad_zoo
+      real, intent(in), optional :: pad_wdepth
 c     ------------------------------------------------------
       write(*,*) "init_mesh_grid: allocate grid arrays: begin" 
 
@@ -120,11 +150,37 @@ c     --- 2D grids ---
       allocate( bottom_layer(nx,ny) )
       write(*,*) "init_mesh_grid: allocate grid arrays: OK"
 
-c     -------Set default padval --------
-      if(present(padding)) padval=padding
-
       call init_horizontal_representation()
 
+c
+c     --- set default padvalue, if present ----
+c     
+      if(present(padding)) then
+         padval_u        = padding
+         padval_v        = padding    
+         padval_w        = padding    
+         padval_temp     = padding 
+         padval_salinity = padding
+         padval_vdiffus  = padding             
+         padval_hdiffus  = padding 
+         padval_dslm     = padding 
+         padval_zoo      = padding
+         padval_wdepth   = padding 
+      endif
+c
+c     --- overwrite with specific values, if present ----
+c          
+      if(present(pad_u))        padval_u        = pad_u 
+      if(present(pad_v))        padval_v        = pad_v            
+      if(present(pad_w))        padval_w        = pad_w          
+      if(present(pad_temp))     padval_temp     = pad_temp     
+      if(present(pad_salinity)) padval_salinity = pad_salinity 
+      if(present(pad_vdiffus))  padval_vdiffus  = pad_vdiffus                  
+      if(present(pad_hdiffus))  padval_hdiffus  = pad_hdiffus  
+      if(present(pad_dslm))     padval_dslm     = pad_dslm   
+      if(present(pad_zoo))      padval_zoo      = pad_zoo
+      if(present(pad_wdepth))   padval_wdepth   = pad_wdepth
+      
       end subroutine init_mesh_grid
        
 
@@ -152,8 +208,8 @@ c     ------------------------------------------------------
       end subroutine close_mesh_grid
 
 
-      subroutine interpolate_cc_3Dgrid_data(geo,array,deriv,result,
-     +                                      status)
+      subroutine interpolate_cc_3Dgrid_data(geo,array,deriv,padval,
+     +                                      result,status)
 c     -------------------------------------------------------------------- 
 c     Interpolate on grid of corner centered data 3D array on point geo.
 c     Apply appropriate extrapolations near boundaries or return padvalue
@@ -180,28 +236,39 @@ c     tested: deriv=0,3
 c     --------------------------------------------------------------------
       real, intent(in)     :: geo(:),array(:,:,:)
       integer, intent(in)  :: deriv  ! 0=value; (1,2,3) = along (x,y,z)
+      real, intent(in)     :: padval
       real, intent(out)    :: result
       integer, intent(out) :: status
 c      
       integer             :: ix,iy,iz,i,idum,ibot,ix0,ix1,iy0,iy1
-      real                :: z,sx,sy,sz,depth,fbar,fup,flow
-      integer             :: cx(4), cy(4), pad_mask(4)
-      real                :: fz(4), dz(4), dfz(4), hweight(4)
+      real                :: z,sx,sy,sz,depth,fbar,fup,flow,dfzdzbar
+      integer             :: cx(4), cy(4)
+      real                :: fz(4), dz, dfzdz(4)
       logical             :: valid(4)
       real, pointer       :: zgrid(:)
 c     --------------------------------------------------------------------
       if (.not.horizontal_range_check(geo)) then
-          result = padval
-          if (deriv>0) result = 0 
+          result = padval          ! value interpolation 
+          if (deriv>0) result = 0  ! derivative interpolation
           status = 1
           return
       endif
 
+      if (is_land(geo)) then
+          result = padval          ! value interpolation 
+          if (deriv>0) result = 0  ! derivative interpolation
+          status = 3
+          return
+      endif
+
+c     --- accept points at bottum and on water surface --- 
+c     --- within a numerical tolerance htol            ---
+
       call interpolate_wdepth(geo,depth,idum)
       if ((geo(3)<-htol).or.(geo(3)>depth+htol)) then
          status = 2                ! signal vertical out-of-bound
-         result = padval           ! derivative interpolation
-         if (deriv>0) result = 0   ! value interpolation
+         result = padval           ! value interpolation
+         if (deriv>0) result = 0   ! derivative interpolation
          return
       endif
 c
@@ -221,16 +288,12 @@ c
       cx(2) = ix0; cy(2) = iy1 
       cx(3) = ix1; cy(3) = iy0 
       cx(4) = ix1; cy(4) = iy1 
-      hweight(1) = (1.0-sx)*(1.0-sy)
-      hweight(2) = (1.0-sx)*(  sy  )
-      hweight(3) = (  sx  )*(1.0-sy)
-      hweight(4) = (  sx  )*(  sy  )
 
       z          = geo(3)  ! short hand
       status     = 0       ! assume interpolation possible
       valid      = .false. ! default for dry/out-of-bounds pillars
-      fz         = 0.      ! default for dry/out-of-bounds pillars
-      dfz        = 0.      ! default for dry/out-of-bounds pillars
+      fz         = 0.      ! default for dry/out-of-bounds pillars (NOT padval!)
+      dfzdz      = 0.      ! default for dry/out-of-bounds pillars 
 c
 c     ------ setup 4 interpolation pillars ------
 c            project z onto these pillars and interpolate
@@ -247,19 +310,19 @@ c
             if ((iz<1).or.(iz>=ibot)) then 
                iz = min(max(iz,1),ibot) ! now iz = 1 or ibot
                flow    = array(cx(i),cy(i),iz)
-               fup     = flow    ! => dfz = 0
+               fup     = flow    ! => dfzdz = 0
                sz      = 0.5     ! set dummy
 c               status  = 2       ! flag vertical extrapolation
-               dz(i)   = 1.0     ! avoid numerical problems, assign dummy
+               dz      = 1.0     ! avoid numerical problems, assign dummy
             ! ---- interior linear vertical interpolation ----
             else
                flow = array(cx(i),cy(i),iz)
                fup  = array(cx(i),cy(i),iz+1)
-               dz(i)= zgrid(iz+1)-zgrid(iz) ! assumed > 0
-               sz   = (z-zgrid(iz))/dz(i)
+               dz   = zgrid(iz+1)-zgrid(iz) ! assumed > 0
+               sz   = (z-zgrid(iz))/dz
             endif
-            fz(i)   = (1.0-sz)*flow + sz*fup
-            dfz(i)  = fup-flow
+            fz(i)    = (1.0-sz)*flow + sz*fup
+            dfzdz(i) = (fup-flow)/dz
          endif ! wetmask ...
       enddo
 c
@@ -278,24 +341,23 @@ c
 
       else ! we know at least one valid corner
 
-         fbar = sum(fz)/count(valid)
+         fbar     = sum(fz)/count(valid)    ! invalid => fz=0
+         dfzdzbar = sum(dfzdz)/count(valid) 
          do i = 1,4
-            if (.not.valid(i)) fz(i) = fbar ! relax to average
+            if (.not.valid(i)) then
+               fz(i)    = fbar     ! relax to average
+               dfzdz(i) = dfzdzbar ! relax to average
+            endif
          enddo
 
       endif
 c
-c     ------ evaluate interpolations/derivatives ------
-c
-      result = 0
-      if (deriv == 0) then     ! evaluate value
-         do i = 1,4
-            result = result + hweight(i)*fz(i) 
-         enddo
-      elseif (deriv == 3) then ! evaluate z derivative
-         do i = 1,4
-            result = result + hweight(i)*dfz(i)/dz(i) 
-         enddo
+c     ------ delegate to horizontal interpolation ------
+c   
+      if     (deriv == 0) then     ! evaluate value
+         call interp_2Dbox_data(sx,sy,fz,deriv,result)
+      elseif (deriv == 3) then     ! evaluate z derivative
+         call interp_2Dbox_data(sx,sy,dfzdz,deriv,result)
       else
          write(*,*) "interpolate_cc_3Dgrid_data: deriv = ",
      +               deriv, "is not implemented"  
@@ -306,8 +368,8 @@ c
 
 
 
-      subroutine interpolate_cc_2Dgrid_data(geo,array,deriv,result,
-     +                                      status)
+      subroutine interpolate_cc_2Dgrid_data(geo,array,deriv,padval,
+     +                                      result,status)
 c     --------------------------------------------------------------------
 c     Interpolate grid of corner centered data 2D array on point geo
 c     with data points at integer valued geo
@@ -315,45 +377,101 @@ c
 c     deriv = 0 gives value, deriv = (1,2) gives derivative along (x,y)
 c     Currently, only deriv = 0, until other derivatives 
 c     are needed.
+c     Do not check vertival position for horizontal interpolations
 c
 c     Return status:
 c       status = 0: interior interpolation performed
 c       status = 1: horizontal range violation, set result = padval
+c       status = 3: dry point / rank deficit situation not permitting interpolation
+c                   Return result = padval for deriv = 0  
 c     --------------------------------------------------------------------
       real, intent(in)     :: geo(:),array(:,:)
       integer, intent(in)  :: deriv  ! 0=value; deriv = (1,2) gives derivative along (x,y)
+      real, intent(in)     :: padval
       real, intent(out)    :: result
       integer, intent(out) :: status
 c      
-      integer           :: ix,iy,ix0,ix1,iy0,iy1
-      real              :: vc(4),sx,sy
+      integer           :: i,ix,iy,ix0,ix1,iy0,iy1
+      real              :: vc(4),sx,sy,vcbar
+      integer           :: cx(4), cy(4)
+      logical           :: valid(4)
 c     --------------------------------------------------------------------
        if (.not.horizontal_range_check(geo)) then
           result = padval
           status = 1
           return
       endif
+c     
+      if (is_land(geo)) then
+          result = padval          ! value interpolation 
+          if (deriv>0) result = 0  ! derivative interpolation
+          status = 3
+          return
+      endif
+
 c
       call get_surrounding_box(geo,ix,iy,sx,sy)
-c      
+
       ix0 = min(max(ix,    1),nx)  ! cover boundary layers
       ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
-c     
       iy0 = min(max(iy,    1),ny)  ! cover boundary layers
       iy1 = min(max(iy + 1,1),ny)  ! cover boundary layers
 c
-      vc(1) = array(ix0,iy0)
-      vc(2) = array(ix0,iy1)
-      vc(3) = array(ix1,iy0)
-      vc(4) = array(ix1,iy1)
+c     define corners in this order
+c         col1  (ix0,iy0)
+c         col2  (ix0,iy1)
+c         col3  (ix1,iy0)  
+c         col4  (ix1,iy1)
+c
+      cx(1) = ix0; cy(1) = iy0 
+      cx(2) = ix0; cy(2) = iy1 
+      cx(3) = ix1; cy(3) = iy0 
+      cx(4) = ix1; cy(4) = iy1 
 
+    
+      status     = 0       ! assume interpolation possible
+      valid      = .false. ! default for dry/out-of-bounds pillars
+      vc         = 0.      ! default for dry/out-of-bounds pillars (NOT padval!)
+c
+c     ------ setup 4 interpolation corners ------
+c
+      do i = 1,4
+         if (wetmask(cx(i),cy(i))>0) then
+            valid(i) = .true.
+            vc(i)    = array(cx(i),cy(i))
+         endif ! wetmask ...
+      enddo
+c
+c     ------ fill in missing data where flagged ------
+c
+      if (all(valid)) then
+
+         continue
+
+      elseif (.not.any(valid)) then
+
+         result = padval
+         if (deriv>0) result = 0 
+         status = 3  ! rank deficit exit
+         return
+
+      else ! we know at least one valid corner
+
+         vcbar     = sum(vc)/count(valid)    ! invalid => vc=0    
+         do i = 1,4
+            if (.not.valid(i)) vc(i) = vcbar
+         enddo
+
+      endif
+c
+c     ------ delegate to horizontal interpolation ------
+c 
       if     (deriv == 0) then 
          call interp_2Dbox_data(sx,sy,vc,deriv,result)
       else
          stop "interpolate_cc_2Dgrid_data: unhandled deriv request"
       endif
 
-      status = 0                ! signal interior interpolation performed
 c     -------------------------------------------------------------------- 
       end subroutine interpolate_cc_2Dgrid_data
 
@@ -367,9 +485,9 @@ c     ------------------------------------------
       integer, intent(out) :: status
       integer              :: statu, statv, statw
 c     ------------------------------------------
-      call interpolate_cc_3Dgrid_data(geo,u,0,r3(1),statu)
-      call interpolate_cc_3Dgrid_data(geo,v,0,r3(2),statv)
-      call interpolate_cc_3Dgrid_data(geo,w,0,r3(3),statw)
+      call interpolate_cc_3Dgrid_data(geo,u,0,padval_u,r3(1),statu)
+      call interpolate_cc_3Dgrid_data(geo,v,0,padval_v,r3(2),statv)
+      call interpolate_cc_3Dgrid_data(geo,w,0,padval_w,r3(3),statw)
       status  = max(statu, statv, statw) ! in the unextected case taht they differ ...
 c     ------------------------------------------ 
       end subroutine interpolate_currents
@@ -383,8 +501,10 @@ c     ------------------------------------------
       integer, intent(out) :: status
       integer              :: statv,stath
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,hdiffus,0,r3(1),stath)
-      call interpolate_cc_3Dgrid_data(geo,vdiffus,0,r3(3),statv)
+      call interpolate_cc_3Dgrid_data(geo,hdiffus,0,padval_hdiffus,
+     +                                r3(1),stath)
+      call interpolate_cc_3Dgrid_data(geo,vdiffus,0,padval_vdiffus,
+     +                                r3(3),statv)
       r3(2)   = r3(1) ! horizontal isotropy
       status  = max(statv,stath) ! in the unextected case taht they differ ...
 c     ------------------------------------------ 
@@ -394,15 +514,15 @@ c     ------------------------------------------
 
       subroutine interpolate_turbulence_deriv(geo, r3, status)
 c     ------------------------------------------ 
-c     Currently do not support horizontal derivatives
+c     Currently do not support horizontal derivatives 
 c     ------------------------------------------ 
       real, intent(in)     :: geo(:)
       real, intent(out)    :: r3(:)
       integer, intent(out) :: status
       integer              :: statv,stath
-      
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,vdiffus,3,r3(3),statv)
+c     padval = 0 is hard coded for derivatives
+      call interpolate_cc_3Dgrid_data(geo,vdiffus,3,0.,r3(3),statv)
       r3(1:2) = 0. ! Currently do not support horizontal derivatives
       status  = statv 
 c     ------------------------------------------    
@@ -420,7 +540,7 @@ c     ------------------------------------------
       real, intent(out)    :: r
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,temp,0,r,status)
+      call interpolate_cc_3Dgrid_data(geo,temp,0,padval_temp,r,status)
 c     ------------------------------------------ 
       end subroutine 
 
@@ -432,7 +552,8 @@ c     ------------------------------------------
       real, intent(out)    :: r
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,salinity,0,r,status)
+      call interpolate_cc_3Dgrid_data(geo,salinity,0,padval_salinity, 
+     +                                r,status)
 c     ------------------------------------------ 
       end subroutine 
 
@@ -444,7 +565,7 @@ c     ------------------------------------------
       real, intent(out)    :: r(:)
       integer, intent(out) :: status
 c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,zoo,0,r(1),status)
+      call interpolate_cc_3Dgrid_data(geo,zoo,0,padval_zoo,r(1),status)
 c     ------------------------------------------ 
       end subroutine 
 
@@ -459,7 +580,8 @@ c     ------------------------------------------
       real, intent(out)    :: r
       integer, intent(out) :: status    
 c     ------------------------------------------ 
-      call interpolate_cc_2Dgrid_data(geo,wdepth,0,r,status)
+      call interpolate_cc_2Dgrid_data(geo,wdepth,0,padval_wdepth,
+     +                                r,status)
       if (is_land(geo)) r=0.0
 c     ------------------------------------------ 
       end subroutine 

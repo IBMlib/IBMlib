@@ -30,8 +30,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: horizontal_range_check
       public :: get_horiz_grid_coordinates
       public :: get_horiz_geo_coordinates
-      public :: get_location_in_mesh
-      public :: get_horiz_ncc
+      public :: get_surrounding_box
+      public :: get_horiz_ncc_index
       public :: get_horiz_ncc_corners
 
       interface get_horiz_grid_coordinates
@@ -89,7 +89,7 @@ c     ------------------------------------------
       real, intent(in) :: geo(:)
       integer          :: ixc,iyc
 c     ------------------------------------------ 
-      call get_horiz_ncc(geo,ixc,iyc) 
+      call get_horiz_ncc_index(geo,ixc,iyc) 
       horizontal_range_check = (1<=ixc).and.(ixc<=nx)
      +                    .and.(1<=iyc).and.(iyc<=ny)
 c     ------------------------------------------ 
@@ -148,7 +148,7 @@ c     --------------------------------------------------------
 
 
 
-      subroutine get_location_in_mesh(geo,ix,iy,sx,sy) ! NB previously: get_horiz_grid_coordinates
+      subroutine get_surrounding_box(geo,ix,iy,sx,sy) ! NB previously: get_horiz_grid_coordinates
 c     ------------------------------------------------------
 c     From the lon/lat vector geo (which may include the z component)
 c     determine the cell association (ix,iy) where the node of the cell is the
@@ -173,11 +173,11 @@ c     ------------------------------------------------------
       sx  = dx1 - int(dx1)  ! intra cell coordinate 0<sx<1
       sy  = dy1 - int(dy1)  ! intra cell coordinate 0<sy<1
 c     ------------------------------------------------------
-      end subroutine get_location_in_mesh
+      end subroutine get_surrounding_box
 
 
 
-      subroutine get_horiz_ncc(geo,ixc,iyc) !,xc,yc)
+      subroutine get_horiz_ncc_index(geo,ixc,iyc) !,xc,yc)
 c     ------------------------------------------ 
 c     Resolve the node-centered grid cell containing geo
 c     (ixc,iyc) is grid indices of the closest node
@@ -191,7 +191,7 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       ixc = 1 + nint((geo(1)-lambda1)/dlambda)     
       iyc = 1 + nint((geo(2)-phi1)   /dphi)   
-      end subroutine get_horiz_ncc
+      end subroutine get_horiz_ncc_index
 
 
 

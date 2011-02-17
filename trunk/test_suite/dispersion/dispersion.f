@@ -1,9 +1,10 @@
       program tracker
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Forward/backward particle ensemble tracking simulation
-c
+c     Test whether horizontal/vertical dispersion is correct 
+c     
 c     Metrics theory : for a 1D RW ensemble subject to homogeneous 
-c     spatial diffusivity and no advection, the statistical properties 
+c     horizontal diffusivity and no advection, the statistical properties 
 c     are as follows:
 c
 c       n = ensemble size
@@ -27,9 +28,9 @@ c     by comparing to the expected value of the estimator on
 c     the scale of the estimator RMS:
 c       P(c) = (ec-exp(ec))/RMS(ec)
 c       P(v) = (ev-exp(ev))/RMS(ev)
-c     
+c
 c     Log: Startup + R script analysis + plotting: MPA
-c          metrics + bugfixes ASC: Jan 25, 2011
+c          metrics + bugfixes, ASC: Jan 25, 2011
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
       use time_tools

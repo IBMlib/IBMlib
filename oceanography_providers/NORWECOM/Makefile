@@ -2,14 +2,16 @@
 #              Makefile for physical_fields.mod 
 ############################################################
 
-LOCAL_OBJ = NORWECOM_grid_transforms.o horizontal_representation.o mesh_grid.o time_services.o NORWECOM_pbi.o 
-GENERIC_DIR = ../generic_elements
+PBI_MAIN     = NORWECOM_pbi.f
+PBI_INCLUDES = NORWECOM_interpolators.f
+PBI_OBJS     = NORWECOM_grid_transforms.o horizontal_representation.o mesh_grid.o time_services.o 
+GENERIC_DIR  = ../generic_elements
 
-physical_fields.a: dependences.mk $(LOCAL_OBJ) 
-	ar rcs physical_fields.a $(LOCAL_OBJ)
+physical_fields.a: dependences.mk $(PBI_OBJS) physical_fields.o 
+	ar rcs physical_fields.a $(PBI_OBJS) physical_fields.o
 
-
-physical_fields.mod:
+physical_fields.mod physical_fields.o: $(PBI_MAIN) $(PBI_INCLUDES) $(PBI_OBJS)
+	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o
 
 
 # --- interface assembling rules: point to variants that provides sub interfaces
@@ -29,7 +31,8 @@ FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 VPATH   += /usr/local/include     # let gmake pick up prerequisite netcdf.mod
 
 clean: FORCE
-	rm -f  *.o  *.a  *.mod  dependences.mk
+	-rm -f  *.o  *.a  *.mod  dependences.mk
+	-find . -maxdepth 1 -type l |xargs rm
 
 FORCE:
 

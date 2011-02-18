@@ -1,0 +1,36 @@
+-----------------------------------------------------------
+Bee_test 
+-----------------------------------------------------------
+$Rev$
+$LastChangedDate$
+$LastChangedBy$ 
+
+Provides a brute-force test of the coastline intersection routine contained
+in a full working PBI. The test is predicated on a particle walking randomly
+around the wet domain space and interacting with the coastline. Options are 
+configured by the external controlfile. The test is most effective if the
+user can maximise the number of coastline interactions, either by having a
+long step size, or starting the bee particle in an area that is naturally 
+(or artificially, for the sake of the test) closed.
+   
+Control file options
+--------------------
+* advec_intg_method  [string: euler/rk2/rk4] - not used by the bee_test 
+  directly, but is required for consistency with the particle advection 
+  schemes etc. 
+* start_geo [real(3): lon, lat, depth] - specifies the longitude, latitude 
+  and depth at which the bee particle will start
+* stability [real] - used to specify the number of steps for which the
+  test should be run. Expressed as log10 of the number of steps ie Number 
+  of steps = 10^stability
+* write_traj [integer] - Flag to indicate whether to write an output trajector
+  or not. 0 is silent, all other values write trajectory. Care should be taken 
+  for stabilities above 6, as this corresponds to around 30MB of disk space. 
+  Higher stabilities can easily fill your hard disk
+* step_size [real] - length of the step size, in metres, for the bee to take
+
+Helper functions
+--------------------
+* Plot_bee.r - R script to read a trajectory produced by the bee_test and write
+  a pdf. Can easily produce unmanageably large pdfs if stability is too high eg
+  stability = 6 gives a 16MB pdf that takes a long time to render

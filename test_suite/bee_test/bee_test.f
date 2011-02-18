@@ -1,15 +1,22 @@
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     -----------------------------------------------------------
+c     Bee_test 
+c     -----------------------------------------------------------
+c     $Rev$
+c     $LastChangedDate$
+c     $LastChangedBy$ 
+c
+c     Provides a rigorous, brute-force test of the coastline
+c     intersection routine contained in a full working PBI. The 
+c     test is predicated on a particle walking randomly around the
+c     wet domain space and interacting with the coastline. Options
+c     are configured by the external controlfile
+c    
+c     Original version by ASC. Adapted to work as a task_provider
+c     by MPA 
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       program bee_test
-c     ------------------------------------------------------------------------
-c     Compile & run:  ifort -e90 coast_line_intersection_hash_tables_general_mesh.f; a.out
-c     ------------------------------------------------------------------------
-c     Plot results in R       
-c     dat <- read.table("fort.10");
-c     plot(NA,asp=1,xlim=range(dat[,c(1,3,5,7)]),ylim=range(dat[,c(2,4,6,8)]));
-c     segments(dat$V1,dat$V2,dat$V3,dat$V4);
-c     segments(dat$V5,dat$V6,dat$V7,dat$V8);
-c     abline(v=-180:180+0.5,h=-90:90+0.5,col="lightgrey",lty=3)
-c     ----------------------------------------------------------------
       use run_context
       use input_parser
       use physical_fields
@@ -29,7 +36,7 @@ c     ----------------------------------------------------------------
 c     ----------------------------------------------------------------
 
 c     Initialise modules
-      write(*,*) "Bee test:  $Rev: 258 $"
+      write(*,*) "Bee test:  $Rev$"
       call init_run_context()
       call init_physical_fields()
       call init_particles()
@@ -53,7 +60,7 @@ c     Initialise the bee
       do istep = 1, loops 
          if(mod(istep,disp_freq)==0) then
             frac= real(istep)/real(loops)*100
-            write(*,'(f5.1,a)') frac,"% complete."
+            write(*,'(a,f5.1,a)') "Bee test ",frac,"% complete."
          endif
          !Setup the step
          call random_number(r2)

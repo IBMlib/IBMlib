@@ -161,8 +161,8 @@ c
       endif
       vdiffus = rdum
 c
- 563  format("init_physical_fields: read const ",a,"=", e12.5," m2/s")
- 564  format("init_physical_fields: using const",a,"=", e12.5," m2/s")
+ 563  format("init_physical_fields: read const  ",a,"=", e12.5," m2/s")
+ 564  format("init_physical_fields: using const ",a,"=", e12.5," m2/s")
       
 
 
@@ -392,9 +392,9 @@ c     ------------------------------------------
       if (present(time)) then
          call set_master_clock(time)
       elseif (present(dt)) then
-         aclock => get_master_clock()
          call add_seconds_to_clock(aclock, dt)
       endif
+      aclock => get_master_clock()
 c
       call resolve_corresp_dataset(aclock, tag, h1900)
       call update_dataset(tag, h1900)

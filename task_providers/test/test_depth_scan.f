@@ -30,12 +30,11 @@ c     ------------   show time starts  ------------
 c.....set clocks 
       call read_control_data(simulation_file, "start_time", idum4)
       call set_clock(start_time, idum4(1), idum4(2), idum4(3), idum4(4))
-      write(*,*) "start_time = "
-      call write_clock(start_time)
-
       call init_physical_fields(start_time)
       call update_physical_fields()
 c
+      write(*,*) "start_time = "
+      call write_clock(start_time)
       call read_control_data(simulation_file,"horizontal_pos", geo(1:2))
       write(*,*) "horizontal_pos          = ", geo(1:2)
       isla = is_land(geo)
@@ -48,17 +47,17 @@ c
 
       call read_control_data(simulation_file,"n_interpol_pts", npt)
       write(*,*) "vertical profile with ", npt, "points"
-      write(*,423) "uvw[m/s]", "temp[C]"
+      write(*,423) "depth[m]", "uvw[m/s]", "temp[C]"
       do ipt = 0,npt
          geo(3) = ipt*wdepth/npt
          call interpolate_currents(geo,uvw,istat)
          call check_interpol(istat,"currents")
          call interpolate_temp(geo,temp,istat)
          call check_interpol(istat,"temperature")
-         write(*,422) uvw, temp
+         write(*,422) geo(3),uvw, temp
       enddo
- 422  format(3f8.3,2x,f8.3)
- 423  format(a24,2x,a8)     
+ 422  format(f8.3, 2x, 3f8.3, 2x, f8.3)
+ 423  format(  a8, 2x,   a24, 2x,   a8)     
 c
       call close_physical_fields()
       

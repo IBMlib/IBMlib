@@ -166,6 +166,10 @@ c
          padval_dslm     = padding 
          padval_zoo      = padding
          padval_wdepth   = padding 
+         write(*,*) "init_mesh_grid: default padding = ",padding
+      else
+         write(*,*) "init_mesh_grid: ",
+     +       "no default padding provided, using", default_padding
       endif
 c
 c     --- overwrite with specific values, if present ----
@@ -181,7 +185,7 @@ c
       if(present(pad_zoo))      padval_zoo      = pad_zoo
       if(present(pad_wdepth))   padval_wdepth   = pad_wdepth
       
-      write(*,*) "init_mesh_grid: Padding values "
+      write(*,*) "init_mesh_grid: resolved padding values:"
       write(*,*) "padval_u       :", padval_u
       write(*,*) "padval_v       :", padval_v
       write(*,*) "padval_w       :", padval_w

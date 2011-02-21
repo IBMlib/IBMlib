@@ -57,17 +57,18 @@ c     ------------------------------------------
       write(*,*) "grid type = regular lon-lat"
       write(*,*) "implementation = "//
      +           "horizontal_grid_transformations_lonlatgrid"
+      
+      lambda1 = l1 ! set module data
+      phi1    = p1 ! set module data
+      dlambda = dl ! set module data
+      dphi    = dp ! set module data
+
       write(*,232) lambda1, dlambda
       write(*,233) phi1,    dphi    
  232  format("init_horiz_grid_transf: lambda1 = ",f12.7,
      +                      " dlambda = ",f12.7," degrees")  
  233  format("init_horiz_grid_transf: phi1    = ",f12.7,
      +                      " dphi    = ",f12.7," degrees") 
- 
-      lambda1 = l1 ! set module data
-      phi1    = p1 ! set module data
-      dlambda = dl ! set module data
-      dphi    = dp ! set module data
       
       end subroutine init_horiz_grid_transf
       

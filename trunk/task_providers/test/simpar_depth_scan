@@ -1,0 +1,10 @@
+!-------------------------------------------------------------------
+!        Main simulation control file 
+!
+!        You also need to provide parameters that the other
+!        intefaces need
+!-------------------------------------------------------------------
+
+start_time     = 2005 03 01 0  !  year  month  day  second_of_day
+horizontal_pos = 6.0 56.0      ! lon lat
+n_interpol_pts = 100           ! print these number of points

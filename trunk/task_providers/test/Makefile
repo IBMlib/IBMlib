@@ -1,10 +1,14 @@
-############################################################3
-#         Makefile for task.a
-# 
-############################################################
+########################################################
+#                Makefile for task.a                   #
+#                                                      # 
+#      Set gmake variable MAIN to the desired          #
+#      task_provider test (in file $(MAIN).f)          #
+########################################################
 
-task.a: test1.o
-	ar rcs task.a test1.o
+MAIN = test_depth_scan
+
+task.a: $(MAIN).o
+	ar rcs task.a $(MAIN).o
 
 include $(COMMON_RULES)
 

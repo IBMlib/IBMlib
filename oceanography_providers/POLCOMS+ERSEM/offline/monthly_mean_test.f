@@ -2,9 +2,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     POLCOMS + ERSEM pbi 
 c     ---------------------------------------------------
-c     $Rev$
-c     $LastChangedDate$
-c     $LastChangedBy$ 
+c     $Rev: 228 $
+c     $LastChangedDate: 2011-01-26 02:52:59 +0100 (Wed, 26 Jan 2011) $
+c     $LastChangedBy: asch $ 
 c
 c     Test reading interface for offline POLCOMS+ERSEM data
 c     
@@ -117,7 +117,7 @@ c     ------------------------------------------
       end subroutine init_physical_fields
 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "POLCOMS + ERSEM pbi version: $Rev$"
+      get_pbi_version =  "POLCOMS + ERSEM pbi version: $Rev: 228 $"
       end function
     
 

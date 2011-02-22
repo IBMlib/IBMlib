@@ -388,13 +388,13 @@ c     ------------------------------------------
       character(len=tag_lenght)        :: tag
       integer                          :: h1900
       type(clock), pointer             :: aclock
-c     ------------------------------------------  
+c     ------------------------------------------
+      aclock => get_master_clock()
       if (present(time)) then
          call set_master_clock(time)
       elseif (present(dt)) then
          call add_seconds_to_clock(aclock, dt)
-      endif
-      aclock => get_master_clock()
+      endif     
 c
       call resolve_corresp_dataset(aclock, tag, h1900)
       call update_dataset(tag, h1900)

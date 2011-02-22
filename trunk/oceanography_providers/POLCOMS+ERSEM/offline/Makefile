@@ -1,15 +1,40 @@
 ############################################################3
 #              Makefile for physical_fields.mod 
-############################################################
+#     $Rev: $
+#     $LastChangedDate:  $
+#     $LastChangedBy: $ 
+#
+#     Configurations: 
+#       Rev 286-309 are based on grid data engine
+#       ../generic_elements/regular_lonlat_grid.f
+#       Rev 310- are based on the mesh_grid generalization
 
-physical_fields.a: dependences.mk regular_lonlat_grid.o MyOcean_daily_mean.o 
-	ar rcs physical_fields.a MyOcean_daily_mean.o  regular_lonlat_grid.o
-	cd $(IBMLIB_DIR); ln -sf $(shell pwd)/regular_lonlat_grid.mod # tmp fix: project up regular_lonlat_grid.mod
+
+############################################################
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o MyOcean_daily_mean.o
+GENERIC_MESH = ../../generic_elements
+
+physical_fields.a: dependences.mk $(LOCAL_OBJ) 
+	ar rcs physical_fields.a $(LOCAL_OBJ)
+
 
 physical_fields.mod:
 
-regular_lonlat_grid.f:
-	ln -sf ../generic_elements/regular_lonlat_grid.f
+
+# --- interface assembling rules: point to variants that provides sub interfaces
+
+horizontal_grid_transformations.f:
+	ln -sf $(GENERIC_MESH)/horizontal_grid_transformations/horizontal_grid_transformations_lonlatgrid.f horizontal_grid_transformations.f
+
+horizontal_representation.f:
+	ln -sf  $(GENERIC_MESH)/horizontal_representation/horizontal_representation_staywet.f horizontal_representation.f
+
+time_services.f:
+	ln -sf $(GENERIC_MESH)/time_services.f
+
+mesh_grid.f:
+	ln -sf $(GENERIC_MESH)/mesh_grid.f  # same name
+
 
 
 include $(COMMON_RULES) # shared information between makefiles
@@ -27,5 +52,5 @@ FORCE:
 #     calling makefiles
 #     EXTRES = -x time_tools -x run_context
 
-time_tools.mod geometry.mod constants.mod array_tools.mode run_context.mod  input_parser.mod  netcdf.mod:
+time_tools.mod geometry.mod array_tools.mod constants.mod run_context.mod  input_parser.mod  netcdf.mod:
 	@echo "update of" $@ "suppressed"

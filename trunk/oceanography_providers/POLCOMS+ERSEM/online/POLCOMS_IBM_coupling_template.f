@@ -4,14 +4,25 @@ c     Template for coupling IBMlib with POLCOMS+ERSEM online
 c
 c     Makefile: produce libibm.a
 c               
+c     Notes: 
+c      1) If the intrinsic function reshape did not create
+c         a copy of data, it would be possible to save memory
+c         by declaring 
+c
+c         real(kind=8), pointer :: u(:,:,:) 
+c         u => reshape(pol_data%pol_u, (/londim,latdim,zdim/),
+c        +               order=(/2,3,1/))
+c         However, this gives the error:
+c           fortcom: Error: When the target is an expression it must deliver a pointer result.
+c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 
       module pbi
       implicit none
       private
-      real(kind=8), pointer :: pt2u(:,:,:) 
-      integer               :: londim,latdim,zdim
+      real(kind=8), allocatable :: u(:,:,:) 
+      integer                   :: londim,latdim,zdim
 
       type polcoms_data_bucket
         real(kind=8),pointer :: pol_u(:,:,:)
@@ -29,15 +40,15 @@ c       ....
       londim = ilondim
       latdim = ilatdim
       zdim   = izdim
-      allocate(pt2u(londim,latdim,zdim), STAT=istat)
+      allocate(u(londim,latdim,zdim), STAT=istat)
       write(*,*) "init_pbi: allocate istat =", istat
-      pt2u = 0.
+      u = 0.
       end subroutine init_pbi
 
       subroutine transfer_data(pol_data)
 c     POLCOMS def:  u(zdim,londim,latdim) ) 
       type(polcoms_data_bucket) :: pol_data
-      pt2u = reshape(pol_data%pol_u, (/londim,latdim,zdim/),
+      u = reshape(pol_data%pol_u, (/londim,latdim,zdim/),
      +               order=(/2,3,1/))
 c     ...      
       call adapt_data()
@@ -47,7 +58,7 @@ c     ...
       end subroutine adapt_data
 
       subroutine close_pbi()
-      deallocate(pt2u)
+      deallocate(u)
       end subroutine close_pbi
 
       end module

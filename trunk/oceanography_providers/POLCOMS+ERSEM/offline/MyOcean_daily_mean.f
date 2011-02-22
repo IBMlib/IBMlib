@@ -11,10 +11,12 @@ c           load             Z5cD(time, z, lat, lon) = "Daily Mean Microzooplank
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
-      use regular_lonlat_grid
+      use mesh_grid
+      use horizontal_grid_transformations
       use geometry
+      use array_tools
       use run_context, only: simulation_file
-      use time_tools           ! import clock type
+      use time_services           ! import clock type and time handling
       use input_parser
       use netcdf   ! use site installation
 
@@ -24,8 +26,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       public :: init_physical_fields     
       public :: close_physical_fields
-      public :: get_master_clock
-      public :: set_master_clock
+      public :: get_master_clock ! from time_services
+      public :: set_master_clock ! from time_services
       public :: update_physical_fields
       public :: interpolate_turbulence
       public :: interpolate_turbulence_deriv
@@ -75,15 +77,15 @@ c     ------------------------------------------
       type(clock), intent(in),optional :: time
       real,parameter :: very_deep = 1000.0
 c     ------------------------------------------
-      if (present(time)) master_clock = time
+      if (present(time)) call set_master_clock(time)
       write(*,*) trim(get_pbi_version()) 
 
       call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
       write(*,*) "init_physical_fields: hydrographic database path =", 
      +           trim(hydroDBpath) 
       call reset_frame_handler()
-      call load_grid_desc()
-      call init_regular_lonlat_grid()  ! allocate core arrays  
+      call load_grid_desc()  ! invokes init_horiz_grid_transf
+      call init_mesh_grid()  ! allocate core arrays  
       
 c     ---- specials for this data set / version ----
 
@@ -112,8 +114,9 @@ c     ---- specials for this data set / version ----
       subroutine close_physical_fields()
 c     ------------------------------------------ 
 c     ------------------------------------------    
-      call close_regular_lonlat_grid()
+      call close_mesh_grid()
       call reset_frame_handler()
+      call close_horiz_grid_transf()
 c     ------------------------------------------
       end subroutine 
 
@@ -125,14 +128,16 @@ c     ------------------------------------------
       logical                          :: update
       character(len=tag_lenght)        :: tag
       integer                          :: frame ! number in that set
+      type(clock), pointer             :: aclock
 c     ------------------------------------------  
+      aclock => get_master_clock()
       if (present(time)) then
          call set_master_clock(time)
       elseif (present(dt)) then
-         call add_seconds_to_clock(master_clock, dt)
+         call add_seconds_to_clock(aclock, dt)
       endif
 c
-      call resolve_corresp_dataset(master_clock, tag, frame)
+      call resolve_corresp_dataset(aclock, tag, frame)
       call update_dataset(tag, frame)
 c     ------------------------------------------       
       end subroutine update_physical_fields
@@ -193,9 +198,12 @@ c     ------------------------------------------
       character(len=tag_lenght) :: tag
       integer                   :: dimid,varid,idum
       real,allocatable          :: lon(:),lat(:)
+      type(clock), pointer      :: aclock
+      real                      :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
 c     ------------------------------------------
       if (data_in_buffers) stop "load_grid_desc:unexpected"
-      call resolve_corresp_dataset(master_clock, tag, idum)
+      aclock => get_master_clock()
+      call resolve_corresp_dataset(aclock, tag, idum)
       call open_data_files(tag) ! -> ncid
 c     --- fetch dimensions ---
       call NetCDFcheck( nf90_inq_dimid(ncid, "lon",  dimid) )
@@ -222,6 +230,9 @@ c     --- probe grid dsecriptors from lon/lat arrays ---
       write(*,232) lambda1, dlambda
       write(*,233) phi1,    dphi 
     
+      write(*,*) "load_grid_desc: horizontal initialization"
+      call init_horiz_grid_transf(lambda1, phi1, dlambda, dphi)
+
  229  format(a,a)    
  231  format("load_grid_desc: 3d grid dim (nx,ny,nz) = ", i4,i4,i4)
  232  format("load_grid_desc: lambda1 = ",f12.7,

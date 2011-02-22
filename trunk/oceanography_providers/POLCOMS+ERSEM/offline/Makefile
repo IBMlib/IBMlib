@@ -5,9 +5,9 @@
 #     $LastChangedBy: $ 
 #
 #     Configurations: 
-#       Rev 286-309 are based on grid data engine
+#       Rev 286-310 are based on grid data engine
 #       ../generic_elements/regular_lonlat_grid.f
-#       Rev 310- are based on the mesh_grid generalization
+#       Rev 311- are based on the mesh_grid generalization
 
 
 ############################################################

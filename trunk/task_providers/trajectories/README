@@ -1,0 +1,105 @@
+-----------------------------------------------------------
+Trajectores task provider
+-----------------------------------------------------------
+$Rev$
+$LastChangedDate$
+$LastChangedBy$ 
+
+Generic task provider to generate a set of trajectories. All configuration,
+including the selection of the output variables and their frequency takes
+place through the configuration file. The system is intended to be generic
+and work for both forward and backwards tracking. Use of multiple particle
+ensembles is currently not supported, but is intended in future versions.
+
+The task provider provides three different types of outputs, all of which
+are optional. If the variable defining the filename is missing or commented
+out, then that particular type of file is not generated. The details and
+configuration options of each particular file type follow
+   
+Release datafile
+--------------------
+An ASCII file listing the release state of each particle. Configuration options:
+* release_dat_fname [string] - full filename, including optional path and 
+  file extension, of the release datafile. Presence of this variable switches
+  on the creation of the release datafile
+* release_var [string (string)] - the name of the particle state variable to write. 
+  Multiple tags are allowed - one column in the ASCII file will be written 
+  for each state variable defined in this manner. An optional argument can also be
+  specified which sets the formatting of the ASCII output, using a standard
+  Fortran 90 format specifieri - if not specified, the default formatting values
+  are used. Examples:
+  release_var = lat        !Writes the latitude of the particles at release
+  release_var = lon 12.7f  !Writes the longitude, formatted at a higher precision
+
+Final state datafile
+--------------------
+Similar in concept to the release data file, but specifying the state of the particles
+at the conclusion of the simulation instead. Also ASCII format. Configuration
+* final_state_fname [string] - full filename, including optional path and 
+  file extension, of the final state datafile. Presence of this variable switches
+  on the creation of the final state datafile
+* final_state_var [string (string)] - the name of the particle state variable to write. 
+  Multiple tags are allowed - one column in the ASCII file will be written 
+  for each state variable defined in this manner. An optional argument can also be
+  specified which sets the formatting of the ASCII output, using a standard
+  Fortran 90 format specifieri - if not specified, the default formatting values
+  are used. Examples:
+  final_state_var = lat        !Writes the latitude of the particles 
+  final_state_var = lon 12.7f  !Writes the longitude, formatted at a higher precision
+  
+Trajectories file 
+--------------------
+A NetCDF file listing the value of selected state variables as a function of time. The
+data is stored as a 2D array in the NetCDF 3 format, where the particleID number is one
+dimension and time is the second (unlimited) dimension. Time is specified as POSIX
+time ie the number of second elapsed since the start of the UNIX epoc, 00:00:00 on 
+1 Jan 1970. Each start variable is then stored as a variable in the file. Extensive
+use is made of the attributes to provide extra information. The internal NetCDF
+representation can be specified, allow for improved datastorage by reducing the
+precision of the storage e.g. specificy NF90_SHORT allows storage as 16 bit integers,
+a 75% improvment over double precision storage. 
+* trajectory_fname [string] - full filename, including optional path and 
+  file extension, of the trajectory file. Presence of this variable switches
+  on the creation of the file
+* traj_output_frequency [integer] - the frequency with which the state variables
+  will be written ie every  n time stepsi. Setting this to a value of 1 writes at
+  every time setup
+* traj_output_range [integer(8)] - range of date-times in which to write trajectories. 
+  Date-times are specified in the same manner as for start and end times 
+  ie yyyy mm dd <seconds in day>
+* traj_var [string (string) (real(2)] - specifies the name of the state variable to 
+  write to the trajectory file. Multiple tags are allowed - one variable in the NetCDF
+  file will be created and written to for each tag. Two optional arguments can be
+  specified
+  1. NetCDF internal representation (string). One of NF90_SHORT, NF90_INT, NF90_FLOAT
+     or NF90_DOUBLE, which correspond to 16 bit and 32 bit integers, and 16 bit
+     and 32bit reals respectively. See NetCDF documentation for full details of these types.
+  2. Variable range (real(2)). In the case where integer internal representation is requested
+     the upper and lower range of values expected can be specified. Values outside this
+     value are set to a default fill value. In the case that no range is specified, default
+     values are provided 
+An example using all options:
+  trajectory_fname       = trajectories.nc 
+  traj_output_frequency  = 5   !write particle positions every n time steps: 1 for every
+  traj_output_range      = 2005 08 21 43200   2005 08 22 00000   !range of times in which to write
+  traj_var    = lat NF90_SHORT -90 90    !Full range, to demonstrate useage 
+  traj_var    = lon NF90_SHORT -180 180    !Full range, to demonstrate useage 
+
+Other parameters
+--------------------
+The following parameters are also used by the trajectory provider
+* start_time [integer(4)] - time at which to start simulation. Specified as year, month,
+  day, second in day
+* end_time [integer(4)] - time at which to end simulation. Specified as above.
+* time_step [integer] - time step of integration. Can be either positive, indicating
+  forward tracking, or negative, indicating backtracking. Sign must be consistent with
+  the start and end times specified previously
+* advec_intg_method [string: euler/rk2/rk4] - Method used to integrate particle motion. 
+  Can choose between an euler, runge-kutta 2 or runge-kutta 4 algorithm
+* random_seed [integer(2) - optional] - Allows specification of the seed for the random
+  number generator, allowing for the full replication of runs. In the case that the seed
+  is not specificed, the seed is generated randomly from the system clock (but this is
+  generally compiler dependent). The random seed used is written to the log file allowing
+  duplication of runs
+* emitbox [real(16)] - specifies the temporal and spatial location of particle emission, 
+  together with the number of particles. Multiple tags are permitted.

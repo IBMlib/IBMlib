@@ -117,6 +117,9 @@ c     Pad value setup for grid interpolations at invalid points:
 c       1) If no pad values are provided, the compiled-in value default_padding 
 c       2) If the overall pad value padding is specified, this will overwrite 1)
 c       3) If specific pad values are provided, they will overwrite 1) and 2)
+c     
+c     Allocate vdiffus(nx,ny,nz+1) to handle that many data sets define
+c     data points at vertical faces (i.e. not cell-centered data and interpolation)
 c     ------------------------------------------------------
       real, intent(in), optional :: padding ! overall value
       real, intent(in), optional :: pad_u 
@@ -137,7 +140,7 @@ c     ------------------------------------------------------
       allocate( w(nx,ny,nz)       )   
       allocate( temp(nx,ny,nz)    )  
       allocate( salinity(nx,ny,nz))  
-      allocate( vdiffus(nx,ny,nz+1) )                      
+      allocate( vdiffus(nx,ny,nz+1) ) ! enable data points at vertical faces
       allocate( hdiffus(nx,ny,nz) ) 
       allocate( zoo(nx,ny,nz)     ) 
       allocate( ccdepth(nx,ny,nz) )  

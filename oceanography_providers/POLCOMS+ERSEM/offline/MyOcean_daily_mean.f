@@ -328,7 +328,7 @@ c     ------------------------------------------
       logical :: not_ok
       real,pointer  :: cc(:), acc(:)
 c     ------------------------------------------ 
-
+      write(*,*) "load_data_frames: loading frame", frame
 c     ---- 3D ----
       start3D(:) = 1
       start3D(4) = frame
@@ -344,11 +344,15 @@ c          (w positive downward in data set)
       call NetCDFcheck( nf90_get_var(ncid, varid, w, start=start3D) )
 c     ---- load temperature ----
       call NetCDFcheck( nf90_inq_varid(ncid, "ETWD", varid) )
-      call NetCDFcheck( nf90_get_var(ncid, varid, temp, start=start3D))  
+      call NetCDFcheck( nf90_get_var(ncid, varid, temp, start=start3D)) 
 c     ---- load vertical turbulent diffusivity ----
+c          notice that generic vertical allocation is nz+1, because
+c          some data sets define data points at vertical faces
       call NetCDFcheck( nf90_inq_varid(ncid, "nuvD", varid) )
-      call NetCDFcheck( nf90_get_var(ncid, varid,vdiffus,start=start3D))  
- 
+      call NetCDFcheck( nf90_get_var(ncid, varid,vdiffus(:,:,1:nz),
+     +                  start=start3D)) ! wrong
+      vdiffus(:,:,nz+1) = 1.e-9 ! render all elements defined
+c
 c          NB: horizontal derivatives NOT implemented
 c          when spatially non constant hdiffus are applied,
 c          interpolate_turbulence_deriv must be updated

@@ -173,7 +173,7 @@ c     most cases terminate here
 c
       
       if ((ix1==ix2).and.(iy1==iy2)) then 
-         all_wet = .true.         ! implied since (ix1,ix2) is wet
+         all_wet = .true.         ! implied since (ix1,iy1) is wet
       else                        ! split logical expression to 
          ixmin   = min(ix1,ix2)   ! avoid the min/max operation in most cases
          ixmax   = max(ix1,ix2)
@@ -205,12 +205,12 @@ c     The continued analysis beyond this point is in grid coordinates
       call get_horiz_grid_coordinates(geo1,xy1)
       call get_horiz_grid_coordinates(geo2,xy2)
 c
-c     Infinitesimal step exit point: capture very small intercell steps
+c     Infinitesimal step exit point: capture very small intercell steps into a dry box
 c     at the numerical resolution limit, where intercell transition
 c     points can not be resolved (consider this as a coastal osculation case)     
-c   
+c     Infinitesimal steps are into side/corner neighbor cells of starting cell
 
-      if ((wetmask(ix2,iy2) == 0).and.
+      if ((wetmask(ix2,iy2) == 0).and.  ! step into dry box
      +    (sum(abs(xy2(1:2)-xy1(1:2))) < step_resol_limit)) then
          cross_coast = .true.
          geohit      = geo1   ! geo1 is tested wet
@@ -221,9 +221,7 @@ c
             call write_summary() ! only if verbose
          endif
          return ! geo1 -> geo2 cross coast, but step below resolution limit
-      endif  
-      
-   
+      endif    
 c     
 c     ---------- intermediate cell loop ----------
 c
@@ -264,9 +262,9 @@ c
 c     
 c     ---------- final cell analysis ----------
 c        
-c     Only perform final cell analysis if final cell is dry and 
-c     no intermediate crossings. An intermediate crossing is 
-c     logically ranked before a final cell.
+c     Only perform final cell analysis, if final cell is dry and 
+c     no intermediate crossings where detyected. An intermediate 
+c     crossing is logically ranked before a final cell.
 c     If final cell analysis is invoked, insist on a solution
 c     because final cell is dry (i.e. handle potential numerical problems robustly) 
 c     If final cell is wet and no intermediate crossing
@@ -280,7 +278,7 @@ c     conclude no coastal crossings 1->2
 c     
 c     ---------- conclude inter cell analysis ----------
 c 
-c     if (cross_coast == .false.) only set geohit and georef if
+c     if still (cross_coast == .false.) only set geohit and georef if
 c     geo2 osculates the coast, otherwise let geohit and georef 
 c     remain undefined
 c
@@ -304,7 +302,7 @@ c        --- handle coastal osculation, if detected
       endif
 
 c
-c     The coast line was crossed geo1->geo2, resolve xyref and xyhit
+c     The coast line was crossed geo1->geo2, now resolve xyref and xyhit
 c     0 < s < 1 is the coordinate along the vector (xy2-xy1) 
 c     corresponding to the point xyhit
 c     
@@ -693,7 +691,6 @@ c     ------------------------------------------
 c     return is_land = .false. at horizontal range violation
 c     ------------------------------------------ 
       real, intent(in) :: geo(:)
-      real             :: xy(2)
       integer          :: ixc,iyc
 c     ------------------------------------------ 
       if (horizontal_range_check(geo)) then ! range OK

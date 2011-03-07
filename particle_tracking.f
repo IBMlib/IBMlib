@@ -850,8 +850,7 @@ c
 
 
 
-
-      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit0)  
+      subroutine multiple_reflection_path(s0, s1, anycross, sref, shit0)  ! COPY2 ->  particle_tracking.f 
 c-------------------------------------------------------------------------
 c     Compute key points of multiple horizontal coastal reflection path
 c     by iterative application of coast_line_intersection primitive
@@ -867,13 +866,14 @@ c     ASC 10Feb2011: improved verbose logging + race condition trap
 c                    fixed exit condition bug for higher reflections
 c                    added trace to enable debugging + transparency
 c-------------------------------------------------------------------------
-      real,intent(in)      :: s0(3), s1(3)
+      real,intent(in)      :: s0(:), s1(:)
       logical,intent(out)  :: anycross
-      real,intent(out)     :: sref(3), shit0(3)
+      real,intent(out)     :: sref(:)   ! buffer assumed same size as s0/s1
+      real,intent(out)     :: shit0(:)  ! buffer assumed same size as s0/s1
 
       integer, parameter   :: max_reflections = 20 ! otherwise time step too long ...
-      real                 :: refs(3,max_reflections) ! first index = fastest 
-      real                 :: hits(3,max_reflections) ! first index = fastest 
+      real                 :: refs(size(s0),max_reflections) ! first index = fastest 
+      real                 :: hits(size(s0),max_reflections) ! first index = fastest 
       logical              :: isla, latercross
       real                 :: ds  
       integer              :: i,k
@@ -888,17 +888,17 @@ c---------------------------------------------------------------
          if (anycross) then 
             write(*,422) i,s0(1:2),s1(1:2),refs(1:2,i),hits(1:2,i) 
             write(*,*) "coastal reflection detected"
-            isla = is_land(sref)
+            isla = is_land(refs(1:2,i))
             if (isla) then
                write(*,*) "reflected point point dry: "//
      +                    "continue multiple reflection analysis"
             else
                write(*,*) "reflected point point wet: "//
-     +                    " multiple reflection analysis end"
+     +                    "check reflection path is wet"
             endif ! isla
          else
             write(*,423) i, s0(1:2), s1(1:2)
-            write(*,*)"final point point wet: "//
+            write(*,*)"no coastal crossing: "//
      +                "multiple reflection analysis end"
          endif
       endif ! verbose
@@ -942,9 +942,8 @@ c     are defined, because step = max_reflections resulted in latercross = .true
 c
       if (i >= max_reflections) then 
          sref = hits(:,max_reflections) ! last wet point in analysis
-         k  = max_reflections
-         ds = sum(abs(hits(1:2,k)-hits(1:2,k-1))) 
-         sref = hits(:,max_reflections) ! last wet point in analysis
+         k    = max_reflections
+         ds   = sum(abs(hits(1:2,k)-hits(1:2,k-1))) 
          if (verbose>0) then
             write(*,*) "multiple reflection analysis: "//
      +                 "race condition trapped"
@@ -965,7 +964,7 @@ c
          stop
       endif
 
-      if (is_land(sref)) then
+      if (is_land(sref)) then ! sref defined
          write(*,*) "multiple_reflection_path: assertion failed"
          write(*,*) "unexpected dry test: island(sref) = ",is_land(sref)
          stop ! no plan B
@@ -1001,7 +1000,6 @@ c     ---- uses scope of multiple_reflection_path ----
 
       end subroutine write_trace ! internal to multiple_reflection_path
       end subroutine multiple_reflection_path
-  
 
 
 

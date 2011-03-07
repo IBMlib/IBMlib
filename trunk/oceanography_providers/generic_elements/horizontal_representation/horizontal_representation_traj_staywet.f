@@ -26,7 +26,9 @@ c         where is jumps to zero.
 c
 c     This version of coast_line_intersection "staywet" abandon the 
 c     coast line cushin approach, but rather focuses 
-c     on the consistency in decisions, essentially
+c     on the consistency in decisions, essentially.
+c     The "traj" tag indicates that this is the trajectory resolving
+c     variant for intermediate cells between initial and final cells.
 c
 c       1) is_land is the authoritative 
 c       2) if coast_line_intersection finds a crossing, then
@@ -542,7 +544,6 @@ c     ------------------------------------------
 c     return is_land = .false. at horizontal range violation
 c     ------------------------------------------ 
       real, intent(in) :: geo(:)
-      real             :: xy(2)
       integer          :: ixc,iyc
 c     ------------------------------------------ 
       if (horizontal_range_check(geo)) then ! range OK

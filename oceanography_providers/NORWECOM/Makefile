@@ -17,7 +17,7 @@ physical_fields.mod physical_fields.o: $(PBI_MAIN) $(PBI_INCLUDES) $(PBI_OBJS)
 # --- interface assembling rules: point to variants that provides sub interfaces
 
 horizontal_representation.f:
-	ln -sf  $(GENERIC_DIR)/horizontal_representation/horizontal_representation_staywet.f horizontal_representation.f
+	ln -sf  $(GENERIC_DIR)/horizontal_representation/horizontal_representation_scan_staywet.f horizontal_representation.f
 
 time_services.f:
 	ln -sf $(GENERIC_DIR)/time_services.f

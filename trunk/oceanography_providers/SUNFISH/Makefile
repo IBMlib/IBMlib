@@ -27,7 +27,7 @@ horizontal_grid_transformations.f:
 	ln -sf $(GENERIC_MESH)/horizontal_grid_transformations/horizontal_grid_transformations_lonlatgrid.f horizontal_grid_transformations.f
 
 horizontal_representation.f:
-	ln -sf  $(GENERIC_MESH)/horizontal_representation/horizontal_representation_staywet.f horizontal_representation.f
+	ln -sf  $(GENERIC_MESH)/horizontal_representation/horizontal_representation_scan_staywet.f horizontal_representation.f
 
 time_services.f:
 	ln -sf $(GENERIC_MESH)/time_services.f

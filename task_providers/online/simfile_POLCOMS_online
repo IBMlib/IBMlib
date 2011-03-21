@@ -1,0 +1,18 @@
+! =================================================================
+!        test input file for ibmlib.f and polcoms_proxy.f
+! =================================================================
+grid_desc    = task_providers/online/simfile_POLCOMS_online ! aka this file
+start_time   = 2004 02 02 0  !  year  month  day  second_of_day
+! --- 
+emitbox      = 2004 02 02 100 2004 02 02 500   0.0 52.0 0.1   1.0 53.0 0.1  100
+advec_intg_method = euler
+! 
+! --- grid_desc --- 
+lambda1 = -3.0
+dlambda = 0.5
+phi1    = 50
+dphi    = 0.33333
+nx      = 14
+ny      = 17
+nz      = 9
+

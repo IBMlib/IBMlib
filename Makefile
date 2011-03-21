@@ -130,8 +130,9 @@ IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but 
 IBMLIB_SRCS    += config.mk compiler_defaults.mk
 IBMLIB_PACKAGE = IBMlib_srcs.tgz
 
+#
 #     Main task of this Makefile: EXECUTABLE - should be first target, to appear as default
-# --- currently TASK appears as task.a - at some point we may homogenize 
+#     currently TASK appears as task.a - at some point we may homogenize 
 #     the setup. Dependencies order reflect strict build order of IBMlib
 #
 #     About order of objects at linking: the  linker  searches  and processes libraries and 
@@ -139,10 +140,22 @@ IBMLIB_PACKAGE = IBMlib_srcs.tgz
 #     providing functions AFTER the last object file it applies. This is 
 #     exactly opposite the make order. 
 #     Therefore hack: dublicate IBMLIB_OBJS to ensure a provider is also after using function ...
-
+#
 $(EXECUTABLE): $(IBMLIB_OBJS)
 	@echo ""
 	$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
+
+
+# 
+#     Alternatively, cast the configuration defined in config.mk into an archive if
+#     ARCHIVE is defined. If both EXECUTABLE and ARCHIVE is set and only "make" is 
+#     typed on the prompt, EXECUTABLE takes precedence, because it is defined first 
+#     in the Makefile
+#
+#
+$(ARCHIVE): $(IBMLIB_OBJS)
+	@echo ""
+	$(BUILD_TOOLS)/arm.py $@ $(IBMLIB_OBJS)
 
 # 
 # --- collect additional optional linkflags / link options from PHYSICAL_FIELDS/PARTICLE_STATE/TASK 

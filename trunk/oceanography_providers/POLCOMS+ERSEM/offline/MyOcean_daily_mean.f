@@ -106,7 +106,7 @@ c     ---- specials for this data set / version ----
  
 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "POLCOMS+ERSEM pbi version: $Rev: 228 $"
+      get_pbi_version="POLCOMS+ERSEM offline pbi version: $Rev: 228 $"
       end function
 
 

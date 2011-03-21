@@ -372,10 +372,10 @@ c
 c
 c     ------ delegate to horizontal interpolation ------
 c   
-      if     (deriv == 0) then     ! evaluate value
-         call interp_2Dbox_data(sx,sy,fz,deriv,result)
-      elseif (deriv == 3) then     ! evaluate z derivative
-         call interp_2Dbox_data(sx,sy,dfzdz,deriv,result)
+      if     (deriv == 0) then     ! interpolate value from fz
+         call interp_2Dbox_data(sx,sy,fz,0,result)
+      elseif (deriv == 3) then     ! interpolate value from dfzdz
+         call interp_2Dbox_data(sx,sy,dfzdz,0,result)
       else
          write(*,*) "interpolate_cc_3Dgrid_data: deriv = ",
      +               deriv, "is not implemented"  
@@ -485,7 +485,7 @@ c
 c     ------ delegate to horizontal interpolation ------
 c 
       if     (deriv == 0) then 
-         call interp_2Dbox_data(sx,sy,vc,deriv,result)
+         call interp_2Dbox_data(sx,sy,vc,0,result) ! interpolate value from vc
       else
          stop "interpolate_cc_2Dgrid_data: unhandled deriv request"
       endif

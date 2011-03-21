@@ -39,7 +39,8 @@ c     ------------------------------------------------------------
       if     (deriv == 0) then
          result = (1-sy)*vl + sy*vu
       else
-         stop "interp_2Dbox_data: unhandled deriv request"
+         write(*,*) "interp_2Dbox_data: unhandled request deriv=",deriv
+         stop 
       endif
 c     ------------------------------------------------------------
       end subroutine interp_2Dbox_data

@@ -12,21 +12,27 @@ c
 c         real(kind=8), pointer :: u(:,:,:) 
 c         u => reshape(pol_data%pol_u, (/londim,latdim,zdim/),
 c        +               order=(/2,3,1/))
-c         However, this gives the error:
-c           fortcom: Error: When the target is an expression it must deliver a pointer result.
 c
+c         However, ifort gives the error:
+c           fortcom: Error: When the target is an expression it must deliver a pointer result.
+c         Furthermore, fortran does not specify whether or not 
+c         reshape should create a copy (this is considered an "implementation strategy" issue)
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 
       module pbi
       implicit none
       private
-      real(kind=8), allocatable :: u(:,:,:) 
-      integer                   :: londim,latdim,zdim
+      real, allocatable :: u(:,:,:) ! kind=4
+      integer           :: londim,latdim,zdim
 
+c     ---- exchenge data type between IBMlib and POLCOMS+ERSEM
+c          keep internal structure public
+c          3D data pointers is expected to to point to
+c          buffers with the POLCOMS layout: (zdim,londim,latdim)
       type polcoms_data_bucket
-        real(kind=8),pointer :: pol_u(:,:,:)
-        real(kind=8),pointer :: pol_t(:,:,:)
+        real(kind=8),pointer :: pol_u(:,:,:) ! POLCOMS layout: (zdim,londim,latdim)
+        real(kind=8),pointer :: pol_t(:,:,:) ! POLCOMS layout: (zdim,londim,latdim)
 c       ....
       end type
 
@@ -45,11 +51,12 @@ c       ....
       u = 0.
       end subroutine init_pbi
 
+
       subroutine transfer_data(pol_data)
 c     POLCOMS def:  u(zdim,londim,latdim) ) 
       type(polcoms_data_bucket) :: pol_data
-      u = reshape(pol_data%pol_u, (/londim,latdim,zdim/),
-     +               order=(/2,3,1/))
+      u = real(reshape(pol_data%pol_u, (/londim,latdim,zdim/),
+     +               order=(/2,3,1/)),kind=4)
 c     ...      
       call adapt_data()
       end subroutine transfer_data
@@ -78,6 +85,7 @@ c     ...
       subroutine init_IBMlib(londim,latdim,zdim)
       integer :: londim,latdim,zdim
       call init_pbi(londim,latdim,zdim)
+c     ...
       end subroutine init_IBMlib
       
       subroutine IBM_step(dt)

@@ -12,8 +12,10 @@
 #    1) It is recommended to apply setups/compilers/FC/compiler_defaults_safe.mk
 #       as $(IBMLIB_DIR)/compiler_defaults.mk
 #    2) In $(IBMLIB_DIR) invoke: make fulltest
-#    3) In this directory invoke: make fulltest or any TESTNAME
-#   
+#    3) In this directory invoke: 
+#              make fulltest     ... or 
+#              make TESTNAME     
+#       where TESTNAME corresponds to a sub directory containing a test in this directory
 #
 #  Prerequisites:
 #    It is assumed the standard Linux scripting languages are available wtihin 
@@ -62,7 +64,7 @@
 .PHONY: fulltest FORCE clean variables $(FULLTEST_SET) Makefile
 
 BASH         = bash
-FULLTEST_SET = minimal_simulation test_output dispersion 
+FULLTEST_SET = minimal_simulation test_output dispersion vertical_homogenity
 #              interface_tests/particle \
 #	       interface_tests/pbi
 
@@ -70,12 +72,17 @@ FULLTEST_SET = minimal_simulation test_output dispersion
 fulltest: $(FULLTEST_SET)
 	@echo "##################  result of FULLTEST ##################"
 	@cat $(addsuffix /test_summary, $^)
+	@echo "##################   end of FULLTEST   ##################"
 
 clean: 
 	@echo cleaning up
 	@rm -f $(addsuffix /test_summary, $(FULLTEST_SET))
 
-# --- Apply default match-anything rule for performing a test ---
+#
+#  Apply default match-anything rule for performing a test ---
+#  identified by the corresponding directory name. Test can be invoked independently
+#  by typing "make <name_of_test>"
+#
 %: FORCE
 	@echo "\n>>> performing test" $@ "<<<\n"
 	@$(BASH) -c "\[  -d $@ \] && cd $@; runtest || echo 'Directory $@ not found'"

@@ -8,19 +8,18 @@ situation where it should be used
    file config.mk into the base directory (where this file is)
    The file config.mk tells which modules should be used for
    PHYSICAL_FIELDS, PARTICLE_STATE and TASK
-
    There are a set of examples in directory setups/configurations
 
 2) Select a compiler by copying a file compiler_defaults.mk  into the 
    base directory (where this file is). compiler_defaults.mk
    contains defaults compiler/link flags
-   
    There are a set of examples in the directory setups/compilers
+   
 
-3) Build the code by typing 
+3) Build the selected configuration by typing 
      make 
-   at the command line
-  
+   at the command line 
+   
 
 If a standard setup is applied steps 1-2 above can be accelerated
 by running a standard script doing steps 1-2. 
@@ -30,3 +29,10 @@ Run these in the base directory (where this file is) e.g. type:
 at the command line
 
 
+Testing IBMlib: IBMlib comes with a self test suite. If testing 
+is the first thing you do, you can just put an empty file for config.mk
+by typing "touch config.mk" instead of step 1 above (but any file will work).
+Then select a compiler (step 2 above) and finally type:
+   make test
+at the command line. A summary of the self test will be printed at the screen
+at the end of (a successful) self test.

@@ -1,0 +1,38 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+advec_intg_method  = rk2   !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+! --- make a point release
+emitbox = 2005 01 15 0     2005 01 15  0   4 56 0.5   4 56 0.5  10000
+
+
+!===========================================================
+!====   parameters needed by vortex1 physics provider   ====
+!===========================================================
+!-----------------------------------------------------------
+!  define the topography
+!-----------------------------------------------------------
+wdepth      = 20.0 ! constant water depth, meters
+coast_east  = 7.0  ! fixed eastern  coast, degrees East
+coast_west  = 1.0  ! fixed western  coast, degrees East
+coast_north = 60.0 ! fixed northern coast, degrees North
+coast_south = 50.0 ! fixed southern coast, degrees North 
+!-----------------------------------------------------------
+!   lon-lat simulation domain (boundary)   
+!----------------------------------------------------------- 
+box_east    =  8.0  ! fixed eastern  boundary, degrees East
+box_west    =  0.0  ! fixed western  boundary, degrees East
+box_north   = 61.0  ! fixed northern boundary, degrees North
+box_south   = 49.0  ! fixed southern boundary, degrees North
+!-----------------------------------------------------------
+!   hydrodynamic parameters
+!-----------------------------------------------------------
+latvc       = 55.0 ! vortex center, degrees North
+lonvc       = 3.0  ! vortex center, degrees East
+cspeed      = 1.0  ! clockwise current speed, m/s
+wtemp       = 8.0  ! constant water temp, deg Celcius
+vdiff       = 0.03 ! constant vertical diffusivity, m2/s
+hdiff       = 0.   ! constant horizontal diffusivity, m2/s

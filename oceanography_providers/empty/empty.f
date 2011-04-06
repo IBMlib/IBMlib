@@ -26,6 +26,11 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccc
       subroutine close_physical_fields()
       end subroutine 
 
+      character*100 function get_pbi_version()  
+      get_pbi_version =  "empty pbi version: $Rev$"
+      end function
+
+
       function   get_master_clock()
       type(clock), pointer :: get_master_clock
       get_master_clock => master_clock

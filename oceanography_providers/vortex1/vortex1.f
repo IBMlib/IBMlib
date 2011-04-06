@@ -95,35 +95,74 @@ c     --------
       subroutine init_physical_fields(time)
 c     ------------------------------------------ 
       type(clock), intent(in),optional :: time 
-      if (present(time)) master_clock = time
+      character*999 :: hydroconf
 c     ------------------------------------------ 
+      if (present(time)) master_clock = time
       write(*,*) trim(get_pbi_version()) 
-c     ------- read input parameters -------
-      call read_control_data(simulation_file,"wdepth",wdepth)
-      write(*,*) "constant water depth = ",wdepth, "meters"
-      call read_control_data(simulation_file,"coast_east",coast_east)
-      call read_control_data(simulation_file,"coast_west",coast_west)
-      write(*,*) "w/e coast = ",coast_west,coast_east,"degrees East"
-      call read_control_data(simulation_file,"coast_north",coast_north)
-      call read_control_data(simulation_file,"coast_south",coast_south)
-      write(*,*) "s/n coast = ",coast_south,coast_north,"degrees North"
-      call read_control_data(simulation_file,"box_east",box_east)
-      call read_control_data(simulation_file,"box_west",box_west)
-      write(*,*) "w/e boundary = ",box_west,box_east,"degrees East"
-      call read_control_data(simulation_file,"box_north",box_north)
-      call read_control_data(simulation_file,"box_south",box_south)
-      write(*,*) "s/n  boundary",box_south,box_north,"degrees North"
-      call read_control_data(simulation_file,"latvc",latvc)
-      call read_control_data(simulation_file,"lonvc",lonvc)
-      write(*,*) "vortex center = (",lonvc,latvc,") degrees E/N"
-      call read_control_data(simulation_file,"cspeed",cspeed)
-      write(*,*) "clockwise current speed",cspeed,"m/s"
-      call read_control_data(simulation_file,"wtemp",wtemp)
-      write(*,*) "constant water temp,",wtemp,"deg Celcius"
-      call read_control_data(simulation_file,"vdiff",vdiff)
-      write(*,*) "constant vertical   diffusivity",vdiff,"m2/s"
-      call read_control_data(simulation_file,"hdiff",hdiff)
-      write(*,*) "constant horizontal diffusivity",hdiff,"m2/s"
+c     ---- first check whether a default configuration is requested ----
+      if (count_tags(simulation_file, 
+     +               "hydrographic_configuration")/=0) then
+         call read_control_data(simulation_file,
+     +                          "hydrographic_configuration",hydroconf)
+         hydroconf = adjustl(hydroconf)
+         if (hydroconf(1:6) == "NStest") then
+            write(*,*) "apply hydrographic_configuration = ",
+     +                 trim(hydroconf)
+c           ------  define the topography ------
+            wdepth      = 40.0 ! constant water depth, meters
+            coast_east  =  8.0  ! fixed eastern  coast, degrees East
+            coast_west  = -2.0  ! fixed western  coast, degrees East
+            coast_north = 59.0 ! fixed northern coast, degrees North
+            coast_south = 53.0 ! fixed southern coast, degrees North 
+c           ------  lon-lat simulation domain (boundary) ------   
+            box_east    = 10.0  ! fixed eastern  boundary, degrees East
+            box_west    = -4.0  ! fixed western  boundary, degrees East
+            box_north   = 61.0  ! fixed northern boundary, degrees North
+            box_south   = 49.0  ! fixed southern boundary, degrees North
+c           ------  hydrodynamic parameters ------
+            latvc       = 56.0 ! vortex center, degrees North
+            lonvc       = 3.0  ! vortex center, degrees East
+            cspeed      = 1.0  ! clockwise current speed, m/s
+            wtemp       = 8.0  ! constant water temp, deg Celcius
+            vdiff       = 0.03 ! constant vertical diffusivity, m2/s
+            hdiff       = 0.   ! constant horizontal diffusivity, m2/s
+         else
+            write(*,*) "unknown hydrographic_configuration = ",hydroconf
+            stop
+         endif   
+      else    ! count_tags(simulation_file,
+         write(*,*) "init_physical_fields:",
+     +              "reading hydrographic configuration parameters"
+c         ------- read input parameters -------
+         call read_control_data(simulation_file,"wdepth",wdepth)
+         write(*,*) "constant water depth = ",wdepth, "meters"
+         call read_control_data(simulation_file,"coast_east",coast_east)
+         call read_control_data(simulation_file,"coast_west",coast_west)
+         write(*,*) "w/e coast = ",coast_west,coast_east,"degrees East"
+         call read_control_data(simulation_file,"coast_north",
+     +                          coast_north)
+         call read_control_data(simulation_file,"coast_south",
+     +                          coast_south)
+         write(*,*) "s/n coast = ",coast_south,coast_north,
+     +              "degrees North"
+         call read_control_data(simulation_file,"box_east",box_east)
+         call read_control_data(simulation_file,"box_west",box_west)
+         write(*,*) "w/e boundary = ",box_west,box_east,"degrees East"
+         call read_control_data(simulation_file,"box_north",box_north)
+         call read_control_data(simulation_file,"box_south",box_south)
+         write(*,*) "s/n  boundary",box_south,box_north,"degrees North"
+         call read_control_data(simulation_file,"latvc",latvc)
+         call read_control_data(simulation_file,"lonvc",lonvc)
+         write(*,*) "vortex center = (",lonvc,latvc,") degrees E/N"
+         call read_control_data(simulation_file,"cspeed",cspeed)
+         write(*,*) "clockwise current speed",cspeed,"m/s"
+         call read_control_data(simulation_file,"wtemp",wtemp)
+         write(*,*) "constant water temp,",wtemp,"deg Celcius"
+         call read_control_data(simulation_file,"vdiff",vdiff)
+         write(*,*) "constant vertical   diffusivity",vdiff,"m2/s"
+         call read_control_data(simulation_file,"hdiff",hdiff)
+         write(*,*) "constant horizontal diffusivity",hdiff,"m2/s"
+      endif
 c     ------- post process input --------
       lamvc    = latvc*deg2rad   ! vortex center in radians
       phivc    = lonvc*deg2rad   ! vortex center in radians

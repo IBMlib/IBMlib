@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#########################################################
+#  Test whether a set of particle state providers
+#  conforms to the IBMlib standard interfaces
+#  Only test compilability
+#
+#  This script loops over the configuration files config_*.mk
+#  in this directory and builds these configurations using
+#  the root makefile (in $IBMLIB_DIR). This means that it is very 
+#  easy to add/remove tests, just add/remove the corresponding 
+#  configuration file. The configuration file should contain:
+#
+#  EXECUTABLE          = ibmrun_test  
+#  PHYSICAL_FIELDS_DIR = <directory of any valid PBI provider>
+#  PARTICLE_STATE_DIR  = <directory of the particle state interface to be tested>
+#  TASK_DIR            = $(IBMLIB_DIR)/test_suite/interface_tests/particle
+#
+#  The main file part_interface_test.f calls the public parts of 
+#  the PARTICLE_STATE_DIR (without checking the result) to see that the 
+#  interface conforms to the IBMlib standard interface protocol
+# 
+#  Notes:
+#   The ? variable holds the exit status of the previously executed command
+#########################################################
+IBMLIB_DIR=../../..
+export TESTDIR=$PWD
+# 
+rm -f config.mk.save
+if [ -e $IBMLIB_DIR/config.mk ]; then 
+   cp $IBMLIB_DIR/config.mk config.mk.save
+fi
+echo " result interface_tests/particle: testing particle state interfaces" > test_summary
+#
+# ====== loop over configurations in this directory ======
+#
+for CONFIG in config_*.mk; 
+do 
+    cp -f ${CONFIG} $IBMLIB_DIR/config.mk  
+    cd $IBMLIB_DIR; make ibmrun_test; MAKERETURN=$?; cd ${TESTDIR}
+    if [ ${MAKERETURN} == "0" ]; then
+	THIS_TEST="OK"
+    else
+	THIS_TEST="FAILED"
+    fi
+    PSI=$(grep PARTICLE_STATE_DIR ${CONFIG})
+    echo "   config =" ${CONFIG} " : compiling " ${PSI} " : " ${THIS_TEST} >> test_summary;
+done
+#
+# ====== restore + clean up ======
+#
+rm -f $IBMLIB_DIR/ibmrun_test
+if [ -e config.mk.save ]; then 
+   mv config.mk.save $IBMLIB_DIR/config.mk
+fi
+#

@@ -1,4 +1,4 @@
-#############################################################3
+############################################################3
 #         Makefile for task.a
 # 
 ############################################################
@@ -20,6 +20,6 @@ FORCE:
 #
 #     EXTRES = -x time_tools  -x run_context  -x physical_fields  -x particles
 
-input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  particles.mod output.mod netcdf.mod netcdf_writer.mod ascii_writer.mod: 
-	@echo "update of" $@ "suppressed by pbi_interface_test Makefile"
+input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod: 
+	echo "update of" $@ "suppressed"
 

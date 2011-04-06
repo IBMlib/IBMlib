@@ -20,6 +20,6 @@ FORCE:
 #
 #     EXTRES = -x time_tools  -x run_context  -x physical_fields  -x particles
 
-input_parser.mod  time_tools.mod  run_context.mod  particle_state.mod  output.mod:
+input_parser.mod  time_tools.mod  run_context.mod  particle_state.mod  particle_tracking.mod  output.mod:
 	echo "update of" $@ "suppressed"
 

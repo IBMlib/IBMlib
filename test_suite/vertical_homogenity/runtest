@@ -5,11 +5,22 @@
 IBMLIB_DIR=../..
 export TESTDIR=$PWD
 #
-[ -d $IBMLIB_DIR/config.mk ] && cp -P config.mk.save
-cp -f config.mk $IBMLIB_DIR
+rm -f config.mk.save
+if [ -e $IBMLIB_DIR/config.mk ]; then 
+   cp $IBMLIB_DIR/config.mk config.mk.save
+fi
+cp config.mk $IBMLIB_DIR/config.mk
+echo "result vertical_homogenity: compilation/runtime error" > test_summary # overwritten by ibmrun_test
+#
+# ====== compile and run test ======
+#
 cd $IBMLIB_DIR; make ibmrun_test; cd ${TESTDIR}
 $IBMLIB_DIR/ibmrun_test simpar > /dev/null # writes test_summary
-# --- restore + clean up
+#
+# ====== restore + clean up ======
+#
 rm -f $IBMLIB_DIR/ibmrun_test
-[ -d config.mk.sav ]   && cp -P $IBMLIB_DIR/config.mk
+if [ -e config.mk.save ]; then 
+   mv config.mk.save $IBMLIB_DIR/config.mk
+fi
 #

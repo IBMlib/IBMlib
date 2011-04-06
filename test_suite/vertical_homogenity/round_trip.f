@@ -172,18 +172,19 @@ c     3) Finally report result of test to file "test_summary"
 c
       call find_free_io_unit(summary)
       open(unit=summary, file="test_summary")
-      write(summary,568) "trajectory closure error =", 
+      write(summary,*) "result vertical_homogenity:"
+      write(summary,568) "horizontal trajectory closure error =", 
      +                   traj_err, traj_err_res
       if (equilib_ok) then
-         write(summary,568) "aggregation at surface   =", 
+         write(summary,568) "vertical aggregation at surface   =", 
      +                   noagg_surf, noagg_surf_res
-         write(summary,568) "aggregation at bottum    =", 
+         write(summary,568) "vertical aggregation at bottum    =", 
      +                   noagg_bott, noagg_bott_res
       else
-         write(summary,*) "veritcal distribution not at equilibrium"
+         write(summary,*) "   vertical distribution not at equilibrium"
       endif
       close(summary)
- 568  format(a,1x,f9.4,1x,a)
+ 568  format(3x,a,1x,f9.4,1x,a)
       
 c     ----------------- close down ---------------------------
      

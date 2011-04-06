@@ -52,21 +52,13 @@
 #    Makefile must appear as in .PHONY for reasons beyond comprehension
 #    make with debugging info: make -d TARGET
 #
-#  TODO: 
-#   minimal_simulation:     OK
-#   test_output:            OK
-#   dispersion               
-#   interface_tests/particle 	       
-#   interface_tests/pbi 
 #   
-#
 #############################################################
 .PHONY: fulltest FORCE clean variables $(FULLTEST_SET) Makefile
 
 BASH         = bash
-FULLTEST_SET = minimal_simulation test_output dispersion vertical_homogenity
-#              interface_tests/particle \
-#	       interface_tests/pbi
+FULLTEST_SET = minimal_simulation test_output dispersion vertical_homogenity \
+               interface_tests/particle interface_tests/pbi
 
 
 fulltest: $(FULLTEST_SET)

@@ -77,6 +77,7 @@ c     ------------ read parameters from file --------------
       
       call find_free_io_unit(summary)
       open(unit=summary,file="test_summary")
+      write(summary,*) "result dispersion:"
       tsim = nint(abs(time_step*nsteps)) ! seconds
 
       call read_control_data(simulation_file,"hdiffus",hdiff)
@@ -180,7 +181,7 @@ c
          write(summary,811) adjustl(direcname(dir)), "variance",  P_v                 
       enddo ! dir loop 
       
- 811  format("direction: ",a8," patch ",a," prediction =",
+ 811  format(3x,"direction: ",a8," patch ",a," prediction =",
      +        3f12.4, " : test OK")
  372  format(25("*"), "loop ",i2, ", step ",i5.5, " ", 25("*"))
  

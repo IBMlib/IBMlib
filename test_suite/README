@@ -1,0 +1,42 @@
+
+
+  Invoking test sets:
+
+    1) It is recommended to apply setups/compilers/FC/compiler_defaults_safe.mk
+       as $(IBMLIB_DIR)/compiler_defaults.mk
+    2) In $(IBMLIB_DIR) invoke: make fulltest  ... or 
+    3) In this directory invoke: 
+              make fulltest     ... or 
+              make TESTNAME     
+       where TESTNAME corresponds to a sub directory containing a test in this directory
+
+  Prerequisites:
+    It is assumed the standard Linux scripting languages are available wtihin 
+    the binary search path as well, in addition to prerequisites to IBMlib
+
+
+  Protocol for new tests:
+
+    1) A test is associated with a directory TESTNAME having the name of the test
+
+    2) The test must be executed by an (executable) script TESTNAME/runtest.
+       The script must be any standard Linux scripting language (*sh,python,perl)
+       The test invoked by TESTNAME/runtest must be self contained and able to
+       be invoked independtly. All data and sources must be available in TESTNAME 
+       or part of the resident IBMlib distribution. 
+
+    3) The test script must summarize the reults of the test in TESTNAME/test_summary
+       The test_summary should be short and conclusive and end with either line
+
+       "result TESTNAME: test OK"      or 
+       "result TESTNAME: test FAILED" (... or just crash)
+
+       In other words TESTNAME/runtest TESTNAME/test_summary are mandatory and reserved
+  
+    4) The code should preferably build into the executable ibmrun_test
+       to avoid accidental confusion with the normal name ibmrun for the
+       executable object
+
+  Other parts of test_suite:
+    * test_pbi is a stand alone test usefull for testing a new PBI
+

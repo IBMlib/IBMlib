@@ -1,5 +1,6 @@
- 
-******  QUICK GUIDE FOR GETTING STARTED  ******
+==========================================================
+           QUICK GUIDE FOR GETTING STARTED  
+==========================================================
 
 Before you build the code, you must configure it to the
 situation where it should be used
@@ -16,7 +17,7 @@ situation where it should be used
    There are a set of examples in the directory setups/compilers
    
 
-3) Build the selected configuration by typing 
+3) Build the selected configuration by typing:
      make 
    at the command line 
    
@@ -29,10 +30,19 @@ Run these in the base directory (where this file is) e.g. type:
 at the command line
 
 
-Testing IBMlib: IBMlib comes with a self test suite. If testing 
-is the first thing you do, you can just put an empty file for config.mk
-by typing "touch config.mk" instead of step 1 above (but any file will work).
-Then select a compiler (step 2 above) and finally type:
-   make test
-at the command line. A summary of the self test will be printed at the screen
-at the end of (a successful) self test.
+
+
+Testing IBMlib: 
+
+   IBMlib comes with a self test suite. If testing is the first thing you do, 
+   you can just put an empty file for config.mk by typing "touch config.mk" 
+   instead of step 1 above (but any file will work).
+   Then select a compiler (step 2 above) and finally type:
+   "make test" at the command line. A summary of the self test will be 
+   printed at the screen at the end of (a successful) self test.
+   So, if you use e.g. the ifort compiler you just type these three lines:
+
+     touch config.mk
+     ln -s setups/compilers/ifort/compiler_defaults.mk
+     make test
+

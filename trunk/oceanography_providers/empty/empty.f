@@ -1,6 +1,6 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Empty physical biology interface 
+c     Empty physical biological interface 
 c     ---------------------------------------------------
 c     $Rev$
 c     $LastChangedDate$

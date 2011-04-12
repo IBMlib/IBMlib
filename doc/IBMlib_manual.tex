@@ -54,7 +54,7 @@
 
 \title{{\Huge IBMlib} \\
        \vspace{2mm}
-       {\Large A generic tool for aquatic individual-based modelling}\\
+       {\Large A generic tool for individual-based modelling of aquatic organisms}\\
        \vspace{5mm}
  \small{Global version of code: \svnRev \\
  SVN revision of this manual: $ $Revision$ $  \\
@@ -81,12 +81,15 @@
 
 \chapter{Overall concepts}
 
-IBMlib is a particle simulation toolbox intended for research purposes.
+IBMlib is a tool box for individual-based modelling intended for research purposes
+by emphasizing flexibility and detailed simulation control ability.
 The core vision of IBMlib is to provide a light weight environment
 that easily allows to combine existing/new biological modules with 
 existing/new physical data sets.
 IBMlib provides and supports simple core functionality and provide
 templates for new developments.
+IBMlib abstracts biological organisms as particles which may display arbitrary 
+behavior and have complex properties describing life processes.
 The IBMlib implementation concept is shown in Figure \ref{IBMlib:concept}
 % ----------------------------------------------------------------------------
 \begin{figure}[p]   % [tbhp]
@@ -101,7 +104,7 @@ The IBMlib implementation concept is shown in Figure \ref{IBMlib:concept}
 It shows a core part IBMlib\_core that contains generic core functionality for
 particle tracking. IBMlib\_core accesses the physical environment via the
 physical interface; this interface can be linked to any data source that is
-able to access the physical environment. The biological properties is specified in 
+able to describe the physical environment. The biological properties is specified in 
 particle state module that provides the particle state interface to IBMlib; 
 this amounts to specifying e.g. how biological particles grow and behave, if relevant.
 The particle state module can also describe passive particles and other 
@@ -110,8 +113,8 @@ to do, e.g. a forward simulation or a data dump or any customized run type.
 When an actual physical, biological 
 and task module has been selected, we refer to it as an IBMlib configuration.
 The setup is able to run offline (i.e. reading physical and biological fields from a database)
-and is being prepared for online simulations (i.e. running contemporarely and coupled with 
-physical circulation and ecosystem models) using variuos coupler schemes.
+and online (i.e. running contemporarely and coupled with 
+physical circulation and ecosystem models) using various coupler schemes.
 
 \chapter{License issues}
 
@@ -130,7 +133,7 @@ The minimal system resources required are:
   \item Gmake. All objects are build from source code by makefiles.
         All makefiles are written for and tested with gmake; other
         make implementations may be used, but this may require 
-        minor adaptation to makefiles
+        minor adaptation to makefiles  
   \item Python. Fortran modules are scanned for use associations with a 
         preprocessor utility in Python. At some point we may ship 
         dependency files along to avoid this requirement.
@@ -141,7 +144,8 @@ properties and task  are selected additional system resources
 may be required (e.g. NetCDF and HDF) - this should be available from the 
 automatic documentation of the sub modules. Further the usage of 
 postprocessing tools for visualization and data analysis may require 
-further system resources, e.g. R and MatLab.  
+further system resources, e.g. R and MatLab. The IBMlib test suite applies
+bash scripts.
 
 \section{Obtaining IBMlib sources} 
 
@@ -151,7 +155,7 @@ IBMlib are usualyy distributed in either two ways:
         (referring to this with filename {\tt ibmlib.tgz}) in a desired
         directory (referring to this with directory name {\tt IBMLIB\_DIR}).
         The type on the command line:
-        \[ tar \ xvfz \ ibmlib.tgz
+        \[ tar \ \ xvfz \ \ ibmlib.tgz
         \]
         to inflate the tarball. 
         Now IBMlib is ready for configuration, see Sec. \ref{build:IBMlib} below.
@@ -353,9 +357,10 @@ configuration - consult these to find out which input fields are mandatory.
 \chapter{Makefiles and build protocols}
 
 
-IBMlib has six dependency levels
+IBMlib has seven dependency levels
 \begin{enumerate}
   \item TASK 
+  \item output providers
   \item particles.mod
   \item PARTICLE\_STATE 
   \item particle\_tracking.mod
@@ -372,7 +377,7 @@ To build an IBMlib configuration, four make files are required:
   \item \$(PARTICLE\_STATE\_DIR)/Makefile  
   \item \$(TASK\_DIR)/Makefile          
 \end{enumerate}
-The first is generic and takes care of the overall build syncrinization.
+The first is generic and takes care of the overall build syncronization.
 The remaining make files are independent and invoked from the first makefile.
 They are not included, because this breaks encapsulation and creates
 name clashes. 
@@ -778,10 +783,6 @@ we will add a convenience subroutine: get\_jacobian ...
         documentation to trace and understand changes.
    
 \end{itemize}
-
-
-
-\chapter{Development time line}
 
 
 \chapter{Functionality}

@@ -1,8 +1,0 @@
-transfer make from SetupSandBox
-         update doc
-chekc physical interface doc
-------------------------------------------------------------------
-
-extrapolation problem with grid_interpolations.f:interp_irregbox_data
-near bottom
-------------------------------------------------------------------

@@ -46,9 +46,10 @@ c.....set clocks
       open(77,file="uvdat")
       do iy = 1,nlat
          lat = latmin + iy*(latmax-latmin)/nlat
+         xyz(2) = lat
          do ix = 1,nlon
-            lon = lonmin + iy*(lonmax-lonmin)/nlon
-            xyz(1:2) = (/lon,lat/)
+            lon = lonmin + ix*(lonmax-lonmin)/nlon
+            xyz(1) = lon
             if (.not.is_land(xyz)) then
                call interpolate_wdepth(xyz,wd,istat)
                xyz(3) = 0.5*wd

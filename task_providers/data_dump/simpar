@@ -1,0 +1,5 @@
+!--------------------------------------------
+!        Main simulation control file 
+!--------------------------------------------
+
+hydroDBpath = /home/asbjorn//DTU/MyOcean/WP3/data

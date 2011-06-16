@@ -19,9 +19,10 @@ export FPPFLAGS  = -fpp
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS))  
 
-
 # linker settings
 LINKFLAGS = -i4
 LINKLIBS  += -L/usr/local/include 
 
+
+UNFORMATTED_LITTLE_ENDIAN = -convert little_endian
 

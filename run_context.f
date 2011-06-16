@@ -25,7 +25,6 @@ c.....set public calling interface
 
       public simulation_file
       public program_name
-      public stop_me   ! allow any level to signal and capture stop request
       public init_run_context
       public close_run_context
 

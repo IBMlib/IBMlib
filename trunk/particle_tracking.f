@@ -300,7 +300,13 @@ c-------------------------------------------------------------
       call interpolate_wdepth(tracattr%position,wd,istat)  
       call checkstat(istat, "renormalize_vertical_position:"//
      +               "interpolate_wdepth ")
-      if (tracattr%position(3)>wd) tracattr%position(3) = wd-wlift
+      if (wd<0) then
+         write(*,*) "renormalize_vertical_position: negative wdepth=",wd
+         stop 
+      endif
+      if (tracattr%position(3)>wd) then
+         tracattr%position(3) = max(0.5*wd, wd-wlift) ! avoid negative pos if very shallow
+      endif
       end subroutine renormalize_vertical_position
 
 

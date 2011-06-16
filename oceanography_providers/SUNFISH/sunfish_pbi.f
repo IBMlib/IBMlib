@@ -656,11 +656,12 @@ c
       w = -w
 c     ------ add DSLM to auxillary grid descriptors for wet points  
 c            acc_width(ix,iy,1) = 0 (sea surface)  
+c            Jun 16, 2011: capture rare cases where dz creates negative depths
       do ix=1,nx
          do iy=1,ny
             if (wetmask(ix,iy)==0) cycle ! nothing for dry points
             dz = dslm(ix,iy) ! change of sea level in this point, positive down
-            wdepth(ix,iy)       = wdepth0(ix,iy)       - dz
+            wdepth(ix,iy)       = max(0.0, wdepth0(ix,iy) - dz)
             acc_width(ix,iy,2:) = acc_width0(ix,iy,2:) - dz
             ccdepth(ix,iy,1)    = ccdepth0(ix,iy,1)    - dz*0.5 
             ccdepth(ix,iy,2:)   = ccdepth0(ix,iy,2:)   - dz          

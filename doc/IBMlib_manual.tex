@@ -79,6 +79,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
 \part{User guide }
 
+% ========================================================================
 \chapter{Overall concepts}
 
 IBMlib is a tool box for individual-based modelling intended for research purposes
@@ -116,10 +117,12 @@ The setup is able to run offline (i.e. reading physical and biological fields fr
 and online (i.e. running contemporarely and coupled with 
 physical circulation and ecosystem models) using various coupler schemes.
 
+% ========================================================================
 \chapter{License issues}
 
 Currently unspecified, likely GPL in future
 
+% ========================================================================
 \chapter{Installation}
 
 \section{System resources and requirements}
@@ -353,7 +356,7 @@ configuration - consult these to find out which input fields are mandatory.
 
 \part{Programmers guide}
 
-
+% ========================================================================
 \chapter{Makefiles and build protocols}
 
 
@@ -739,7 +742,43 @@ we will add a convenience subroutine: get\_jacobian ...
 \end{itemize}
 
 %%====================================================================
+\chapter{FAQ (programmers)}
 
+\section{Compilation}
+   \subsection{My XXX module requires a special compilation flag}
+   In the sub-makefile write {tt \$(FCFLAGS) += special\_compiler\_flag(s)}''.
+   This adds the special compilation flag to the other flags applied
+   to the module. 
+   When recommitting source code to SVN such cases must be cleaned up to 
+   ensure portability. If the compilation flag are very special (only provided by
+   a few compilers) we recommend you to find a programming solution
+   to the problem. If it is a generic compilation flag write 
+   {tt \$(FCFLAGS) += GENERIC\_DESCRIPTION} in the sub-makefile and then
+   define {tt GENERIC\_DESCRIPTION} in compiler\_defaults.mk. 
+   This allows to specify the special compilation flag for other compilers
+   as well to maintain portability of IBMlib.
+
+\section{Execution error/warnings}
+   \subsection{IMBlib writes ``checkstat: ... error= ...'' and dies}
+   Some data sets/interpolators display problems, usually related to 
+   boundaries, where interpolate\_X raises some exceptions
+   If the problem is being analyzed or is understood, you 
+   can set {\tt checkstat\_action = warn\_and\_continue} 
+   (or {\tt checkstat\_action = ignore\_exceptions}) to prevent 
+   IMBlib from stopping the simulation. Remember to recompile.
+   This does not solve the underlying problem but only hide the symptoms. 
+   The underlying problem may be (but not lilited to):
+   \begin{itemize}
+     \item  The hydrographic data set may contain inconsistencies
+            (e.g. imply negative water depths)
+     \item  The interpolate\_X in the actual PBI has not been carefully set up to 
+            handle positions close to boundaries
+     \item  coast\_line\_intersection in the actual PBI has subtle problems
+            letting particles displace onto land
+   \end{itemize}
+   
+
+% ========================================================================
 \chapter{Code development guide lines}
 
 \section{Design principles and standards}

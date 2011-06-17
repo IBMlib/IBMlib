@@ -15,7 +15,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       type(control_file) :: simulation_file
       character*999      :: program_name
       logical            :: module_is_initialized = .false.
-      logical            :: stop_me = .false. ! for debugging
+      integer            :: debug_baton=0 ! for debugging
 
       character*(*), parameter :: args         = " <input_file> "
       character*(*), parameter :: syntax_error = "syntax error, usage: "
@@ -29,7 +29,7 @@ c.....set public calling interface
       public close_run_context
 
 c.....For debugging only: allow any including level to signal and capture stop request 
-      public stop_me   
+      public debug_baton  
 
 
       contains

@@ -778,6 +778,23 @@ we will add a convenience subroutine: get\_jacobian ...
    \end{itemize}
    
 
+\section{Debugging}
+   \subsection{Can I stop the code at some specific conditions ?}
+   Old school programmer like to put in write statements strategic places in the
+   code and thereby narrow in the problem. But does your problem happen only for  
+   particle number 7545345 first after 73 hours simulation ?
+   Surely you will kill your hard disk if you write out all diagnostic
+   information. 
+   There is a general low tech mechanism enabled in IBMlib to handle this 
+   at programming level. In module run\_context there is a global public integer flag 
+   {\tt debug\_baton} that is initialized to 0 at compile time. 
+   It allows any including level to signal and another to capture a stop/write request.
+   Simply when the problem appears, set {\tt debug\_baton} to a non-zero value
+   and let other parts of IBMlib listen to (and respond to) {\tt debug\_baton /= 0}.
+   Especially, when you have written the diagnostic information you want,
+   put the line {\tt if (debug\_baton /= 0) stop} somewhere strategic in the code 
+   and recompile. (Remember to delete it again, when the problem is solved)
+  
 % ========================================================================
 \chapter{Code development guide lines}
 

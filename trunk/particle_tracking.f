@@ -68,12 +68,32 @@ c...............................................................
       integer, parameter :: rk4   = 30
 
 
-      integer :: verbose = 0    ! control output volume of certain subroutines (0=silent)
-
-
-      integer, parameter, public :: BC_reflect = 0 ! handle to invoke reflecting boundary conditions
-      integer, parameter, public :: BC_sticky  = 1 ! handle to invoke sticky boundary conditions
+c     ---- Boundary ondition handlers      
+      integer, parameter, public :: BC_reflect = 0 ! reflecting boundary conditions
+      integer, parameter, public :: BC_sticky  = 1 ! sticky boundary conditions
       
+
+c     ============  Behavioral configuration ============
+
+      integer :: verbose = 0   ! control output volume of certain subroutines (0=silent)
+
+c
+c     Some data sets/interpolators display problems at 
+c     e.g. boundaries, where interpolate_X raises some exceptions
+c     If the problem is being analyzed or is understood, 
+c     checkstat_action /= stop_execution allows particle tracking to continue
+c     Behavior can be changed at compile time (here). Later we may add
+c     a module operator to do this at run time 
+c
+      integer,parameter :: stop_execution    = 0  ! default
+      integer,parameter :: warn_and_continue = 1  ! print problem to stdout
+      integer,parameter :: ignore_exceptions = 2  ! do nothing
+
+      integer :: checkstat_action = stop_execution  ! set this to change behavior
+
+      
+
+
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c.....  Neutral tracer attribute components .....................
@@ -227,8 +247,20 @@ c------------------------------------------------------------
       character*(*)       :: who
 c------------------------------------------------------------
       if (istat /= 0) then
-         write(*,*) who, "error=", istat
-         stop
+         if     (checkstat_action == stop_execution) then
+            write(*,*) "checkstat:",who, "error=", istat
+            stop
+         elseif (checkstat_action == warn_and_continue) then
+            write(*,*) "checkstat:",who, "error=", istat,
+     +                 "(continue execution)"
+            return
+         elseif (checkstat_action == ignore_exceptions) then
+            return
+         else    ! consider this fatal
+            write(*,*) "checkstat: unknown checkstat_action=",
+     +                  checkstat_action
+            stop 
+         endif
       endif
       end subroutine checkstat
 

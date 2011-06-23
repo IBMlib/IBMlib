@@ -1,0 +1,17 @@
+! ================================================================
+! grid descriptor for SUNFISH NPZD data set provided by NERI 2010
+! which is a sub set of the full cmod grid
+! ================================================================
+nx = 207
+ny = 177
+nz = 20
+
+lambda1 = -4.0833333333
+dlambda =  0.1666666667
+phi1    = 48.3333333333
+dphi    =  0.10
+
+khor  = 8216   ! internal ECOSMO dimension
+ndrei = 82108  ! internal ECOSMO dimension
+kasor = 8106   ! internal ECOSMO dimension
+nbio  = 17     ! internal ECOSMO dimension

@@ -68,6 +68,11 @@ c     ------ data frame handler ------
       character*(*), parameter  :: not_set_c = "not set"
       integer, parameter        :: not_set_i = -9999  
 
+c     ---- ECOSMO zooplankton load/conversion
+      integer, parameter        :: ibio_small_zoo = 6
+      integer, parameter        :: ibio_large_zoo = 7
+      real,parameter            :: carbon2DW = 1.0/0.32
+
 c     --- 3D grids ---
                 
       real,allocatable,target :: ccdepth0(:,:,:)   ! reference cell center depth water below surface [m] (dslm=0)
@@ -674,7 +679,7 @@ c     ------------------------------------------
       integer, intent(in) :: frame ! pick frame
       integer :: ir, nread, i1, ix,iy
       integer :: lw,lwa,lwe,i,j,k,lump,ibio
-      real    :: dz,h
+      real    :: dz,h,zbiomass
       integer :: mjarcc,lmoncc,ndaycc,iviercc,ipcc
 c     ---- automatic arrays as reading buffers
       real :: zmit(khor)      ! sea surface elevation 
@@ -688,7 +693,7 @@ c     ---- automatic arrays as reading buffers
       real :: dump_nynx(ny,nx)  
       real :: dump_khor(khor)
       real :: Tc(ndrei,3:nbio) ! NPZD
-
+      
 c     ------------------------------------------ 
 c
 c     ======= figure out where file pointer is now =======
@@ -887,9 +892,8 @@ c
 c     ---- update hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
 c     keep init value == molecular_diffusivity 
 c
-c     ---- update zoo(:,:,:)        ! Zooplankton [10^-3 mol N/liter]
+c     ---- update zoo(:,:,:)        ! total Zooplankton [DW myg/liter ]
       zoo  = 0.0
-      ibio = 6
       i1   = 1
       do j=1,nx ! replaced n-> nx
         do i=1,ny
@@ -897,7 +901,9 @@ c     ---- update zoo(:,:,:)        ! Zooplankton [10^-3 mol N/liter]
               if (iland(i,j,k)>0) then                
                  ix = j         ! corresponding regular lonlat indices
                  iy = ny+1-i    ! corresponding regular lonlat indices
-                 zoo(ix,iy,k) = Tc(i1,ibio)
+                 zbiomass = Tc(i1,ibio_small_zoo)+Tc(i1,ibio_large_zoo) ! unit mgC/m**3
+                 zbiomass = zbiomass*carbon2DW                          ! unit DW myg/l = mg/m**3
+                 zoo(ix,iy,k) = zbiomass
                  i1 = i1+1
               endif
            enddo

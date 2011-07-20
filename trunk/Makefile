@@ -118,7 +118,7 @@ include  config.mk                            # mandatory include
 EXT_LIBS     = libtime/libtime77.a
 BASELIBS     = grid_interpolations.o  runtime_tools.o  string_tools.o 
 BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
-               run_context.mod  output.mod  geometry.mod  array_tools.mod  spline2D.mod
+               run_context.mod  output.mod  geometry.mod  array_tools.mod  spline.mod
 BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
 OUTPUT_MODS  = $(addsuffix .mod, $(OUTPUT_WRITERS))
 OUTPUT_ARCS  = $(addsuffix .a,   $(OUTPUT_WRITERS))

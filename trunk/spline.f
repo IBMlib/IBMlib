@@ -15,9 +15,9 @@ c     TODO: add optional slopeBC. Default to natural BC
 c           For 1D spline this requires yp1,ypn
 c           For 2D spline this requires 4 value arrays
 c
-c     ifort -e90 spline2D.f
+c     ifort -e90 spline.f
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      module spline2D
+      module spline
       implicit none
       private 
 
@@ -52,7 +52,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
          module procedure delete_spline_1D
          module procedure delete_spline_2D
       end interface 
-      
+c      
+c     ---- define public scope of this module ----
+c
       public :: spline_1D
       public :: spline_2D
       public :: setup_spline
@@ -329,7 +331,7 @@ ccccccccccccccccccc         T E S T     B L O C K   ccccccccccccccccccccc
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c$$$
 c$$$      program test
-c$$$      use spline2D
+c$$$      use spline
 c$$$      implicit none 
 c$$$
 c$$$      integer, parameter :: n1 = 21, n2 =31

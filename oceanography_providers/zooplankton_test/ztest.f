@@ -30,6 +30,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_turbulence
       public :: interpolate_turbulence_deriv
       public :: interpolate_currents
+      public :: interpolate_zooplankton
       public :: interpolate_temp
       public :: interpolate_wdepth
       public :: is_wet    

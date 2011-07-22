@@ -8,12 +8,27 @@ c     $LastChangedBy:  $
 c
 c     Preliminary skeleton for Letcher type egg/larval bioenergetics
 c     with daily growth increments based on optimal fouraging.
-c     This module is generic and does not contain species-specific parameters
+c     This module is generic and does not contain species-specific parameters,
+c     but deals with generic characteristics as length and weight.
 c     Species-specific proterties are obtained through 
-c     subroutines in module species_properties. The prey availability 
-c     is assessed through module prey_community.
-c     This module deals with generic characteristics as length and weight
-c     
+c     subroutines in module larval_properties. The prey availability 
+c     is assessed through module prey_community. This module composes the primary 
+c     class state_attributes of species and state-specific subclasses
+c     which are inherited from sub modules. Sub classes are tight, i.e
+c     they have public scope. This means they should only be inherited 
+c     locally.
+c     Module association structure (classes in paranthesis):
+c
+c                     optimal_forager (-> state_attributes)
+c       
+c                          |                                |
+c
+c      larval_properties (-> larval_physiology)   prey_community (-> no classes)
+c                                       
+c                          |              |                 |             
+c
+c                     particle_state_base (-> local_environment)
+c
 c     Growth representation: growth is in mass. Length and weight
 c     is stored separately. If weight > nominal weight(current length)
 c     then current length is updated so weight = nominel weight(length)
@@ -51,7 +66,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use output               ! access polytype for get_prop_state/get_metadata_state
 
       use particle_state_base  
-      use species_properties   ! import type(physiology) 
+      use larval_properties   ! import type(physiology) 
       use prey_community
       use spline
 
@@ -66,7 +81,7 @@ c     -----------------------------------------------
       type state_attributes
       private
 
-        type(larval_physiology) :: larvstate   ! defined in module species_properties 
+        type(larval_physiology) :: larvstate   ! defined in module larval_properties 
 
         real        :: survival           ! 0 < survival < 1 of this particle 
         logical     :: alive                
@@ -278,7 +293,7 @@ c     --------------------------------------------------------------
       real,intent(in)                         :: dt ! in seconds
 c
       type(local_environment)                 :: local_env
-      real                                    :: xyz(3),zbiomass(1),temp
+      real                                    :: xyz(3)
       integer                                 :: status
       real                                    :: irate,tacc,tempavg
 c     --------------------------------------------------------------
@@ -293,7 +308,7 @@ c     --------------------------------------------------------------
          call add_ingestion(state%larvstate, irate*dt, dt) ! currently just average, no Poisson       
       endif
       state%time_since_growth = state%time_since_growth + dt
-      state%tempxdt           = state%tempxdt           + dt*temp            
+      state%tempxdt           = state%tempxdt + dt*local_env%temp            
 
       if (state%time_since_growth > growth_increment_interval) then
          tacc    = state%time_since_growth
@@ -594,7 +609,7 @@ c     Encounter rate density is evaluated as clearence volume [unit == mm3/sec]
 c     times density of prey [unit == individuals/mm3/mm] 
 c
 c     Applies spectrum_prey_density (from module prey_community)
-c     and SV (from module species_properties)      
+c     and SV (from module larval_properties)      
 c
 c     deriv = false: return enc_rate   
 c     deriv = true : return (d/dlp) enc_rate   

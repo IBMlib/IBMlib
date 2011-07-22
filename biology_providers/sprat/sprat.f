@@ -1,4 +1,4 @@
-      module species_properties
+      module larval_properties
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     This module implements the specific parameterization 

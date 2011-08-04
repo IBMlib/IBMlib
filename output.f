@@ -22,7 +22,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         character (len=999) :: type  !Type of data stored: real, int, log, str
         real:: r
         integer:: i
-        logical:: l
+        !logical:: l
         character (len=999) :: s
       end type polytype
       public ::polytype
@@ -121,8 +121,12 @@ c     ============================================================
         logical,intent(in) :: lin
         !Assign arguments to boolean slot
         this%name = name
-        this%type ="log"
-        this%l=lin
+        this%type ="int"
+        if(lin) then
+          this%i=1
+        else 
+          this%i =0
+        endif
       end subroutine polytype_construct_logical
 
       subroutine polytype_construct_string(this, name, str)
@@ -165,8 +169,8 @@ c     ============================================================
             write(strout,fmt=fmt) this%r
         case ("int")
             write(strout,fmt=trim(fmt)) this%i
-        case ("log")
-            write(strout,fmt=trim(fmt)) this%l
+        !case ("log")
+        !    write(strout,fmt=trim(fmt)) this%l
         case ("str")
             write(strout,fmt=trim(fmt)) this%s
         case default

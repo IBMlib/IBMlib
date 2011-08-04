@@ -1706,25 +1706,25 @@ c------------------------------------------------------------
      +                  units="m",fmt="(f7.2)",type="real")
       case ("mobx")
         call construct(var,"mobx","Meridonal mobility",
-     +                  units="T/F",fmt="(l1)",type="log")
+     +                  units="1/0",fmt="(i1)",type="int")
       case ("moby")
         call construct(var,"moby","Zonal mobility",
-     +                  units="T/F",fmt="(l1)",type="log")
+     +                  units="1/0",fmt="(i1)",type="int")
       case ("mobz")
         call construct(var,"mobz","Vertical mobility",
-     +                  units="T/F",fmt="(l1)",type="log")
+     +                  units="1/0",fmt="(i1)",type="int")
       case ("ashore")
         call construct(var,"ashore","Is particle ashore?",
-     +                  units="T/F",fmt="(l1)",type="log")
+     +                  units="1/0",fmt="(i1)",type="int")
       case("outofdomain")
         call construct(var,"outofdomain","Is particle out of "
-     +       // "the domain?", units="T/F",fmt="(l1)",type="log")
+     +       // "the domain?",units="1/0",fmt="(i1)",type="int")
       case ("atbottom")
         call construct(var,"atbottom","Is the particle at bottom?",
-     +                  units="T/F",fmt="(l1)",type="log")
+     +                  units="1/0",fmt="(i1)",type="int")
       case ("atsurface")
         call construct(var,"atsurface","Is particle at the "
-     +       //"surface?",units="T/F",fmt="(l1)",type="log")
+     +       //"surface?",units="1/0",fmt="(i1)",type="int")
       case ("shoreBC")
         call construct(var,"shoreBC","shoreBC","-","(i2)","int")
       case ("domainBC")

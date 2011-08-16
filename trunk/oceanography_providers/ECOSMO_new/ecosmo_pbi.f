@@ -901,8 +901,8 @@ c     ---- update zoo(:,:,:)        ! total Zooplankton [DW myg/liter ]
               if (iland(i,j,k)>0) then                
                  ix = j         ! corresponding regular lonlat indices
                  iy = ny+1-i    ! corresponding regular lonlat indices
-                 zbiomass = Tc(i1,ibio_small_zoo)+Tc(i1,ibio_large_zoo) ! unit mgC/m**3
-                 zbiomass = zbiomass*carbon2DW                          ! unit DW myg/l = mg/m**3
+                 zbiomass = Tc(i1,ibio_small_zoo)+Tc(i1,ibio_large_zoo) ! unit = mgC/m**3
+                 zbiomass = zbiomass*carbon2DW/1,0e6                    ! unit = kg DW / m**3
                  zoo(ix,iy,k) = zbiomass
                  i1 = i1+1
               endif

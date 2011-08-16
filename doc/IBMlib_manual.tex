@@ -541,16 +541,34 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
     in m/s oriented as standard vectors (\ref{Vectororientationandunits}) 
            
   \item {\tt interpolate\_temp (xyz, r, status)} Degree Celcius   \newline       
-  \item {\tt interpolate\_salty(xyz, r, status)} PSU              \newline
 
   \item {\tt interpolate\_dslm(xyz, r, status)}  m                \newline
 
     sea surface elevation above a reference level. Rigid lid
     data sets should return 0 for this field. 
       
-  \item {\tt [interpolate\_wind(xy, r2, status)]} m/s \newline
- 
+  {\em Optional extensions} \newline
+
+    Some interpolation services are also required by more specialized applications,
+    e.g. zooplankton concentration for energy budget growth models of early 
+    life stages. These interpolation services are not required by core particle tracking
+    modules and therefore these interpolation services need only be provided in
+    case the more specialized applications utilized in the current setup.
+
+  \item {\tt interpolate\_wind(xy, r2, status)]} m/s \newline
+
     surface wind vector with standard orientation in m/s
+ 
+  \item {\tt interpolate\_salty(xyz, r, status)} PSU   \newline  
+
+    Standard salinity
+
+  \item {\tt interpolate\_zooplankton(xy, rvec, status)]} kg dry weight/m$^3$ \newline
+
+    Zooplankton concentration. Currently bulk zooplankton concentration
+    is returned in element {\tt rvec(1)}. The protocol for this interpolation service
+    is under development.
+
 
 
 \end{itemize}

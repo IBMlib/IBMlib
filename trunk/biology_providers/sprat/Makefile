@@ -1,11 +1,18 @@
-############################################################3
+############################################################
 #                Makefile for particle_state.mod
 #
 #     $Rev:  $
 #     $LastChangedDate: $
 #     $LastChangedBy: $ 
 ############################################################
-LOCAL_OBJ = particle_state_base.o prey_community.o sprat.o optimal_forager.o 
+ONLY_LARVAE = feeding_larval_stage_2_particle_state.o  numerical_1d_integrals.o  particle_state_base.o  prey_community.o  larval_properties.o  feeding_larval_stage.o 
+
+MULTI_STAGE = numerical_1d_integrals.o  particle_state_base.o  prey_community.o  larval_properties.o  feeding_larval_stage.o  yolksac_properties.o  egg_properties.o  released_egg_stage.o  yolksac_larval_stage.o  early_life_stages.o
+
+#
+# >>>>>>>> select which variant you want to build by setting LOCAL_OBJ <<<<<<<<<<<
+# 
+LOCAL_OBJ   = $(MULTI_STAGE)    
 
 GENERIC_BIOENERGETICS = ../generic_bioenergetics
 
@@ -14,17 +21,40 @@ particle_state.a: dependences.mk $(LOCAL_OBJ)
 
 particle_state.mod:
 
-
+# ---------------------------------------------------------------------------------
 # --- interface assembling rules: point to variants that provides sub interfaces
+# ---------------------------------------------------------------------------------
 
+# --- specific components ---
+
+larval_properties.f:
+	ln -sf sprat_feeding_larv.f larval_properties.f
+yolksac_properties.f:
+	ln -sf sprat_yolksac_larv.f yolksac_properties.f
+egg_properties.f:
+	ln -sf sprat_egg.f          egg_properties.f
+
+
+
+# --- generic components ---
+
+
+early_life_stages.f:
+	ln -sf $(GENERIC_BIOENERGETICS)/early_life_stages.f
+released_egg_stage.f:
+	ln -sf $(GENERIC_BIOENERGETICS)/released_egg_stage.f
+yolksac_larval_stage.f:
+	ln -sf $(GENERIC_BIOENERGETICS)/yolksac_larval_stage.f
+feeding_larval_stage_2_particle_state.f:
+	ln -sf $(GENERIC_BIOENERGETICS)/feeding_larval_stage_2_particle_state.f
 particle_state_base.f:
 	ln -sf $(GENERIC_BIOENERGETICS)/particle_state_base.f
-
+numerical_1d_integrals.f:
+	ln -sf $(GENERIC_BIOENERGETICS)/numerical_1d_integrals.f
 prey_community.f:
 	ln -sf $(GENERIC_BIOENERGETICS)/prey_community.f
-
-optimal_forager.f:
-	ln -sf $(GENERIC_BIOENERGETICS)/optimal_forager.f
+feeding_larval_stage.f:
+	ln -sf  $(GENERIC_BIOENERGETICS)/optimal_forager.f  feeding_larval_stage.f
 
 
 include $(COMMON_RULES)

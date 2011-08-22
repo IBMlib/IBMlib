@@ -1,15 +1,18 @@
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Growth/survival based on bioenergetics
+c     Growth/survival of larvae based on bioenergetics
 c     ---------------------------------------------------
 c     $Rev: $
 c     $LastChangedDate: $
 c     $LastChangedBy:  $ 
 c
-c     Preliminary skeleton for Letcher type egg/larval bioenergetics
+c     Preliminary skeleton for Letcher type larval bioenergetics
 c     with daily growth increments based on optimal fouraging.
 c     This module is generic and does not contain species-specific parameters,
 c     but deals with generic characteristics as length and weight.
+c     This module provides both the particle state interface
+c     and the embedded larvae interface (for inclusion in a stage resolving upper module)
+c
 c     Species-specific proterties are obtained through 
 c     subroutines in module larval_properties. The prey availability 
 c     is assessed through module prey_community. This module composes the primary 
@@ -19,7 +22,7 @@ c     they have public scope. This means they should only be inherited
 c     locally.
 c     Module association structure (classes in paranthesis):
 c
-c                     optimal_forager (-> state_attributes)
+c                     optimal_forager (-> state_attributes + feeding_larvae)
 c       
 c                          |                                |
 c
@@ -34,7 +37,7 @@ c     is stored separately. If weight > nominal weight(current length)
 c     then current length is updated so weight = nominel weight(length)
 c     Length can never decrease. Weight can increase/decrease.
 c    
-c     Currently, handling time (HT) and capture success (CS) does only
+c     Currently, handling time (handling_time) and capture success (capture_sucess) does only
 c     depend on predator/prey size ratio. This is the basis for 
 c     precalculating foraging windows, depending only on larval size
 c     and feeding profitability - otherwise the optimal diet determination
@@ -46,58 +49,80 @@ c            time    = seconds
 c
 c     TODO
 c       
+c       stabilize calculate_ingestion_rate to situation where max is close to p=0
 c       egg sub model
 c       FF larv sub model
 c       settlement sub model
+c       more general configuration protocol for ingestion_ref_DB (shape,content)
 c       poisson process for encounter over average encounter
-c       
-c       
+c       signal interpolation exceeding lplow_2Dspline/lphigh_2Dspline
+c       reset intent for dummies in subroutine calculate_ingestion_rate when testing is done
 c
 c     Questions to Ute Daewel etal:
 c         MDMIN in beta ==  weight0??(currently set so)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      module particle_state
+      module feeding_larval_stage  ! use name change module to switch to particle_state
 
-      use time_tools           ! import clock type
-      use particle_tracking    ! space types/methods 
+      use time_tools            ! import clock type
+      use particle_tracking     ! space types/methods 
       use physical_fields
       use run_context, only: ctrlfile => simulation_file
       use input_parser
-      use output               ! access polytype for get_prop_state/get_metadata_state
+      use output                ! access polytype for get_prop_state/get_metadata_state
 
       use particle_state_base  
-      use larval_properties   ! import type(physiology) 
-      use prey_community
-      use spline
+      use larval_properties     ! import: type(larval_physiology) + capture_sucess+ handling_time + search_volume
+      use prey_community        ! import: prey_mass + prey_spectrum_density
+      use numerical_1d_integrals ! import trapez_integral
 
       implicit none            
       private     
 
+c     ----------------------------------------------------------------    
+c     Class feeding_larvae is for the embedded larvae interface 
+c     and contains attributes relating to the larval stage alone
+c     along with attributes relating to optimal foraging
+c     ----------------------------------------------------------------
+
+      
+      type feeding_larvae
+      private
+         type(larval_physiology) :: larvstate         ! defined in module larval_properties 
+         real                    :: time_since_growth ! = sum(dt) - for growth aggregation
+         real                    :: tempxdt           ! = sum(temp*dt) - for averaging ambient temperaturE
+      end type
+      public :: feeding_larvae ! make type state_attributes visible outside
+
 c     -----------------------------------------------    
-c     Class state_attributes contains all attributes 
+c     Class state_attributes is for the 
+c     particle state interface and contains all attributes 
 c     related to the state of a particle beyond 
-c     spatial aspects
+c     spatial aspects.
 c     -----------------------------------------------
+
       type state_attributes
       private
 
-        type(larval_physiology) :: larvstate   ! defined in module larval_properties 
+         type(feeding_larvae) :: larvae
+c
+c        ---- administrative attributes relating to existence context ----   
+c 
+         real        :: survival   ! 0 < survival < 1 of this particle 
+         logical     :: alive                
+         integer     :: death_day  ! Julian day     
+         integer     :: orig_boxID ! spatial release box
+         integer     :: particleID ! ensemble ID - negative is unset
 
-        real        :: survival           ! 0 < survival < 1 of this particle 
-        logical     :: alive                
-        integer     :: death_day          ! Julian day
-        real        :: time_since_growth  ! = sum(dt) - for growth aggregation
-        real        :: tempxdt            ! = sum(temp*dt) - for averaging ambient temperature
-
-        integer     :: orig_boxID   ! spatial release box
-        integer     :: particleID   ! ensemble ID - negative is unset
-      
       end type
-      public :: state_attributes     ! make type state_attributes visible outside
+      public :: state_attributes ! make type state_attributes visible outside
 
 
 
-c.....All other subroutine than these below are private to the module
+
+
+
+c.....Particle state interface: (stand-alone)
+   
       public :: init_particle_state  ! module operator
       public :: close_particle_state ! module operator
       public :: init_state_attributes
@@ -106,92 +131,110 @@ c.....All other subroutine than these below are private to the module
       public :: delete_state_attributes 
       public :: write_state_attributes
       public :: get_particle_version
-      public :: get_property        ! currently void
-      public :: get_metadata_state  ! currently void
+      public :: get_property         ! currently void
+      public :: get_metadata_state   ! currently void
 
+      public :: init_feeding_larval_stage
+      public :: close_feeding_larval_stage
+      public :: init_state_attributes_FL
+      public :: get_active_velocity_FL
+      public :: update_particle_state_FL
+      public :: delete_state_attributes_FL
+c.....All other subroutine than these below are private to the module
 
       interface get_property
-        module procedure get_prop_state
+      module procedure get_prop_state
       end interface
       
+      interface init_state_attributes
+      module procedure init_state_attributes_SA
+      end interface
+
+      interface get_active_velocity
+      module procedure get_active_velocity_SA
+      end interface
+      
+      
+      interface update_particle_state
+      module procedure update_particle_state_SA
+      end interface
+
+      interface set_state_hatched   ! internal interface
+      module procedure set_state_hatched_FL
+      module procedure set_state_hatched_SA
+      end interface
+
+      interface delete_state_attributes
+      module procedure delete_state_attributes_SA
+      end interface   
+  
 
 c     ==============================================================
 c     ========             module data section              ========
 c     ==============================================================
-      integer, parameter    :: verbose = 0    ! control output volume
+      integer, parameter    :: verbose = 0 ! control output volume
 
-      integer               :: particle_counter   ! module counter for generating IDs for particles
+      integer               :: particle_counter ! module counter for generating IDs for particles
 
-      type(spline_2D)       :: lplow_2Dspline   ! predation window, lower lp/llarv
-      type(spline_2D)       :: lphigh_2Dspline  ! predation window, upper lp/llarv
-
-      integer               :: nforpt           ! sampling point for ingeation integrals
+      integer               :: nforpt ! sampling point for ingration integrals
       real, parameter       :: growth_increment_interval = 86400 ! later move to input
 
-      logical, parameter    :: slope = .true.   ! for d/dlp functions
-      logical, parameter    :: value = .false.  ! for d/dlp functions
-
       real,parameter        :: lp_min_search_value = 1.e-3 ! [mm] lower prey size, for optimality search
+
+c
+      real,allocatable      :: ingestion_ref_DB(:,:,:)   ! (llarv,logZ,julian_day)
+      real,allocatable      :: llarv_grid(:)
+      real,allocatable      :: logZ_grid(:)              ! log base = e
+      real,allocatable      :: jday_grid(:)              ! currently no periodic BC applies
 c     ===============================================================
-                                  contains
+                               contains
 c     ===============================================================
      
  
-      subroutine init_particle_state()  ! module operator
+      subroutine init_particle_state()
+      call init_feeding_larval_stage()
+      end subroutine init_particle_state
+
+      subroutine init_feeding_larval_stage() ! module operator
 c     ---------------------------------------------------------------
 c     This subroutine should initialize this module 
 c     ---------------------------------------------------------------
-      real, allocatable :: rprof_grid(:), llarv_grid(:)
-      integer           :: nrprof, nllarv, i
-      real              :: rprofmin, dllarv,llarv_len_max,llarv_len_min
+c     
+      type(local_environment) :: local_env ! for testing
+      type(larval_physiology) :: ref_larv  ! for testing
+      real                    :: lp,llarv,dlp ,drp,rprof,irate
+      real                    :: dllarv, dlogZ, djday
+      integer                 :: m,mpt,i0,j0,k0,i1,j1,k1
 c     ---------------------------------------------------------------
       write (*,*) trim(get_particle_version())
-      particle_counter = 1 ! ID for next larvae
-c
-c     --- setup optimal foraging auxillary grids
-c
-      call read_control_data(ctrlfile,"larval_rprof_grid_min", rprofmin)
-      call read_control_data(ctrlfile,"larval_llarv_grid_min", 
-     +                       llarv_len_min) 
-      call read_control_data(ctrlfile,"larval_llarv_grid_max", 
-     +                       llarv_len_max)
-   
-      write(*,*) "init_particle_state: larval interpolation grid = [",
-     +           llarv_len_min,llarv_len_max,"]"
-      write(*,*) "init_particle_state: larval profitability grid = [",
-     +           rprofmin, " 1.0]"
+c     
+c     --- pass init to sub modules
+c     
+      call init_larval_properties() ! module init
 
-      call read_control_data(ctrlfile,"larval_nprof_grid_points",nrprof)
-      call read_control_data(ctrlfile,"larval_llarv_grid_points",nllarv)
+      particle_counter = 1      ! ID for next larvae (inactive when embedded)
+c     
       call read_control_data(ctrlfile,"ingestion_integral_sampling",
-     +                       nforpt)
-
-      write(*,*) "init_particle_state: larval size   sampling  =",nllarv
-      write(*,*) "init_particle_state: profitability sampling  =",nrprof
-      write(*,*) "init_particle_state: intake integral sampling=",nforpt
-
-      allocate( rprof_grid(nrprof) )
-      allocate( llarv_grid(nllarv) )
-      do i=1,nrprof
-         rprof_grid(i) = rprofmin + (1.0-rprofmin)*(i-1)/(nrprof-1)
-      enddo
-      dllarv = llarv_len_max - llarv_len_min 
-      do i=1,nllarv
-         llarv_grid(i) = llarv_len_min + dllarv*(i-1)/(nllarv-1)
-      enddo
-      write(*,155) "rprof_grid", rprofmin,      nrprof, 1.0
-      write(*,155) "llarv_grid", llarv_len_min, nllarv, llarv_len_max
-      write(*,*)   "init_particle_state: setup_foraging_window_db"
- 155  format("init_particle_state:",a," =[",f9.5,",<",i4,">,",f9.5,"]")
+     +     nforpt)
+      write(*,*) "init_particle_state: ingestion integral sampling =",
+     +            nforpt
       
-      call setup_foraging_window_db(rprof_grid, llarv_grid)
+      call setup_ingestion_db()
+     
+cc      ----- test section -----
 
-c     grids llarv_grid and rprof_grid are copied by spline class
-c     so they need not to be kept
-      deallocate (rprof_grid)
-      deallocate (llarv_grid)
+c      call probe_local_environment((/0.0, 0.0, 1.0/),local_env)
+c      lp    = 0.5
+c      llarv = 10.0
+c      dlp   = 0.03
+c      call test_lp_derivatives(lp, llarv, local_env, dlp)
+c      rprof = 0.56
+c      drp   = 0.01
+c      call test_rprof_derivatives(llarv, rprof, local_env, drp)
+c      stop 555
 
-      end subroutine 
+      end subroutine init_feeding_larval_stage
+
 
 
       character*100 function get_particle_version()  
@@ -202,7 +245,12 @@ c     ---------------------------------------------------------------
 
 
 
-      subroutine close_particle_state() ! module operator
+      subroutine close_particle_state()
+      call close_feeding_larval_stage()
+      end subroutine close_particle_state
+
+
+      subroutine close_feeding_larval_stage() ! module operator
 c     ---------------------------------------------------------------
 c     Module clean up stuff here
 c     (e.g. memory deallocation, MPI finalisation, final dumps etc.)
@@ -210,15 +258,16 @@ c     Only deallocate own data, i.e. data allocated in this module
 c     ---------------------------------------------------------------
       write(*,*) "close_particle_state():"
       particle_counter               = 0
+c
+c     --- pass init to sub modules reversely
+c
+      call close_larval_properties()  ! module close down
 
-      call delete_spline(lplow_2Dspline)
-      call delete_spline(lphigh_2Dspline)
-
-      end subroutine 
+      end subroutine close_feeding_larval_stage
       
 
 
-      subroutine init_state_attributes(state, space, time_dir,             
+      subroutine init_state_attributes_SA(state, space, time_dir,             
      +                                 initdata, emitboxID)
 c     ---------------------------------------------------------------
 c     This subroutine should initialize state attributes (and 
@@ -236,6 +285,35 @@ c     ---------------------------------------------------------------
       character*(*),intent(in)               :: initdata
       integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------------
+      state%orig_boxID = emitboxID   ! store releasing box
+      state%particleID = particle_counter    
+      particle_counter = particle_counter + 1 ! module data
+
+      call init_state_attributes_FL(state%larvae, space, time_dir,             
+     +                                 initdata) 
+c     ----------------------------------------------------
+      end subroutine init_state_attributes_SA
+
+
+
+
+      subroutine init_state_attributes_FL(state, space, time_dir,             
+     +                                 initdata)
+c     ---------------------------------------------------------------
+c     This subroutine should initialize state attributes (and 
+c     possibly also space attributes like boundary conditions and mobility)
+c
+c     Their space part shas already been initialized so that e.g. 
+c     local physical conditions
+c     can be assessed using their position. 
+c    
+c     Currently initdata is unused
+c     --------------------------------------------------------------- 
+      type(feeding_larvae),intent(out)       :: state
+      type(spatial_attributes),intent(inout) :: space
+      real,intent(in)                        :: time_dir            
+      character*(*),intent(in)               :: initdata
+c     ---------------------------------------------------------------
       if (time_dir<0) then
          write(*,*) "init_state_attributes: time_dir<0 not implemented" 
          stop
@@ -243,27 +321,20 @@ c     ---------------------------------------------------------------
       
 c     parse initdata string here, if needed
 
-      state%orig_boxID = emitboxID   ! store releasing box
-      state%particleID = particle_counter    
-      particle_counter = particle_counter + 1 ! module data
-
-      call init_larval_physiology(state%larvstate)
-
-      call set_state_hatched(state, space) 
-
-      state%time_since_growth = 0 
-      state%tempxdt           = 0    
-      state%survival          = 1.0   
-
+      call set_larvae_hatched(state%larvstate, space) ! currently only support this init state
+  
 c     ----------------------------------------------------
-      end subroutine 
+      end subroutine init_state_attributes_FL
+
+      
 
 
-      subroutine get_active_velocity(state, space, v_active)
+      subroutine get_active_velocity_SA(state, space, v_active)
 c     --------------------------------------------------------------
 c     Currently no migration pattern implemented (set v_active = 0 0 0)
 c     If available, this subroutine should determine
 c     v_active from (state, space) of the particle
+c
 c     This should really be in species properties
 c     --------------------------------------------------------------
       type(state_attributes), intent(in)   :: state
@@ -272,15 +343,60 @@ c     --------------------------------------------------------------
 c 
       v_active = 0.
 c     --------------------------------------------------------------
-      end subroutine 
+      end subroutine get_active_velocity_SA
+
+
+      subroutine get_active_velocity_FL(state, space, v_active)
+c     --------------------------------------------------------------
+c     Currently no migration pattern implemented (set v_active = 0 0 0)
+c     If available, this subroutine should determine
+c     v_active from (state, space) of the particle
+c
+c     This should really be in species properties
+c     --------------------------------------------------------------
+      type(feeding_larvae), intent(in)     :: state
+      type(spatial_attributes), intent(in) :: space      
+      real, intent(out)                    :: v_active(:) ! meter/second
+c 
+      v_active = 0.
+c     --------------------------------------------------------------
+      end subroutine get_active_velocity_FL
 
 
 
-      subroutine update_particle_state(state, space, dt)
+      subroutine update_particle_state_SA(state, space, dt)
+c     --------------------------------------------------------------
+c     --------------------------------------------------------------
+      type(state_attributes), intent(inout)   :: state
+      type(spatial_attributes), intent(inout) :: space
+      real,intent(in)                         :: dt   ! in seconds
+c
+      real                                    :: mortality_rate
+      logical                                 :: die, next ! stage shift/death request
+c     --------------------------------------------------------------
+      if (.not.state%alive) return
+      call update_particle_state_FL(state%larvae, space, dt,  
+     +                       mortality_rate, die, next)
+c
+c     Update administrative attributes - currently ignore next, if set
+c
+      state%survival = state%survival * exp(-mortality_rate*dt)
+      if (die) call set_state_dead(state, space)  
+c     --------------------------------------------------------------
+      end subroutine update_particle_state_SA
+
+
+
+
+      subroutine update_particle_state_FL(state, space, dt, 
+     +                       mortality_rate, die, next)
 c     --------------------------------------------------------------
 c     This subroutine should integrate state forward for
-c     time period dt 
-c
+c     time period dt.
+c     Also set auxillary parameters:
+c        mortality_rate: current net mortality rate [1/sec]
+c        die           : if .true. kill this entity (avoid having mortality_rate=infinity)
+c        next          : if .true. advance (or regress) to ontogenetic stage (depending on sign of dt)
 c     The subroutines below call a potentially deep hierachy
 c     of other subroutines; to avoid duplicated interpolations of
 c     the local environment, a flat container structure local_environment
@@ -288,9 +404,11 @@ c     is created which contains potential look-ups, and this
 c     container structure is passed around to increase flexibility
 c     and avoid messy argument relaying 
 c     --------------------------------------------------------------
-      type(state_attributes), intent(inout)   :: state
+      type(feeding_larvae), intent(inout)     :: state
       type(spatial_attributes), intent(inout) :: space
       real,intent(in)                         :: dt ! in seconds
+      real,intent(out)                        :: mortality_rate
+      logical,intent(out)                     :: die, next
 c
       type(local_environment)                 :: local_env
       real                                    :: xyz(3)
@@ -298,38 +416,51 @@ c
       real                                    :: irate,tacc,tempavg
 c     --------------------------------------------------------------
       if (dt<0) stop "negative dt values currently blocked"
-      
+
       call get_tracer_position(space, xyz)
-      call probe_local_environment(xyz,local_env)
+      call probe_local_environment(xyz, local_env)
+              
+      call add_routine_metabolic_costs(state%larvstate,local_env,dt) ! day/night    
       
-      call add_routine_metabolic_costs(state%larvstate,local_env,dt) ! day/night
       if (local_env%light) then 
-         call calculate_ingestion_rate(state%larvstate,local_env,irate)   ! visual predator
+         call interpolate_ingestion_rate(state%larvstate,local_env,
+     +                                   irate)                 ! visual predator
          call add_ingestion(state%larvstate, irate*dt, dt) ! currently just average, no Poisson       
       endif
+
       state%time_since_growth = state%time_since_growth + dt
       state%tempxdt           = state%tempxdt + dt*local_env%temp            
-
+      
       if (state%time_since_growth > growth_increment_interval) then
          tacc    = state%time_since_growth
          tempavg = state%tempxdt/tacc
          call grow_larvae(state%larvstate, tempavg, tacc) ! growth in mass
-         call update_larval_length(state) 
-         call update_survival_chance(state, space, tacc) 
+         call update_larval_length(state)  ! now length/weight are in sync
+         call inquire_stage_change(state%larvstate, next) 
          state%time_since_growth = 0.0 ! reset time accumulator
          state%tempxdt           = 0.0 ! reset temp accumulator
       endif
+      call evaluate_survival_chance(state, space, dt,
+     +                                    mortality_rate, die)
+
+      stop "define next above before exit"
+
       call clear_local_environment(local_env) ! in case memory were allocaetd
 c     --------------------------------------------------------------
+      end subroutine update_particle_state_FL
+
+
+
+
+      subroutine delete_state_attributes_SA(state) 
+      type(state_attributes), intent(inout) :: state 
+      call delete_state_attributes_FL(state%larvae)
       end subroutine 
 
-
-
-      subroutine delete_state_attributes(state) 
-      type(state_attributes), intent(inout) :: state 
+      subroutine delete_state_attributes_FL(state) 
+      type(feeding_larvae), intent(inout) :: state 
       call close_larval_physiology(state%larvstate)
       end subroutine 
-
 
       subroutine write_state_attributes(state)
 c     --------------------------------------------------------------
@@ -340,14 +471,14 @@ c     --------------------------------------------------------------
 
 
 c     ==============================================================
-c     ========      internal (non public) subroutine        ========
+c     ========      internal (non public) subroutines       ========
 c     ==============================================================
 
 
 
       subroutine get_condition_number(state, phi)
 c     ---------------------------------------------------
-      type(state_attributes), intent(in)   :: state 
+      type(feeding_larvae), intent(in)     :: state 
       real, intent(out)                    :: phi
       real                                 :: nomweight
 c     ---------------------------------------------------
@@ -358,11 +489,11 @@ c     ---------------------------------------------------
 
 
 
-      subroutine update_larval_length(state)   
+      subroutine update_larval_length(state)    
 c     ---------------------------------------------------
 c     Enforce that larval length can not decrease
 c     ---------------------------------------------------
-      type(state_attributes), intent(inout) :: state 
+      type(feeding_larvae), intent(inout) :: state 
       real :: lnom
       call weight_to_nominal_length(state%larvstate%weight, lnom)
       if (lnom > state%larvstate%length) state%larvstate%length = lnom
@@ -372,25 +503,42 @@ c     ---------------------------------------------------
       
 
 
-      subroutine set_state_hatched(state, space) 
+      subroutine set_state_hatched_FL(state, space) 
+c     ---------------------------------------------------
+c     Initialize larvae in newly hatched state
+c     make no assumptions about previous history
+c     ---------------------------------------------------
+      type(feeding_larvae), intent(inout)    :: state
+      type(spatial_attributes),intent(inout) :: space
+c     ---------------------------------------------------
+      call set_tracer_mobility_free(space)   
+      call set_larvae_hatched(state%larvstate,space)
+      state%time_since_growth = 0 
+      state%tempxdt           = 0    
+      end subroutine set_state_hatched_FL
+
+
+
+      subroutine set_state_hatched_SA(state, space) 
 c     ---------------------------------------------------
 c     Initialize larvae in newly hatched state
 c     make no assumptions about previous history
 c     ---------------------------------------------------
       type(state_attributes), intent(inout)  :: state
       type(spatial_attributes),intent(inout) :: space
-c     ---------------------------------------------------
-      call set_tracer_mobility_free(space)       
-      call set_larvae_hatched(state%larvstate,space)                         
-      state%alive                = .true.
-      
-      end subroutine set_state_hatched
+c     ---------------------------------------------------       
+      call set_state_hatched(state%larvae, space)  
+      state%survival          = 1.0   
+      state%alive             = .true.
+      end subroutine set_state_hatched_SA
+
 
 
 
       subroutine set_state_dead(state, space)
 c     ---------------------------------------------------
-c     Set larval state to dead
+c     Set larval state to dead (there is no overloaded variant for 
+c     type feeding_larvae, because it does not know if it is dead or not)
 c     leave most variable at value just before larvae died
 c     make no assumptions about previous history
 c     ---------------------------------------------------
@@ -406,62 +554,14 @@ c     ---------------------------------------------------
       end subroutine set_state_dead
 
 
-c     ------ numerical integrals of continuous feeding intervals here ------
-
-
-      subroutine trapez_integral(y, dy, h, intg, dintg_dx0, dintg_dx1) 
-c     ------------------------------------------------------------------
-c     Evaluate the trapez integral intg and the end points derivatives
-c     (dintg_dx0, dintg_dx1) of the integrand y(x) on a regular sampling grid
-c     x = [x0, x0+h, ..., x1](not in argument list - not needed explicitly) 
-c     with regular grid spacing h. dy is the derivative of y, dydx(x), 
-c     on same regular sampling grid.
-c     
-c     The end point derivatives (dintg_dx0, dintg_dx1) are consistent with
-c     values obtained by numerical differentiation when using a 
-c     finite sampling grid x. When a finite sampling grid is used, this
-c     is slightly different from the analytic end point rule. When 
-c     sampling grid x becomes infinitely dense, (dintg_dx0, dintg_dx1) 
-c     should converge to the result of the analytic end point rule
-c
-c     Validated by numerical differentiation    
-c     ------------------------------------------------------------------
-      real,intent(in)  :: y(:)
-      real,intent(in)  :: dy(:)
-      real,intent(in)  :: h
-      real,intent(out) :: intg, dintg_dx0, dintg_dx1
-      integer          :: n,i
-      real             :: w(size(y)),dhdx0,dhdx1,dsdx0,dsdx1
-c     ------------------------------------------------------------------
-      n     = size(y)
-      w     = 1.0
-      w(1)  = 0.5
-      w(n)  = 0.5
-      dhdx0 = -1.0/(n-1)/h
-      dhdx1 =  1.0/(n-1)/h
-c
-      intg      = 0.0 
-      dintg_dx0 = 0.0
-      dintg_dx1 = 0.0
-      do i=1,n
-         dsdx0     = 1.0*(n-i)/(n-1)
-         dsdx1     = 1.0*(i-1)/(n-1)
-         intg      = intg + w(i)*y(i)
-         dintg_dx0 = dintg_dx0 + w(i)*(dy(i)*dsdx0 + y(i)*dhdx0)
-         dintg_dx1 = dintg_dx1 + w(i)*(dy(i)*dsdx1 + y(i)*dhdx1)
-      enddo
-      intg      = intg*h
-      dintg_dx0 = dintg_dx0*h
-      dintg_dx1 = dintg_dx1*h
-      end subroutine trapez_integral
 
 
 
-      subroutine eval_gain(llarv,rprof,local_env, g,dgdp,d2gdp2)
+      subroutine eval_gain(llarv,rprof,local_env, g, dgdp)
 c     ------------------------------------------------------------------
 c     Evaluate the energetic gain g [myg/sec] that a larvae of length llarv
 c     have when feeding at profitability level rprof
-c     Also evaluate profitability derivatives dgdp,d2gdp2
+c     Also evaluate profitability derivatives dgdp
 c
 c     Notice that the analytic rule for derivatives of an integral 
 c     can not be used when a finite numerical sampling scheme is applied
@@ -477,214 +577,316 @@ c     ------------------------------------------------------------------
       type(local_environment),intent(in) :: local_env ! ambient conditions
       real,intent(out)                   :: g
       real,intent(out)                   :: dgdp
-      real,intent(out)                   :: d2gdp2
 c
       integer :: i
-      real    :: lp_intv
-      real    :: lp(nforpt)  ! automatic array to represent integration grids
+      real    :: lp_intv,lp
       real    :: y(nforpt)   ! automatic array to represent ingestion integrands
       real    :: dy(nforpt)  ! automatic array to represent integrand derivatives
-
-c     --- 2D spline derivative operator handlers ---
-      integer,parameter :: deriv00(2) = (/0,0/)  ! just value 
-      integer,parameter :: deriv01(2) = (/0,1/)  ! d/dp
-      integer,parameter :: deriv02(2) = (/0,2/)  ! d2/dp2
+      real    :: w(nforpt)   ! automatic array to represent handling time integrands
+      real    :: dw(nforpt)  ! automatic array to represent integrand derivatives
 
       real    :: lp0, lp1, h
       real    :: ing, ding_dlp0, ding_dlp1
       real    :: xht, dxht_dlp0, dxht_dlp1
-      real    :: ding_dp, dxht_dp, d2ing_dp2, d2xht_dp2, b, db_dp 
-      real    :: dlp0_dp, d2lp0_dp2, dlp1_dp, d2lp1_dp2 
-
+      real    :: ding_dp, dxht_dp,  b, db_dp 
+      real    :: dlp0_dp, dlp1_dp  
+      real    :: enc, pval, htime, denc_dlp, dpval_dlp, dhtime_dlp
 c     ------------------------------------------------------------------ 
-
 c
 c     --- retreieve foraging window [lp0,lp1] for this (llarv,rprof)
+c         and the derivatives with respect to profitability
+       
+      call find_foraging_window(llarv,local_env,rprof, 
+     +                          lp0, dlp0_dp, lp1, dlp1_dp)
 c
-      call evaluate_spline(lplow_2Dspline, llarv,rprof,deriv00,lp0) 
-      call evaluate_spline(lphigh_2Dspline,llarv,rprof,deriv00,lp1) 
-      lp0     = lp0*llarv ! unscale 
-      lp1     = lp1*llarv ! unscale 
-c
-c     --- setup integration sampling grid
-c
+c     --- setup ingestion / handling time integrands and evaluate integrals
+c         along with derivatives
+c      
       lp_intv = lp1-lp0
       h       = lp_intv/(nforpt-1)
       do i=1,nforpt
-         lp(i) = lp0 + lp_intv*(i-1)/(nforpt-1)
+         lp = lp0 + lp_intv*(i-1)/(nforpt-1)
+         call encounter_rate(lp, llarv, local_env, enc, denc_dlp)
+         call prey_value(lp, llarv, local_env, pval, dpval_dlp)
+         call handling_time(lp, llarv, local_env, htime, dhtime_dlp)
+c      
+c        y  =  encounter_rate * prey_value        
+c        w  =  encounter_rate * handling_time
+c
+         y(i)   = enc * pval
+         dy(i)  = denc_dlp * pval  +  enc * dpval_dlp  
+c
+         w(i)   = enc * htime 
+         dw(i)  = denc_dlp * htime  +  enc * dhtime_dlp       
+c
       enddo
 c
-c     --- setup ingestion integrand and evaluate ingestion integral
-c         along with derivatives
-c      
-      do i=1,nforpt
-         y(i)  = enc_rate(lp(i), llarv, local_env, value)
-     +           * epsil(lp(i), llarv, value)
-         dy(i) = enc_rate(lp(i), llarv, local_env, slope)
-     +          * epsil(lp(i), llarv, value) 
-     +          + enc_rate(lp(i), llarv, local_env, value)
-     +          * epsil(lp(i), llarv, slope)             
-      enddo
-      call trapez_integral(y, dy, h, ing, ding_dlp0, ding_dlp1) 
-c
-c     --- setup handling time (per unit time) integrand and evaluate 
-c         handling time integral along with derivatives
-c      
-      do i=1,nforpt
-          y(i) = enc_rate(lp(i), llarv, local_env, value)
-     +          * HT(lp(i), llarv, value)
-          dy(i) = enc_rate(lp(i), llarv, local_env, slope)
-     +          * HT(lp(i), llarv, value) 
-     +          + enc_rate(lp(i), llarv, local_env, value)
-     +          * HT(lp(i), llarv, slope)        
-      enddo
-      call trapez_integral(y, dy, h, xht, dxht_dlp0, dxht_dlp1)
+      call trapez_integral(y, dy, h, ing, ding_dlp0, ding_dlp1)
+      call trapez_integral(w, dw, h, xht, dxht_dlp0, dxht_dlp1) 
       xht = xht + 1.0  ! per unit time (does not affect derivatives)
-
 c
 c     --- compute end point derivatives consistently
 c         with the numerical integration scheme using chain rule
-c       
-     
-      call evaluate_spline(lplow_2Dspline, llarv,rprof,deriv01,dlp0_dp)    
-      call evaluate_spline(lplow_2Dspline, llarv,rprof,deriv02,
-     +                     d2lp0_dp2)  
-      call evaluate_spline(lphigh_2Dspline,llarv,rprof,deriv01,dlp1_dp)   
-      call evaluate_spline(lphigh_2Dspline,llarv,rprof,deriv02,
-     +                     d2lp1_dp2) 
-
+c        
 c
       ding_dp   = ding_dlp0*dlp0_dp + ding_dlp1*dlp1_dp
       dxht_dp   = dxht_dlp0*dlp0_dp + dxht_dlp1*dlp1_dp
-      d2ing_dp2 =   ding_dlp0*(dlp0_dp**2 + d2lp0_dp2) 
-     +            + ding_dlp1*(dlp1_dp**2 + d2lp1_dp2) 
-      d2xht_dp2 =   dxht_dlp0*(dlp0_dp**2 + d2lp0_dp2) 
-     +            + dxht_dlp1*(dlp1_dp**2 + d2lp1_dp2) 
-
-      b     = ding_dp*xht - ing*dxht_dp
-      db_dp = d2ing_dp2*xht - ing*d2xht_dp2
-
+      b         = ding_dp*xht - ing*dxht_dp
 c
 c     --- finally collect gain g and derivates (dgdp,d2gdp2) from
 c         computed integrals using chain rule
 c     
       g      = ing/xht
       dgdp   = b/xht**2
-      d2gdp2 = (db_dp*xht**2 - 2.0*b*xht*dxht_dp)/xht**4
-
 
       end subroutine eval_gain
 
+ 
 
-
-      subroutine calculate_ingestion_rate(self, local_env, irate) 
+      subroutine calculate_ingestion_rate(ref_larv, local_env, irate, 
+     +                                    rprof) 
 c     ------------------------------------------------------------------
-c     Given the food biomass density zbiomass [g/l] calculate 
-c     the intake rate irate [myg/sec] based on optimal foraging theory
-c     for the larvae represented by self
+c     Calculate the intake rate irate [myg/sec] based on optimal foraging theory
+c     for a reference larvae in state ref_larv when subject to 
+c     local environment local_env.
+c     0 <  rprof < 1 is the relative profitability corresponding to the optimal feeding rate irate
 c     This algorithm localizes the feeding profitability level corresponding
-c     to optimal gain, using splines of continuous food selection intervals
-c     Using a bracketed Newton process
+c     to optimal gain using bisection of gain function value/slope
+c     ------------------------------------------------------------------
+      type(larval_physiology),intent(in) :: ref_larv
+      type(local_environment),intent(in) :: local_env 
+      REAL,intent(out)                   :: irate ! optimal feeding rate
+      REAL,intent(out)                   :: rprof ! relative profitability for optimal feeding rate
 c
-c     Tests: 
-c         1) make a plot of gain vs 0.1 < profitability < 1
-c         2) check consistency of g,dgdp,d2gdp2 in eval_gain
+      REAL                               :: llarv
+      real                               :: p, g,dgdp
+      real                               :: pleft,pright,gleft,gright
+      integer                            :: ist, nsteps,i
+      real, parameter                    :: pleft_min = 1.0e-6  ! initial left search bracket 
+      real, parameter                    :: pleft_max = 0.999 9 ! initial right search bracket 
+      real, parameter                    :: p_resol   = 1.e-7
+      logical                            :: printinfo
 c     ------------------------------------------------------------------
-      type(larval_physiology),intent(in) :: self
-      type(local_environment),intent(in) :: local_env ! ambient conditions
-      REAL,intent(out)                   :: irate
+      llarv     = ref_larv%length 
+      pleft     = pleft_min
+      pright    = pleft_max 
+      
+c     --- check bracket assertions --
+      call eval_gain(llarv,pleft,local_env, gleft, dgdp)    
+      if (dgdp < 0) write(*,211) "left"
+      
+      call eval_gain(llarv,pright,local_env, gright, dgdp)    
+      if (dgdp > 0) write(*,211) "right"
+        
+ 211  format("calculate_ingestion_rate: warning: invalid ",a,
+     +       " bracket - continuing optimization")
+
+c
+c     Bisect maximum gain interval 
+c
+      nsteps = int(log((pright-pleft)/p_resol) / log(2.))
+      
+      do ist = 1, nsteps
+         p = 0.5*(pright + pleft)
+         call eval_gain(llarv, p, local_env, g, dgdp)   
+         if (dgdp > 0) then
+            pleft  = p
+            gleft  = g
+         else
+            pright = p
+            gright = g
+         endif
+c         write(*,*) "[",pleft,">",g,"<",pright, "]"
+      enddo
+c
+c     Finally set irate = max gain 
+c
+      rprof   = 0.5*(pleft + pright) ! final estimator 
+      call eval_gain(llarv, rprof, local_env, irate, dgdp) 
+      
+
+      end subroutine calculate_ingestion_rate
+     
+
+
+
+      subroutine interpolate_ingestion_rate(larvstate, local_env, irate) 
 c     ------------------------------------------------------------------
-      irate = 99. ! silent compiler warnings
-      end subroutine
+c     Interpolate (upper limit) optimal ingestion rate from ingestion_ref_DB
+c     which was initialized in setup_ingestion_db
+c     This interpolator assumes regular llarv,logZ,jday grids
+c     Extract grid spacing/size dynamically rather than storing it as module data
+c     subroutine is validated
+c     ------------------------------------------------------------------
+      type(larval_physiology),intent(in) :: larvstate
+      type(local_environment),intent(in) :: local_env 
+      REAL,intent(out)                   :: irate ! optimal feeding rate
+c
+      REAL                               :: llarv,logZ,jday,vc(8) ! 8=2*2*2
+      REAL                               :: sllarv,slogZ,sjday
+      REAL                               :: dllarv,dlogZ,djday
+      integer                            :: i0,i1,j0,j1,k0,k1
+      integer                            :: nllarv,nlogZ,njday,deriv
+c     ------------------------------------------------------------------
+c     
+c     locate grid coordinates in ingestion_ref_DB(nllarv,nlogZ,njday)
+c
+      llarv = larvstate%length
+      nllarv = size(llarv_grid)
+      if ((llarv < llarv_grid(1)).or.(llarv > llarv_grid(nllarv))) then
+         write(*,*) "interpolate_ingestion_rate: " //
+     +              "extrapolating for dimension llarv"
+      endif
+      dllarv = llarv_grid(2)-llarv_grid(1) ! regular grid
+      i0     = 1 + int((llarv-llarv_grid(1)) / dllarv)
+      i1     = i0 + 1
+      i0     = max(1,min(i0,nllarv))
+      i1     = max(1,min(i1,nllarv))
+      sllarv = (llarv - llarv_grid(i0))/dllarv
+c      
+      logZ   = log(local_env%zbiomass)
+      nlogZ  = size(logZ_grid)
+      if ((logZ < logZ_grid(1)).or.(logZ > logZ_grid(nlogZ))) then
+         write(*,*) "interpolate_ingestion_rate: " //
+     +              "extrapolating for dimension logZ"
+      endif
+      dlogZ  = logZ_grid(2)-logZ_grid(1)   ! regular grid
+      j0     = 1 + int((logZ-logZ_grid(1)) / dlogZ)
+      j1     = j0 + 1
+      j0     = max(1,min(j0,nlogZ))
+      j1     = max(1,min(j1,nlogZ))
+      slogZ = (logZ - logZ_grid(j0))/dlogZ
+c      
+      jday  = float(local_env%julday)  
+      njday = size(jday_grid)              ! integer
+      if ((jday < jday_grid(1)).or.(jday > jday_grid(njday))) then
+         write(*,*) "interpolate_ingestion_rate: " //
+     +              "extrapolating for dimension jday"
+      endif
+      djday = jday_grid(2)-jday_grid(1) ! regular grid
+      k0     = 1 + int((jday-jday_grid(1)) / djday)
+      k1     = k0 + 1
+      k0     = max(1,min(k0,njday))
+      k1     = max(1,min(k1,njday))
+      sjday = (jday - jday_grid(k0))/djday
+c      
+c     vc(1:8) = v000,v001,v010,v011, v100,v101,v110,111
+c
+      vc(1) = ingestion_ref_DB(i0,j0,k0)
+      vc(2) = ingestion_ref_DB(i0,j0,k1)
+      vc(3) = ingestion_ref_DB(i0,j1,k0)
+      vc(4) = ingestion_ref_DB(i0,j1,k1)
+      vc(5) = ingestion_ref_DB(i1,j0,k0)
+      vc(6) = ingestion_ref_DB(i1,j0,k1)
+      vc(7) = ingestion_ref_DB(i1,j1,k0)
+      vc(8) = ingestion_ref_DB(i1,j1,k1)
+      deriv = 0        ! request value interpoaltion
+c
+      call interp_3Dbox_data(sllarv,slogZ,sjday,vc,deriv,irate)
+c     
+      end subroutine interpolate_ingestion_rate
 
 
-
-      real function enc_rate(lp,llarv, local_env,deriv)
+      subroutine encounter_rate(lp, llarv, local_env, enc, denc_dlp)
 c     --------------------------------------
-c     Evaluate the encounter rate density [unit == individuals/mm/sec] 
+c     Evaluate the encounter rate density enc [unit == individuals/mm/sec] and derivatives
 c     of prey at length lp [mm] of a larval predator of length llarv [mm]
 c     The encounter rate of prey in a length interval [lp - 0.5*dL; lp + 0.5*dL]
 c     corresponds to dN = enc_rate*dL  [unit == individuals/sec]
 c     Encounter rate density is evaluated as clearence volume [unit == mm3/sec]
 c     times density of prey [unit == individuals/mm3/mm] 
 c
-c     Applies spectrum_prey_density (from module prey_community)
-c     and SV (from module larval_properties)      
-c
-c     deriv = false: return enc_rate   
-c     deriv = true : return (d/dlp) enc_rate   
+c     Applies prey_spectrum_density (from module prey_community)
+c     and search_volume (from module larval_properties)          
 c     --------------------------------------
       REAL,intent(in)                    :: lp        ! prey length [mm]
       REAL,intent(in)                    :: llarv     ! larval length [mm]
       type(local_environment),intent(in) :: local_env ! ambient conditions
-      logical,intent(in)                 :: deriv
+      REAL,intent(out)                   :: enc       ! encounter rate density
+      REAL,intent(out),optional          :: denc_dlp  ! (d/dlp) encounter rate density   
+
+      REAL                               :: dens, ddens_dlp
+      REAL                               :: svol, dsvol_dlp
 c     --------------------------------------
-      if (deriv) then
-         enc_rate = 
-     +         spectrum_prey_density(lp,local_env,slope)
-     +         * SV(lp,llarv,local_env,value)
-     +       + spectrum_prey_density(lp,local_env,value)
-     +         * SV(lp,llarv,local_env,slope) 
+      if ( present(denc_dlp) ) then
+         call prey_spectrum_density(lp, local_env, dens, ddens_dlp)
+         call search_volume(lp, llarv, local_env, svol, dsvol_dlp)
+         enc      = dens * svol
+         denc_dlp = ddens_dlp * svol  +  dens * dsvol_dlp
       else
-         enc_rate = 
-     +         spectrum_prey_density(lp,local_env,value)
-     +         * SV(lp,llarv,local_env,value)
+         call prey_spectrum_density(lp, local_env, dens)
+         call search_volume(lp, llarv, local_env, svol)
+         enc = dens * svol
+      endif
+     
+      end subroutine encounter_rate
 
-      endif      
-      end function enc_rate
+ 
 
-
-
-      real function epsil(lp,llarv,deriv)
+      subroutine prey_value(lp,llarv,local_env,pval,dpval_dlp)
 c     --------------------------------------
-c     Evaluate prey value * capture success  [myg] 
-c     of prey length lp
-c     deriv = false: return epsil   
-c     deriv = true : return (d/dlp) epsil   
+c     Evaluate prey value = prey mass * capture success  [myg] 
+c     of prey length lp      
 c     --------------------------------------
       REAL,intent(in)                    :: lp        ! prey length [mm]
       REAL,intent(in)                    :: llarv     ! larval length [mm]
-      logical,intent(in)                 :: deriv
+      type(local_environment),intent(in) :: local_env 
+      REAL,intent(out)                   :: pval      ! prey value
+      REAL,intent(out),optional          :: dpval_dlp ! (d/dlp) prey value
+
+      REAL                               :: pmass, dpmass_dlp
+      REAL                               :: csucc, dcsucc_dlp
 c     --------------------------------------
-      if (deriv) then
-         epsil = prey_mass(lp,slope)*CS(lp,llarv,value)
-     +         + prey_mass(lp,value)*CS(lp,llarv,slope)
-      else
-         epsil = prey_mass(lp,value)*CS(lp,llarv,value)
-      endif      
-      end function epsil
+      if ( present(dpval_dlp) ) then
+         call prey_mass(lp, pmass, dpmass_dlp)
+         call capture_sucess(lp, llarv, local_env, csucc, dcsucc_dlp)
+         pval      = pmass * csucc
+         dpval_dlp = dpmass_dlp * csucc  +  pmass * dcsucc_dlp
+      else   
+         call prey_mass(lp, pmass)
+         call capture_sucess(lp, llarv, local_env, csucc)
+         pval = pmass * csucc
+      endif
+
+      end subroutine prey_value
 
 
       
-      real function rank(lp,llarv,deriv)
-c     --------------------------------------
+      subroutine rank(lp, llarv, local_env, rnk, drnk_dlp)
+c     ----------------------------------------------------------------------------
 c     Evaluate            
-c                       value * capture success   [myg] 
-c         prey rank =  ---------------------------------
-c                           handling time      [seconds]
+c                           prey_value    [myg] 
+c         prey rank =   -----------------------------
+c                        handling time    [seconds]
 c   
-c     of prey length lp
-c     deriv = false: return rank
-c     deriv = true : return (d/dlp) rank
-c     --------------------------------------
+c     of prey length lp, where prey_value = prey_mass * capture success
+c     and optionally (d/dlp) prey rank 
+c     ----------------------------------------------------------------------------
       REAL,intent(in)                    :: lp        ! prey length [mm]
       REAL,intent(in)                    :: llarv     ! larval length [mm]
-c     type(local_environment),intent(in) :: local_env ! ambient conditions
-      logical,intent(in)                 :: deriv
-c     --------------------------------------
-      if (deriv) then
-         rank = (epsil(lp,llarv,slope)* HT(lp,llarv,value)
-     +         - epsil(lp,llarv,value)* HT(lp,llarv,slope))
-     +         / HT(lp,llarv,value)**2
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(out)                   :: rnk       ! prey rank 
+      REAL,intent(out),optional          :: drnk_dlp  ! (d/dlp) prey rank 
+ 
+      REAL                               :: pval, dpval_dlp 
+      REAL                               :: htime, dhtime_dlp 
+c     ----------------------------------------------------------------------------
+      if ( present(drnk_dlp) ) then
+         call prey_value(lp, llarv, local_env, pval, dpval_dlp)
+         call handling_time(lp, llarv, local_env, htime, dhtime_dlp)
+         rnk      = pval/htime
+         drnk_dlp = (dpval_dlp*htime - pval*dhtime_dlp)/htime**2
       else
-         rank =  epsil(lp,llarv,value)
-     +         / HT(lp,llarv,value)
-      endif      
-      end function rank
+         call prey_value(lp, llarv, local_env, pval)
+         call handling_time(lp, llarv, local_env, htime)
+         rnk = pval/htime
+      endif
+   
+      end subroutine rank
 
 
       
-      subroutine find_rank_maximum(llarv,lp,rmax)
+      subroutine find_rank_maximum(llarv, local_env, lp, rmax)
 c     --------------------------------------
 c     Locate prey length lp corresponding to the 
 c     prey rank maximum rmax for a larvae 
@@ -692,201 +894,278 @@ c     with larval length llarv using rank slope bisection
 c
 c     Assert lp_min_search_value < lp < llarv to establish a search bracket
 c     --------------------------------------
-      REAL,intent(in)    :: llarv ! larval length [mm]
-      REAL,intent(out)   :: lp    ! prey length [mm]
-      REAL,intent(out)   :: rmax  ! rank maximum [myg/second]
+      REAL,intent(in)                    :: llarv ! larval length [mm]
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(out)                   :: lp    ! prey length at rank maximum [mm]
+      REAL,intent(out)                   :: rmax  ! rank maximum [myg/second]
 c
       REAL,parameter     :: lp_resolution = 1.e-6 ! [mm]
    
-      REAL               :: lpleft,lpright,r
+      REAL               :: lpleft,lpright,rnk,drnk_dlp
       integer            :: nsteps, ist
 c     -------------------------------------
       lpleft  = lp_min_search_value  ! assert (d/dlp) rank (lleft)  > 0
       lpright = llarv                ! assert (d/dlp) rank (lright) < 0
 c     --- check assertions ---
-      if (rank(lpleft,llarv,slope) < 0) then
+      call rank(lpleft, llarv, local_env, rnk, drnk_dlp)   
+      if (drnk_dlp < 0) then   ! 
          stop "find_rank_maximum: invalid left bracket"
       endif
-      if (rank(lpright,llarv,slope) > 0) then
+      call rank(lpright, llarv, local_env, rnk, drnk_dlp) 
+      if (drnk_dlp > 0) then
          stop "find_rank_maximum: invalid right bracket"
       endif
       nsteps = int(log((lpright-lpleft)/lp_resolution) / log(2.))
-      do ist=1,nsteps
+      do ist = 1, nsteps
          lp = 0.5*(lpleft + lpright)
-         if (rank(lp,llarv,slope) > 0) then
+         call rank(lp, llarv, local_env, rnk, drnk_dlp) 
+         if (drnk_dlp > 0) then
             lpleft  = lp
          else
             lpright = lp
          endif
       enddo
-      lp   = 0.5*(lpleft + lpright) ! final estimator
-      rmax = rank(lp,llarv,value)
+
+      lp   = 0.5*(lpleft + lpright) ! final estimator 
+      call rank(lp, llarv, local_env, rmax)
+      
       end subroutine find_rank_maximum
 
 
 
-      subroutine find_foraging_window(llarv,rprof,lplow,lphigh)
+      subroutine find_foraging_window(llarv,local_env,rprof,
+     +                  lplow, dlplow_drp,
+     +                  lphigh, dlphigh_drp)
 c     -------------------------------------------------------
 c     Locate the larval foraging prey size interval 
 c     window [lplow,lphigh] where rprof < rank(lp)/max_rank < 1
-c     Can be accelerated using a Newton search process
+c     along with derivatives (dlplow_drp, dlphigh_drp) of (lplow,lphigh) with respect to rprof
+c
+c     These derivatives are determined exactly by perturbation theory from 
+c     the derivatives of rank(lp). In the singular limit rprof->1
+c     derivatives are assigned +/- infty, with sign from left side limit of rprof->1
+c
 c     Assume optimal foraging window is a contiguous interval 
 c     Assume optimal foraging window is within the
 c     search interval [lp_min_search_value, lpmaxfactor*llarv]
 c     -------------------------------------------------------- 
-      REAL,intent(in)    :: llarv ! larval length [mm]
-      REAL,intent(in)    :: rprof ! minimal relative profitability [myg/second]
-      REAL,intent(out)   :: lplow, lphigh ! foraging window [mm]
-      
-      REAL               :: lp_rmax,rmax,dlp,minrank
-      REAL               :: lpleft,lpright
+      REAL,intent(in)                    :: llarv                   ! larval length [mm]
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(in)                    :: rprof                   ! minimal relative profitability [1/second]
+      REAL,intent(out)                   :: lplow, lphigh           ! foraging window [mm]
+      REAL,intent(out)                   :: dlplow_drp, dlphigh_drp ! derivatives of foraging window [mm]
+c
+      REAL               :: lp_rmax,rmax,minrank,rnk,drnk_dlp
       REAL,parameter     :: lpmaxfactor = 1.0 ! max prey/pred size ratio 
       REAL               :: lplow_limit, lphigh_limit 
+      REAL,parameter     :: infty = 1.0e30 ! value returned in singular limit
 c     -------------------------------------------------------- 
 c
-c     1) locate rank maximum as delimiter for locating lplow,lphigh
-c        Capture singular limit rprof=1, where lplow=lphigh=lp_rmax
-      call find_rank_maximum(llarv, lp_rmax, rmax)
-      if (abs(rprof-1.0)<1.e-4) then
-         lplow  = lp_rmax
-         lphigh = lp_rmax
-         return
-      endif
+c     locate rank maximum as delimiter for locating lplow,lphigh
 c
-c     2) else locate lplow/lphigh
+      call find_rank_maximum(llarv, local_env, lp_rmax, rmax) 
+c
+c     Capture singular limit rprof=1, where lplow=lphigh=lp_rmax
+c
+      if (abs(rprof-1.0)<1.e-4) then
+         lplow         = lp_rmax
+         lphigh        = lp_rmax
+c        --- set derivatives to infinity with sign corresponding to left side limit of rprof->1
+         dlplow_drp    = +infty
+         dlphigh_drp   = -infty         
+         return
+      else
+c
+c     else locate lplow/lphigh by newton_search
 c  
-      minrank = rmax*rprof
-      lplow_limit  = lp_min_search_value
-      lphigh_limit = lpmaxfactor*llarv
-      call newton_search(lplow_limit, lp_rmax,      minrank, lplow)
-      call newton_search(lp_rmax,     lphigh_limit, minrank, lphigh)
+         minrank      = rmax*rprof 
+         lplow_limit  = lp_min_search_value
+         lphigh_limit = lpmaxfactor*llarv
+         call newton_search(lplow_limit, lp_rmax,      minrank, lplow)
+         call newton_search(lp_rmax,     lphigh_limit, minrank, lphigh)
+c        --- set derivatives (rescale to relative profitability = profitability/rmax)
+         call rank(lplow, llarv, local_env, rnk, drnk_dlp)
+         dlplow_drp    = rmax/drnk_dlp ! exact limit from perturbation theory 
+         call rank(lphigh, llarv, local_env, rnk, drnk_dlp)
+         dlphigh_drp   = rmax/drnk_dlp ! exact limit from perturbation theory
+      endif
 
       contains
 
-      subroutine newton_search(x0,x1,r0,x)
+      subroutine newton_search(xleft, xright, r0, x)
 c     ------------------------------------------------
-c     solve rank(x,llarv,value)=r0 in [x0,x1] in local scope
+c     Solve rank(x,llarv,value)=r0 in [xleft,xright] in local scope
+c     using a bracketed Newton search algorithm.
+c     The algorithm uses a bisection fall back on a safe bracket,
+c     in case the Newton search does not converge satisfactory
+c     
+c     use llarv and local_env from embedding scope
 c     ------------------------------------------------
-      real,intent(inout) :: x0,x1 ! input solution bracket
-      real,intent(in)    :: r0    ! function offset
-      real,intent(out)   :: x     ! solution 
-      real               :: s0,s1,sm,xm,f,df,dx
-      REAL,parameter     :: dxlimit = 1.0e-7
+      real,intent(in)    :: xleft, xright ! input solution bracket
+      real,intent(in)    :: r0            ! function offset
+      real,intent(out)   :: x             ! solution 
+      real               :: s0,s1,s,f,df,dx, rnk,drnk_dlp
+      real               :: x0,x1,xlast   ! dynamical bracket
+      REAL,parameter     :: dxlimit = 1.0e-6
       integer            :: iter
       integer,parameter  :: max_iter = 20 ! suspend newton search, if exceeded
 c     --------
       iter = 1
-      x  = 0.5*(x0 + x1)
-      s0 = sign(1.0, rank(x0,llarv,value)-r0)
-      s1 = sign(1.0, rank(x1,llarv,value)-r0)
-      dx = x1-x0 ! an upper bound 
-      do while (abs(dx) > dxlimit) ! Newton loop     
-         f  = rank(x,llarv,value)-r0
-         df = rank(x,llarv,slope)
-         dx = -f/df
-         x  = x+dx
+      x0 = xleft   ! copy initial bracket
+      x1 = xright  ! copy initial bracket
+      
+c     ---- check assertions ----
+      if (x1<x0) stop "newton_search: invalid bracket"
+      call rank(x0, llarv, local_env, rnk)
+      s0 = sign(1.0, rnk-r0)
+      call rank(x1, llarv, local_env, rnk)
+      s1 = sign(1.0, rnk-r0)
+      if ((s0*s1)>0) stop "newton_search: root not bracket"
+c      
+c     locate the solution x: xleft <= x0 < x < x1 < xright
+c
+      dx    = x1-x0         ! an upper bound, to enter while loop
+      x     = 0.5*(x0 + x1) ! set value in case already abs(dx) < dxlimit
+      do while (abs(dx) > dxlimit) ! Newton loop 
+         call rank(x, llarv, local_env, rnk, drnk_dlp)
+         dx    = -(rnk-r0)/drnk_dlp  ! Newton step
+         x     = x + dx   
          if ((x<x0).or.(x>x1).or.(iter>max_iter)) then ! bisection fall back
-            xm  = 0.5*(x0 + x1)
-            sm  = sign(1.0, rank(xm,llarv,value)-r0)
-            dx  = x1-x0 ! an upper bound
-            if (s0*sm > 0) then
-               x0 = xm
-               s0 = sm
-            else
-               x1 = xm
-               s1 = sm
+            xlast = x
+            x     = 0.5*(x0 + x1)
+            dx    = x - xlast
+            call rank(x, llarv, local_env,rnk)
+            s   = sign(1.0, rnk-r0)
+            if (s0*s > 0) then ! update left bracket + sign
+               x0 = x
+               s0 = s
+            else               ! update right bracket + sign
+               x1 = x
+               s1 = s
             endif
-            x  = 0.5*(x0 + x1) ! new mid point
-         endif    ! bisection 
+         endif    ! bisection fall back
 c         write(*,*) x0,x1,x,dx
          iter = iter+1
+         
       enddo ! while     
       end subroutine newton_search ! local function to find_foraging_window
       end subroutine find_foraging_window
 
 
 
-      subroutine setup_foraging_window_db(rprof_grid, llarv_grid)
+
+
+      subroutine setup_ingestion_db()
 c     ----------------------------------------------------------------
-c     Setup 2D spline for lookup of foraging window, corresponding
-c     to a given preying larval size and relative profitability.
-c     The predation window is scaled to the preying larval size to 
-c     condition the spline. Result is stored in module data 
-c     lplow_2Dspline and lphigh_2Dspline
-c 
-c     If the relative profitability (rprof) is 1 (within numerical precision)
-c     apply the exact limit to avoid numerical problem in solving 
-c     near-singular problem. In the future, we may apply the
-c     analytic expansion around rprof = 1
+c     Setup upper ingestion limit data base for reference ranges
+c     Implicit range for jday_grid is 1..365 (ignore leap years in this context)
 c     ----------------------------------------------------------------
-      real, intent(in) :: rprof_grid(:)  ! grid of relative profitabilities
-      real, intent(in) :: llarv_grid(:)  ! grid of preying larvae lengths
-      integer          :: ip,il,nrprof,nllarv
-      real             :: rprof, llarv, lplow,lphigh
-      real             :: lp_rmax, rmax
-      real,parameter   :: rprof_tol = 1.e-4
-      real             :: lower(size(llarv_grid),size(rprof_grid))
-      real             :: upper(size(llarv_grid),size(rprof_grid))
-c     -----------------------------------------------------
-      nllarv = size(llarv_grid)
-      nrprof = size(rprof_grid)
+      real             :: llarv_len_max, llarv_len_min  ! llarv_grid
+      real             :: logZ_min, logZ_max            ! logZ_grid
+      real,parameter   :: jday_min = 1.0          ! currently hard code this
+      real,parameter   :: jday_max = 365.0        ! currently hard code this
+      integer          :: nllarv, nlogZ, njday, i,j,k       
+      real             :: dllarv, dlogZ, djday, irate, rprof
+      type(local_environment) :: local_env 
+      type(larval_physiology) :: ref_larv
+c     ----------------------------------------------------------------
+      write(*,*)   "init_particle_state: setup_ingestion_db"
+c
+c     Read reference grid specifications
+c
+      call read_control_data(ctrlfile,"larval_length_grid_min", 
+     +     llarv_len_min) 
+      call read_control_data(ctrlfile,"larval_length_grid_max", 
+     +     llarv_len_max)     
+      call read_control_data(ctrlfile,"larval_length_grid_points", 
+     +     nllarv)  
+      write(*,732) "larval length",  llarv_len_min,llarv_len_max, nllarv
+c     
+      call read_control_data(ctrlfile,"logZ_grid_min", logZ_min) 
+      call read_control_data(ctrlfile,"logZ_grid_max", logZ_max)
+      call read_control_data(ctrlfile,"logZ_grid_points", nlogZ)
+      write(*,732) "logZ",  logZ_min, logZ_max, nlogZ
+c
+      call read_control_data(ctrlfile,"julian_day_grid_points", njday)
+      write(*,732) "Julian_day", jday_min, jday_max, njday
       
-      do il = 1, nllarv
-         llarv = llarv_grid(il)
-         do ip = 1, nrprof
-            rprof = rprof_grid(ip) ! 
-            if ((rprof < -rprof_tol).or.(rprof > 1.0+rprof_tol)) then
-               write(*,*) "setup_foraging_window_db: invalid rprof", 
-     +                     rprof
-               stop
-            endif
-c           ---- define foraging window: [lplow,lphigh] ----       
-            if (abs(rprof-1.0)<rprof_tol) then
-               call find_rank_maximum(llarv, lp_rmax, rmax)
-               lplow  = lp_rmax ! window collapses
-               lphigh = lp_rmax ! window collapses
-            else
-               call find_foraging_window(llarv,rprof,lplow,lphigh)
-            endif
-            write(*,*) llarv,rprof, ":", lplow/llarv,lphigh/llarv
-            lower(il,ip) = lplow/llarv
-            upper(il,ip) = lphigh/llarv
-         enddo
+ 732  format("setup_ingestion_db: ",a," grid = [",2f12.7,"] with ",
+     +                           i6," points")
+
+c
+c     Setup reference grids
+c
+      allocate( ingestion_ref_DB(nllarv,nlogZ,njday)  )
+      allocate( llarv_grid(nllarv) )
+      allocate( logZ_grid(nlogZ)   )
+      allocate( jday_grid(njday)   )     
+
+      dllarv = llarv_len_max - llarv_len_min
+      do i=1,nllarv
+         llarv_grid(i) = llarv_len_min + dllarv*(i-1)/(nllarv-1)
+      enddo
+
+      dlogZ = logZ_max - logZ_min
+      do j=1,nlogZ
+         logZ_grid(j) = logZ_min + dlogZ*(j-1)/(nlogZ-1)
+      enddo
+
+      djday = jday_max - jday_min
+      do k=1,njday
+         jday_grid(k) = jday_min + djday*(k-1)/(njday-1)
       enddo
 c
-c     ..... lplow_2Dspline/lphigh_2Dspline are module data .....
-c           grids llarv_grid and rprof_grid are copied by spline class
-c           so they need not to be kept
+c     ------ main loop over reference points ------
 c
-      call setup_spline(lplow_2Dspline, llarv_grid,rprof_grid,lower)
-      call setup_spline(lphigh_2Dspline,llarv_grid,rprof_grid,upper)
-
-      end subroutine setup_foraging_window_db
+      local_env%light = .true.
+      local_env%temp  = -1.0 ! should not be used
+      do i = 1, nllarv
+         ref_larv%length = llarv_grid(i)
+         do j = 1, nlogZ
+            local_env%zbiomass = exp(logZ_grid(j))  ! log base = e
+            do k = 1, njday
+               local_env%julday = jday_grid(k)
+               call calculate_ingestion_rate(ref_larv, local_env, 
+     +                                       irate, rprof) 
+               write(*,532) llarv_grid(i), logZ_grid(j), 
+     +                      int(jday_grid(k)), irate, rprof
+               ingestion_ref_DB(i,j,k)  = irate
+            enddo
+         enddo
+      enddo
+      write(*,*)   "setup_ingestion_db: ingestion_ref_DB initialized"
+ 532  format("setup_ingestion_db: llarv=",e11.5," logZ=",e11.5,
+     +       " jday=",i4," -> ingestion rate =",e11.5," @ p=",f12.8)   
+c     ----------------------------------------------------------------
+      end subroutine setup_ingestion_db
       
 
 
-
-      subroutine update_survival_chance(state, space, dt)
+      subroutine evaluate_survival_chance(state, space, dt,
+     +                                    mortality_rate, die)
 c     ---------------------------------------------------
 c     Update the survival counter state%survival for this organism
 c     corresponding to time interval dt
 c     Currently impose condition number hard limit
 c     ---------------------------------------------------
-      type(state_attributes),intent(inout)   :: state
+      type(feeding_larvae),intent(inout)     :: state
       type(spatial_attributes),intent(inout) :: space
       real,intent(in)                        :: dt
+      real,intent(out)                       :: mortality_rate
+      logical,intent(out)                    :: die
+c
       real                                   :: phi
 c     ---------------------------------------------------
-c     state%survival = ...
-
+      mortality_rate = 0.0 ! elaborate later
       call get_condition_number(state, phi)
       if (phi < min_condition_number) then
-         call set_state_dead(state, space)  ! set state%survival to zero
+         die = .true.
+      else
+         die = .false.
       endif
+      end subroutine evaluate_survival_chance
 
-      end subroutine update_survival_chance
 
-      
 
 c     subroutine calculate_predation_survival(state,space,pred_surv)
 c     --------------------------------------------------- 
@@ -895,6 +1174,161 @@ c     At some point we may also overlay predator maps (space available)
 c     ---------------------------------------------------
 c     end subroutine calculate_predation_survival
       
+
+c     ==============================================================
+c     testing/validation subroutines
+c     ==============================================================
+
+
+      subroutine test_lp_derivatives(lp, llarv, local_env, dlp)
+c     ---------------------------------------------------
+c     Debugging/validation utility when testing a new setup
+c     Test the consistency of analytical derivatives and
+c     numerical derivatives of:
+c
+c         capture_sucess(lp, llarv, local_env, vector)   from larval_propertie
+c         handling_time(lp,  llarv, local_env, vector)   from larval_propertie
+c         search_volume(lp,  llarv, local_env, vector)   from larval_properties
+c
+c         prey_mass(lp, vector)                          from prey_community
+c         prey_spectrum_density(lp, local_env, vector)   from prey_community
+c
+c         encounter_rate(lp, llarv, local_env, vector)   defined locally from above subroutines
+c         prey_value(lp, llarv, local_env, vector)       defined locally from above subroutines 
+c         rank local(lp, llarv, local_env, vector)       defined locally from above subroutines
+c
+c     where vector has length 1-3
+c     Result is printed to stdout.
+c     dlp is the step length for numerical differentiation
+c     
+c     It is recommended to apply auto doubling of real variables
+c     to have exact validation of derivatives (set this in compiler_defaults.mk,
+c     for the ifort compiler this is -r8)
+c     ---------------------------------------------------
+      REAL,intent(in)                    :: lp        ! prey length [mm]
+      REAL,intent(in)                    :: llarv     ! larval length [mm]
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(in)                    :: dlp       ! step length for numerical differentiation [mm]
+      REAL                               :: val,slope,vm,vp
+c     ---------------------------------------------------
+      write(*,*) "--- test_lp_derivatives:begin --- "
+      write(*,*)
+      write(*,*) "lp    =", lp
+      write(*,*) "llarv =", llarv
+      write(*,*) "dlp   =", dlp
+      write(*,*)
+c     
+      call capture_sucess(lp-dlp, llarv, local_env, vm) 
+      call capture_sucess(lp+dlp, llarv, local_env, vp) 
+      call capture_sucess(lp,     llarv, local_env, val, slope) ! extract analytic derivatives
+      write(*,732) "capture_sucess", val
+      write(*,733) "capture_sucess", slope,(vp-vm)/2/dlp
+      
+      write(*,*)
+c
+      call handling_time(lp-dlp, llarv, local_env, vm) 
+      call handling_time(lp+dlp, llarv, local_env, vp)  
+      call handling_time(lp,     llarv, local_env, val, slope) ! extract analytic derivatives
+      write(*,732) "handling_time", val
+      write(*,733) "handling_time", slope, (vp-vm)/2/dlp
+      write(*,*)
+c
+      call search_volume(lp-dlp, llarv, local_env, vm) 
+      call search_volume(lp+dlp, llarv, local_env, vp)   
+      call search_volume(lp,     llarv, local_env, val, slope) ! extract analytic derivatives
+      write(*,732) "search_volume", val
+      write(*,733) "search_volume", slope, (vp-vm)/2/dlp
+      write(*,*)
+c
+      call prey_mass(lp-dlp, vm) 
+      call prey_mass(lp+dlp, vp) 
+      call prey_mass(lp,     val, slope) ! extract analytic derivatives
+      write(*,732) "prey_mass", val
+      write(*,733) "prey_mass", slope, (vp-vm)/2/dlp
+      write(*,*)
+c
+      call prey_spectrum_density(lp-dlp, local_env, vm) 
+      call prey_spectrum_density(lp+dlp, local_env, vp) 
+      call prey_spectrum_density(lp,     local_env, val, slope) ! extract analytic derivatives
+      write(*,732) "prey_spectrum_density", val
+      write(*,733) "prey_spectrum_density", slope, (vp-vm)/2/dlp
+      write(*,*)
+c
+      call encounter_rate(lp-dlp, llarv, local_env, vm)     
+      call encounter_rate(lp+dlp, llarv, local_env, vp)  
+      call encounter_rate(lp,     llarv, local_env, val, slope) ! extract analytic derivatives     
+      write(*,732) "encounter_rate", val
+      write(*,733) "encounter_rate", slope, (vp-vm)/2/dlp 
+      write(*,*)
+c
+      call prey_value(lp-dlp, llarv, local_env, vm)  
+      call prey_value(lp+dlp, llarv, local_env, vp) 
+      call prey_value(lp,     llarv, local_env, val, slope) ! extract analytic derivatives  
+      write(*,732) "prey_value", val
+      write(*,733) "prey_value", slope, (vp-vm)/2/dlp 
+      write(*,*)
+c
+      call rank(lp-dlp, llarv, local_env, vm) 
+      call rank(lp+dlp, llarv, local_env, vp) 
+      call rank(lp,     llarv, local_env, val, slope) ! extract analytic derivatives  
+      write(*,732) "rank", val
+      write(*,733) "rank", slope, (vp-vm)/2/dlp 
+      write(*,*)
+      write(*,*) "--- test_lp_derivatives:end --- "
+c     
+ 732  format("testing value   ",a,": value = ",e14.7)
+ 733  format("testing d/dlp   ",a,": analyt= ",e14.7," num= ",e14.7)    
+      
+    
+      end subroutine test_lp_derivatives
+
+      
+
+      subroutine test_rprof_derivatives(llarv,rprof,local_env,drp)
+c------------------------------------------------------------
+c     Test the consistency of analytical derivatives and
+c     numerical derivatives wrt. rprof
+c
+c     It is recommended to apply auto doubling of real variables
+c     to have exact validation of derivatives (set this in compiler_defaults.mk,
+c     for the ifort compiler this is -r8)
+c------------------------------------------------------------
+      REAL,intent(in)                    :: llarv     ! larval length [mm]
+      REAL,intent(in)                    :: rprof     ! relative profitability (0 < rprof < 1)
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(in)                    :: drp       ! step in rprof for numerical differentiation
+      REAL                        :: g,dgdp
+      REAL                        :: gm,gp,dum1,dum2
+      REAL                        :: lplowm,lplowp,lplow,dlplow_drp
+      REAL                        :: lphighm,lphighp,lphigh,dlphigh_drp
+c------------------------------------------------------------
+      write(*,*) "test_rprof_derivatives:"
+
+      call eval_gain(llarv,rprof-drp,local_env, gm, dum1)
+      call eval_gain(llarv,rprof+drp,local_env, gp, dum1)
+      call eval_gain(llarv,rprof,    local_env, g,  dgdp)
+      write(*,287) "eval_gain","g", g
+      write(*,288) "eval_gain","dg_dp",dgdp,"dg_dp",(gp-gm)/2/drp 
+
+      call find_foraging_window(llarv, local_env, rprof-drp,
+     +                          lplowm, dum1, lphighm, dum2)
+      call find_foraging_window(llarv, local_env, rprof+drp,
+     +                          lplowp, dum1, lphighp, dum2)
+      call find_foraging_window(llarv, local_env, rprof,
+     +                          lplow, dlplow_drp, lphigh, dlphigh_drp)
+      write(*,287) "find_foraging_window","lplow", lplow
+      write(*,288) "find_foraging_window","dlplow_drp", dlplow_drp,
+     +             "dlplow_drp", (lplowp-lplowm)/2/drp
+
+      write(*,287) "find_foraging_window","lphigh", lphigh
+      write(*,288) "find_foraging_window","dlphigh_drp", dlphigh_drp,
+     +             "dlphigh_drp", (lphighp-lphighm)/2/drp
+       
+
+ 287  format(a20,":",a12,"         ="e14.7)
+ 288  format(a20,":",a12,"(analyt) =",e14.7,a12,"(num) =",e14.7)
+
+      end subroutine test_rprof_derivatives
 
 
 c     ==============================================================

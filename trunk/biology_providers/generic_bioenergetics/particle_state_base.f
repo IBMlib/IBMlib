@@ -31,6 +31,7 @@ c     ============  define public scope for this module =============
 
       public :: local_environment
       public :: probe_local_environment
+      public :: write_local_environment
       public :: clear_local_environment
 
 c     ===============================================================
@@ -47,14 +48,43 @@ c     ---------------------------------------------------
       real                                 :: zdum(1)
 c     ---------------------------------------------------
       call interpolate_temp(pos, local_env%temp, status) 
-      local_env%light = is_light(current_time, pos) ! current_time from physical_fields
-      call interpolate_zooplankton (pos, zdum, status) ! zdum: expects a vector
-      local_env%zbiomass = zdum(1)
+      call check_stat("interpolate_temp",status)
       current_time => get_master_clock()
+      local_env%light = is_light(current_time, pos)    ! current_time from physical_fields
+      call interpolate_zooplankton (pos, zdum, status) ! zdum: expects a vector
+      call check_stat("interpolate_zooplankton",status)
+      local_env%zbiomass = zdum(1)                     ! unit = kg DW / m3
       call get_julian_day(current_time, local_env%julday)
-
+c     -----------
+      contains   ! accesses parent scope
+c     -----------      
+      subroutine check_stat(who,intg)
+      character*(*),intent(in) :: who
+      integer, intent(in)      :: intg
+      if (intg>0) then
+         write(*,*) who, "failed with status = ",intg
+         write(*,*) "interpolation position =", pos ! access parent scope
+         stop 64221
+      endif
+      end subroutine check_stat
       end subroutine probe_local_environment
       
+
+      subroutine write_local_environment(local_env)
+c     ---------------------------------------------------
+c     For debugging
+c     ---------------------------------------------------
+      type(local_environment), intent(inout) :: local_env
+      write(*,692) "temperature", local_env%temp
+      write(*,692) "zoo biomass", local_env%zbiomass
+      write(*,694) "light",       local_env%light
+      write(*,693) "julian day",  local_env%julday
+        
+ 692  format("local_environment:", a10, "=", f12.7)  
+ 693  format("local_environment:", a10, "=", i12) 
+ 694  format("local_environment:", a10, "=", l12)      
+
+      end subroutine write_local_environment
 
 
 

@@ -13,6 +13,9 @@ c
 c     Russell, F.S. 1976. The eggs and planktonic stages of British marine fishes. 
 c     Academic Press : metamorphosis, at 32-41mm
 c     Onset of schooling: l=15 mm
+c
+c     Minimal testing guide:
+c       test value/derivative consistency of CS, HT, SV by numerical differencing
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       use time_tools           ! import clock type
@@ -94,38 +97,72 @@ c     encounter process parameters
 c
 c     =================== define public scope ===================
 c
+      public :: init_larval_properties   ! module initialization
+      public :: close_larval_properties  ! module close down
+
       public :: larval_physiology        ! component for state_attributes
-      public :: init_larval_physiology   ! constructor
-      public :: close_larval_physiology  ! destructor
+      public :: init_larval_physiology   ! class constructor
+      public :: close_larval_physiology  ! class destructor
+      public :: set_larvae_hatched       ! alternative class constructor
+
       public :: length_to_nominal_weight ! length-weight key
       public :: weight_to_nominal_length ! corresponding weight-length key
-      public :: set_larvae_hatched       
-      public :: CS                          ! evaluate capture success of encounter 
-      public :: HT                          ! evaluate handling time 
-      public :: SV                          ! evaluate search volume
+             
+      public :: capture_sucess           ! evaluate capture success of encounter 
+      public :: handling_time            ! evaluate handling time 
+      public :: search_volume            ! evaluate search volume
       public :: add_routine_metabolic_costs 
       public :: add_ingestion               
       public :: grow_larvae
-      public :: min_condition_number        ! hard limit for survival
+      public :: inquire_stage_change
+      public :: min_condition_number     ! hard limit for survival
 
-
+      
 c     ===============================================================
                              contains
 c     ===============================================================
 
-      subroutine init_larval_physiology(self)
+      subroutine init_larval_properties()
+      end subroutine init_larval_properties
+      
+      subroutine close_larval_properties()
+      end subroutine close_larval_properties
+
+
+      subroutine init_larval_physiology(self,len,wgt)
+c     ------------------------------------------
       type(larval_physiology), intent(out) :: self
+      real, intent(in)                     :: len,wgt
+c     ------------------------------------------
       self%length       = -1   ! signal unset
       self%weight       = -1   ! signal unset
       self%hatch_day    = -1   ! signal unset 
       self%stomach_content = 0.0
       self%RMcosts         = 0.0
+      self%length          = len          
+      self%weight          = wgt 
       end subroutine init_larval_physiology
 
 
       subroutine close_larval_physiology(self)
       type(larval_physiology), intent(inout) :: self
       end subroutine close_larval_physiology
+
+
+      subroutine set_larvae_hatched(self, space) 
+c     ---------------------------------------------------
+c     Initialize larvae in newly hatched state
+c     make no assumptions about previous history
+c     ---------------------------------------------------
+      type(larval_physiology), intent(inout) :: self
+      type(spatial_attributes),intent(inout) :: space
+      type(clock), pointer                   :: current_time
+c     ---------------------------------------------------
+      call init_larval_physiology(self,length0,weight0)                      
+      current_time    => get_master_clock()
+      call get_julian_day(current_time, self%hatch_day)
+
+      end subroutine set_larvae_hatched
 
 
 
@@ -148,97 +185,81 @@ c     ---------------------------------------------------
       real, intent(out) :: length
       length = length0*(weight/weight0)**w2lxpo
       end subroutine weight_to_nominal_length
-
-
-
-      subroutine set_larvae_hatched(self, space) 
-c     ---------------------------------------------------
-c     Initialize larvae in newly hatched state
-c     make no assumptions about previous history
-c     ---------------------------------------------------
-      type(larval_physiology), intent(inout) :: self
-      type(spatial_attributes),intent(inout) :: space
-      type(clock), pointer                   :: current_time
-c     ---------------------------------------------------
-      self%length     = length0          
-      self%weight     = weight0                          
-      current_time    => get_master_clock()
-      call get_julian_day(current_time, self%hatch_day)
-
-      end subroutine set_larvae_hatched
       
 
 
-      real function CS(lp,llarv,deriv)
-c     ---------------------------------- 
-c     prey capture success  
+      subroutine capture_sucess(lp, llarv, local_env, csuc, dcsuc_dlp)
+c     -------------------------------------------------------------------- 
+c     prey capture success and optionally its derivative wrt. lp: dcsuc_dlp
 c
-c     TODO: parameterize turbulence impact on CS
-c           along with SV (see MacKenzie 1994, Evidence ...)
-c
-c     deriv = false: return capture success 
-c     deriv = true : return (d/dlp) capture success 
-c     ---------------------------------- 
-      REAL,intent(in)    :: lp    ! prey length [mm]
-      REAL,intent(in)    :: llarv ! larval length [mm]
-      logical,intent(in) :: deriv
-      REAL               :: lpmax ! max size an llarv can eat
-c     ---------------------------------- 
+c     TODO: parameterize turbulence impact on capture_sucess
+c           along with search_volume (see MacKenzie 1994, Evidence ...)  
+c     -------------------------------------------------------------------- 
+      REAL,intent(in)                    :: lp    ! prey length [mm]
+      REAL,intent(in)                    :: llarv ! larval length [mm]
+      type(local_environment),intent(in) :: local_env ! ambient conditions
+      REAL,intent(out)                   :: csuc      ! capture_sucess
+      REAL,intent(out),optional          :: dcsuc_dlp ! (d/dlp) capture_sucess 
+
+      REAL                               :: lpmax ! max size an llarv can eat
+c     -------------------------------------------------------------------- 
       lpmax = lpmax_inf/(1.0 + (llarv/lpmax_scale)**lpmax_expo)
+
       if (lp>lpmax) then
-         CS = 0.0 ! both for deriv == value+slope 
-      else
-         if (deriv) then
-            CS = -CS_0/lpmax
-         else
-            CS =  CS_0*(1.0 - lp/lpmax)
-         endif   
-      endif  ! lp>lpmax
-c     write(*,*) "cs",lp,llarv,deriv,CS
-      end function CS
+         csuc = 0.0 
+         if ( present(dcsuc_dlp) ) dcsuc_dlp = 0.0
+         return
+      endif
+      
+      csuc = CS_0*(1.0 - lp/lpmax)
+
+      if ( present(dcsuc_dlp) ) dcsuc_dlp = -CS_0/lpmax
+
+      end subroutine capture_sucess
 
 
 
-      real function HT(lp,llarv,deriv)
-c     ---------------------------------- 
-c     prey handling time [seconds]
-c
-c     deriv = false: return handling time   
-c     deriv = true : return (d/dlp) handling time   
+
+      subroutine handling_time(lp, llarv, local_env, ht, dht_dlp)
+c     -------------------------------------------------------------------- 
+c     prey handling time [seconds] and optionally its derivative wrt. lp: dht_dlp
 c
 c     numerical overflow protection:
-c      
-c     ---------------------------------- 
-      REAL,intent(in)    :: lp  ! prey length [mm]
-      REAL,intent(in)    :: llarv ! larval length [mm]
-      logical,intent(in) :: deriv
-      REAL               :: w,arg
+c         have (d/dlp) handling_time > 0 to avoid artifacts
+c     -------------------------------------------------------------------- 
+      REAL,intent(in)                    :: lp    ! prey length [mm]
+      REAL,intent(in)                    :: llarv ! larval length [mm]
+      type(local_environment),intent(in) :: local_env ! ambient conditions 
+      REAL,intent(out)                   :: ht    ! handling time [seconds]
+      REAL,intent(out),optional          :: dht_dlp ! (d/dlp) handling time [seconds]
+c    
+      REAL               :: w,dw_dlp 
       REAL,parameter     :: log10 = log(10.0)
       REAL,parameter     :: wmax = 5.0 ! numerical overflow limit
-c     --------------------------------------
-      w   = HT_fac2*log10*(lp/llarv)
-      if (w<wmax) then  
-         HT = exp(HT_fac1 * exp(w))
-         if (deriv) then
-            HT = HT * HT_fac1* exp(w) * w /lp
-         endif   
-      else   ! avoid numerical overflow 
-         if (deriv) then
-            HT = 0.0 + HT_fac2*log10/llarv
-         else
-            HT = exp(HT_fac1 * exp(wmax)) + (w-wmax)
+c     ------------------------------------------------------------------------
+      w      = HT_fac2*log10*(lp/llarv)
+      dw_dlp = HT_fac2*log10/llarv
+      if (w<wmax) then 
+         ht = exp(HT_fac1 * exp(w))
+         if ( present(dht_dlp) ) then
+             dht_dlp = ht * HT_fac1 * exp(w) * dw_dlp
          endif
+      else   ! avoid numerical overflow; have (d/dlp) handling_time > 0
+         ht = exp(HT_fac1 * exp(wmax)) + (w-wmax)
+         if ( present(dht_dlp) ) then
+             dht_dlp = dw_dlp
+         endif 
       endif
-c      write(*,*) "ht",lp,llarv,deriv,HT
-      end function HT
+
+      end subroutine handling_time
 
 
 
 
-      real function SV(lp,llarv,local_env,deriv)
+      subroutine search_volume(lp, llarv, local_env, svol, dsvol_dlp)
 c     ---------------------------------- 
 c     Search volume (unit = mm3/sec) of larvae with length llarv
-c     wrt. prey of length lp 
+c     wrt. prey of length lp and optionally its derivative wrt. lp: dsvol_dlp)
 c     
 c     deriv = false: return search volume (unit = mm3/sec)   
 c     deriv = true : return (d/dlp) search volume (currently not used) 
@@ -247,25 +268,25 @@ c     SSlarv = larval swim speed (assuming active) [mm/sec]
 c     alpha  = angle of visual acuity              [radians]
 c     SSprey = prey swim speed (before persuit?)   [mm/sec]
 c     V      = velocity component perpendicular to RD   [mm/sec]
-c     
+c
 c     TODO: * parameterize wturb
-c           * FO.17:5.p333.2008 and JFB.66.p882.2005 uses SV_relSSprey = 3
+c           * FO.17:5.p333.2008 and JFB.66.p882.2005 uses search_volume_relSSprey = 3
 c             this is probably based on escape velocity, which should not enter 
 c             the encounter part (pre-pursuit)
 c           * check prefactor 2 in V = sqrt(... + 2*wturb**2)
 c             (depends of frame of reference for wturb)
-c           * implement deriv== .true.
 c     ---------------------------------- 
-      REAL,intent(in)    :: lp    ! prey length [mm]
-      REAL,intent(in)    :: llarv ! larval length [mm]
+      REAL,intent(in)                    :: lp    ! prey length [mm]
+      REAL,intent(in)                    :: llarv ! larval length [mm]
       type(local_environment),intent(in) :: local_env ! ambient conditions
-      logical,intent(in) :: deriv
-              
+      REAL,intent(out)                   :: svol  ! search volume [mm3/sec]
+      REAL,intent(out),optional          :: dsvol_dlp ! (d/dlp) search volume 
+
       REAL,parameter     :: pi      = 4.0*atan(1.0)
       REAL,parameter     :: deg2rad = pi/180.0
       REAL,parameter     :: wturb = 0.0 ! current setting, later move to local_env
       REAL               :: alpha, RD, SSlarv, SSprey, V
-      REAL               :: dRD,dSSprey,dV
+      REAL               :: dRD_dlp, dSSprey_dlp, dV_dlp, prefac
 c     --------------------------------------
 c
 c     --- determine reactive distance RD       
@@ -279,27 +300,24 @@ c
       SSlarv = 181.15/(1.0+exp(-(llarv-29.52)/5.57)) ! Munk (1992)
       SSprey = lp*SV_relSSprey
       V      = sqrt(SSlarv**2 + SSprey**2 + 2*wturb**2)
+      prefac = SV_visual_fraction * pi
 c
-c     evaluate value/derivative of SV
+c     evaluate value/derivative of search_volume
 c
-      if (deriv) then
-
-         dRD     = 1.0/2.0/tan(alpha/2.0)
-         dSSprey = SV_relSSprey
-         dV      = dSSprey*SSprey/V
-
-         SV      = SV_visual_fraction * pi * (2*RD*dRD*V + RD**2*dV)
-
-      else ! deriv == value
-  
-         SV      = SV_visual_fraction * pi * RD**2 * V
-
+      svol = prefac * RD**2 * V
+c
+      if ( present(dsvol_dlp) ) then
+         dRD_dlp     = 1.0/2.0/tan(alpha/2.0) ! independent of lp
+         dSSprey_dlp = SV_relSSprey ! independent of lp
+         dV_dlp      = dSSprey_dlp * SSprey / V
+         dsvol_dlp   = prefac * (2*RD*dRD_dlp*V + RD**2*dV_dlp)
       endif
-      end function SV
+   
+      end subroutine search_volume
 
 
 
-      subroutine add_routine_metabolic_costs(self,local_env,dt)
+      subroutine add_routine_metabolic_costs(self, local_env, dt)
 c     ---------------------------------------------------
 c     Add standard metabolic costs to metabolic buffer self%RMcosts
 c     corresponding to time interval dt at ambient conditions local_env
@@ -359,10 +377,13 @@ c     ---------------------------------------------------
 c     ---------------------------------------------------
 c     Update larval mass (but not length) corresponding to ingestion
 c     at average temperature tempavg and time interval dt
+c     set next: if .true. request advancement (or regression) of ontogenetic 
+c     stage (depending on sign of dt)
 c     ---------------------------------------------------
       type(larval_physiology),intent(inout) :: self 
       real, intent(in)                      :: tempavg   ! deg celcius
-      real, intent(in)                      :: dt        ! seconds
+      real, intent(in)                      :: dt        ! seconds 
+c      
       real                                  :: growth, max_growth
       real                                  :: ingestion, AE, SDA, cmax
       real, parameter                       :: hour12 = 12*3600.0
@@ -382,7 +403,7 @@ c     ---- combine pieces into a potential growth ----
 c     potentially impose a max growth here as well
 
 c     ---- update larval weight      
-      self%weight = self%weight + growth
+      self%weight = self%weight + growth   
 
 c     ---- clear metabolic buffers
       self%stomach_content = 0.0
@@ -390,5 +411,24 @@ c     ---- clear metabolic buffers
 
       end subroutine grow_larvae
 
+
+      subroutine inquire_stage_change(self, next) 
+c     -------------------------------------------------------------------------------------------
+c     Test whether to advance (or regress) ontogenetic stage 
+c     Return next = .true. to advance (or regress) to ontogenetic stage (depending on sign of dt)
+c     Do not consider sign of simulation time arrow
+c     assumes weight/length are appropriately updated
+c     -------------------------------------------------------------------------------------------
+      type(larval_physiology),intent(in) :: self 
+      logical,intent(out)                :: next
+      real,parameter                     :: epsil = 1.e-4 ! avoid flagging if at stage boundary
+c     ---------------------------------------------------   
+      if ((self%length < (length0-epsil)).or.
+     +    (self%length > (length_meta+epsil))) then
+         next = .true.
+      else
+         next = .false.
+      endif
+      end subroutine inquire_stage_change
 
       end ! module

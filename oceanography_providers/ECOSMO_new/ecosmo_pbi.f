@@ -8,11 +8,12 @@ c     $LastChangedBy: asch $
 c
 c     PBI for ECOSMO data output (in 2011 binary format)
 c
+c     ASC@23Aug2011: Incorporated answers from Corinna Schrum August 04, 2011 to unclear issues
+c
 c     NOTE: this file must be compiled with UNFORMATTED_LITTLE_ENDIAN
 c           specify how your compiler sets this in compiler_defaults.mk
 c
-c     TODO: fix ibio=6 load
-c           non CC interpolate_turbulence       (remember to uncomment mesh_grid load)
+c     TODO: non CC interpolate_turbulence       (remember to uncomment mesh_grid load)
 c           non CC interpolate_turbulence_deriv (remember to uncomment mesh_grid load)
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
@@ -71,7 +72,7 @@ c     ------ data frame handler ------
 c     ---- ECOSMO zooplankton load/conversion
       integer, parameter        :: ibio_small_zoo = 6
       integer, parameter        :: ibio_large_zoo = 7
-      real,parameter            :: carbon2DW = 1.0/0.32
+      real,parameter            :: carbon2DW = 1.0/0.32 ! Fishery Bulletin 73(4) 1975, p777 + errata
 
 c     --- 3D grids ---
                 
@@ -161,7 +162,7 @@ c
  
 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "SUNFISH pbi version: $Rev: 310 $"
+      get_pbi_version =  "ECOSMO offlie pbi version: $Rev: 310 $"
       end function
 
    
@@ -836,16 +837,15 @@ c                 ECOSMO convention is positive up
 c                wg(i,j,k)=wc(c)/1000.   ! ECOSMO assignment
                  ix = j         ! corresponding regular lonlat indices
                  iy = ny+1-i    ! corresponding regular lonlat indices
-                 w(ix,iy,k) = wcmit(i1)
+                 w(ix,iy,k) = wcmit(i1)/1000.  ! It still has to be re-scaled (Corinna Schrum August 04, 2011)
                  i1 = i1+1
               endif
            enddo
         enddo
       enddo
-     
-
-
+   
       w = -w ! flip sign, physical_fields sign convention is positive down
+
 
 c     ---- update  CC scalars:
 c     ----     temp(:,:,:) Water temp. [Celcius]
@@ -879,7 +879,7 @@ c
               if (iland(i,j,k)>0) then                
                  ix = j         ! corresponding regular lonlat indices
                  iy = ny+1-i    ! corresponding regular lonlat indices
-                 vdiffus(ix,iy,k) = scmit(i1)*acmit(i1)
+                 vdiffus(ix,iy,k) = scmit(i1)*acmit(i1)/10000. ! It still has to be re-scaled (Corinna Schrum August 04, 2011)
                  i1 = i1+1
               endif
            enddo
@@ -902,7 +902,7 @@ c     ---- update zoo(:,:,:)        ! total Zooplankton [DW myg/liter ]
                  ix = j         ! corresponding regular lonlat indices
                  iy = ny+1-i    ! corresponding regular lonlat indices
                  zbiomass = Tc(i1,ibio_small_zoo)+Tc(i1,ibio_large_zoo) ! unit = mgC/m**3
-                 zbiomass = zbiomass*carbon2DW/1,0e6                    ! unit = kg DW / m**3
+                 zbiomass = zbiomass*carbon2DW/1.0e6                    ! unit = kg DW / m**3
                  zoo(ix,iy,k) = zbiomass
                  i1 = i1+1
               endif

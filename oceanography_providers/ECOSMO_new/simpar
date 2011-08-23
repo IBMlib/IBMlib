@@ -1,5 +1,10 @@
 start_time  = 1980 01 07 33201   
 
+! ================================================================
+! The ECOSMO physical_fields module expects the following tags
+! defined in the input file (tag values below are examples)
+! ================================================================
+
 hydroDBpath = /home/asbjorn/DTU/MEECE/ECOSMO_IBMlib_coupling/test_data
 grid_desc   = oceanography_providers/ECOSMO_new/grid_desc_ecosmo
 topography  = oceanography_providers/ECOSMO_new/postinfo.for

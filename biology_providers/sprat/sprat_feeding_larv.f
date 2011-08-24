@@ -38,8 +38,8 @@ c     --------------------------------------------------------------------
          real    :: weight             ! mandatory entry: dry weight in myg <= nominel weight at length
          integer :: hatch_day          ! mandatory entry: Julian day
 
-         real    :: stomach_content      ! myg, currently just an ingestion cache
-         real    :: RMcosts              ! myg
+c         real    :: stomach_content      ! myg, currently just an ingestion cache
+c         real    :: RMcosts              ! myg
       end type
 
 c     =================== biological parameters ===================
@@ -110,9 +110,7 @@ c
              
       public :: capture_sucess           ! evaluate capture success of encounter 
       public :: handling_time            ! evaluate handling time 
-      public :: search_volume            ! evaluate search volume
-      public :: add_routine_metabolic_costs 
-      public :: add_ingestion               
+      public :: search_volume            ! evaluate search volume            
       public :: grow_larvae
       public :: inquire_stage_change
       public :: min_condition_number     ! hard limit for survival
@@ -137,8 +135,6 @@ c     ------------------------------------------
       self%length       = -1   ! signal unset
       self%weight       = -1   ! signal unset
       self%hatch_day    = -1   ! signal unset 
-      self%stomach_content = 0.0
-      self%RMcosts         = 0.0
       self%length          = len          
       self%weight          = wgt 
       end subroutine init_larval_physiology
@@ -317,25 +313,30 @@ c
 
 
 
-      subroutine add_routine_metabolic_costs(self, local_env, dt)
+      subroutine grow_larvae(self, local_env, irate, dt)
 c     ---------------------------------------------------
-c     Add standard metabolic costs to metabolic buffer self%RMcosts
-c     corresponding to time interval dt at ambient conditions local_env
-c
+c     Update larval mass (but not length) corresponding to interval dt
+c     subject to (maximal) ingestion rate. 
+c     ---------------------------------------------------
+      type(larval_physiology),intent(inout) :: self 
+      type(local_environment),intent(in)    :: local_env ! ambient conditions
+      real, intent(in)                      :: irate     ! (maximal) ingestion rate [myg/sec] 
+      real, intent(in)                      :: dt        ! seconds 
+c      
+      real                                  :: growth, max_growth
+      real                                  :: ingestion, AE, SDA, cmax
+      real, parameter                       :: hour12  = 12*3600.0
+      real, parameter                       :: onehour = 3600.0 ! in seconds
+      real                                  :: RS, k, dl, RMcosts
+c     ---------------------------------------------------      
+
+c     Compute metabolic costs RMcosts corresponding to time interval dt 
+c     at ambient conditions local_env
 c     FO.17:5.p333.2008, table 1, eqs 4+5
-c
 c     Q10 def: R2 = R1*Q10**((T2-T1)/10) 
-c     ---------------------------------------------------
-      type(larval_physiology),intent(inout)   :: self
-      type(local_environment),intent(in)      :: local_env ! ambient conditions
-      real,intent(in)                         :: dt        ! in seconds
-c     -------------------------------
-      real,parameter                          :: onehour = 3600.0 ! in seconds
-      real                                    :: RS, k, dl
-c     ---------------------------------------------------
 c
-c     compute standard metabolic rate RS as myg/hour at night
-c 
+c     --- RS = standard metabolic rate RS as myg/hour at night
+ 
       RS = std_metab_fac * (self%weight)**std_metab_massexp * 
      +     std_metab_q10**((local_env%temp - std_metab_Tref)/10.0)
 c
@@ -351,63 +352,27 @@ c
          k=1.0  ! night
       endif
 
-      self%RMcosts = self%RMcosts + k*RS*(dt/onehour)
-
-      end subroutine add_routine_metabolic_costs
-
-
-
-      subroutine add_ingestion(self, ingestion, dt)
-c     ---------------------------------------------------
-c     Add ingested mass[myg] to stomach_content corresponding
-c     to time interval dt
-c     Possibly apply an ingestion rate limit
-c     ---------------------------------------------------
-      type(larval_physiology),intent(inout)  :: self
-      real,intent(in)                        :: ingestion  ! unit = myg  
-      real,intent(in)                        :: dt         ! unit = sec 
-c     ---------------------------------------------------
-      self%stomach_content = self%stomach_content + ingestion
-
-      end subroutine add_ingestion
-
-
-
-      subroutine grow_larvae(self, tempavg, dt)
-c     ---------------------------------------------------
-c     Update larval mass (but not length) corresponding to ingestion
-c     at average temperature tempavg and time interval dt
-c     set next: if .true. request advancement (or regression) of ontogenetic 
-c     stage (depending on sign of dt)
-c     ---------------------------------------------------
-      type(larval_physiology),intent(inout) :: self 
-      real, intent(in)                      :: tempavg   ! deg celcius
-      real, intent(in)                      :: dt        ! seconds 
-c      
-      real                                  :: growth, max_growth
-      real                                  :: ingestion, AE, SDA, cmax
-      real, parameter                       :: hour12 = 12*3600.0
-c     ---------------------------------------------------      
+      RMcosts = k*RS*(dt/onehour)  ! [myg] for time interval dt 
+      
+c     ---- impose a consumption limit on ingestion  ----
+      cmax = cmax_fac * (self%weight)**cmax_massexp * 
+     +                   cmax_q10**((local_env%temp  - cmax_Tref)/10.0) ! myg/12 h
+      
+      ingestion = min(cmax*dt/hour12, irate*dt)      ! [myg] for time interval dt 
+      
+c     ---- assess assimilation efficiency AE
       AE  = AEinfty*(1.0 - AEreduc*exp(-AEdecay*(self%weight-weight0)))
+
+c     ---- assess standard dynamic action SDA
       SDA = min(1.0, SDAmin + SDAslope*(self%length - length0))
     
-c     ---- impose a max consumption limit (for now using avg temp) ----
-      cmax = cmax_fac * (self%weight)**cmax_massexp * 
-     +                   cmax_q10**((tempavg - cmax_Tref)/10.0) ! myg/12 h
-      
-      ingestion = min(cmax*dt/hour12, self%stomach_content)
-
 c     ---- combine pieces into a potential growth ----
-      growth = ingestion*AE*(1.0 - SDA) - self%RMcosts
+      growth = ingestion*AE*(1.0 - SDA) - RMcosts   ! [myg] for time interval dt 
 
 c     potentially impose a max growth here as well
 
-c     ---- update larval weight      
+c     ---- update larval weight for time interval dt      
       self%weight = self%weight + growth   
-
-c     ---- clear metabolic buffers
-      self%stomach_content = 0.0
-      self%RMcosts         = 0.0
 
       end subroutine grow_larvae
 

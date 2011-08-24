@@ -82,14 +82,16 @@ c     ----------------------------------------------------------------
 c     Class feeding_larvae is for the embedded larvae interface 
 c     and contains attributes relating to the larval stage alone
 c     along with attributes relating to optimal foraging
+c
+c     Currently time bundling of growth processes are disabled
 c     ----------------------------------------------------------------
 
       
       type feeding_larvae
       private
          type(larval_physiology) :: larvstate         ! defined in module larval_properties 
-         real                    :: time_since_growth ! = sum(dt) - for growth aggregation
-         real                    :: tempxdt           ! = sum(temp*dt) - for averaging ambient temperaturE
+c         real                    :: time_since_growth ! = sum(dt) - for growth aggregation
+c         real                    :: tempxdt           ! = sum(temp*dt) - for averaging ambient temperaturE
       end type
       public :: feeding_larvae ! make type state_attributes visible outside
 
@@ -413,39 +415,30 @@ c
       type(local_environment)                 :: local_env
       real                                    :: xyz(3)
       integer                                 :: status
-      real                                    :: irate,tacc,tempavg
+      real                                    :: irate
 c     --------------------------------------------------------------
       if (dt<0) stop "negative dt values currently blocked"
 
       call get_tracer_position(space, xyz)
       call probe_local_environment(xyz, local_env)
-              
-      call add_routine_metabolic_costs(state%larvstate,local_env,dt) ! day/night    
-      
+     
+c     --- determine ingestion rate - assume it is a visual predator     
       if (local_env%light) then 
          call interpolate_ingestion_rate(state%larvstate,local_env,
-     +                                   irate)                 ! visual predator
-         call add_ingestion(state%larvstate, irate*dt, dt) ! currently just average, no Poisson       
+     +                                   irate)                 ! currently just average, no Poisson        
+      else
+         irate = 0.0   ! no light -> no feeding
       endif
-
-      state%time_since_growth = state%time_since_growth + dt
-      state%tempxdt           = state%tempxdt + dt*local_env%temp            
       
-      if (state%time_since_growth > growth_increment_interval) then
-         tacc    = state%time_since_growth
-         tempavg = state%tempxdt/tacc
-         call grow_larvae(state%larvstate, tempavg, tacc) ! growth in mass
-         call update_larval_length(state)  ! now length/weight are in sync
-         call inquire_stage_change(state%larvstate, next) 
-         state%time_since_growth = 0.0 ! reset time accumulator
-         state%tempxdt           = 0.0 ! reset temp accumulator
-      endif
-      call evaluate_survival_chance(state, space, dt,
+      call grow_larvae(state%larvstate, local_env, irate, dt) ! growth in mass
+      call update_larval_length(state) ! now length/weight are in sync
+      call inquire_stage_change(state%larvstate, next) 
+      call evaluate_mortality_rate(state, space, dt,
      +                                    mortality_rate, die)
 
-      stop "define next above before exit"
+c      write(55,*) state%larvstate%length,  state%larvstate%weight  ! hack
 
-      call clear_local_environment(local_env) ! in case memory were allocaetd
+      call clear_local_environment(local_env) ! in case memory were allocated
 c     --------------------------------------------------------------
       end subroutine update_particle_state_FL
 
@@ -513,8 +506,7 @@ c     ---------------------------------------------------
 c     ---------------------------------------------------
       call set_tracer_mobility_free(space)   
       call set_larvae_hatched(state%larvstate,space)
-      state%time_since_growth = 0 
-      state%tempxdt           = 0    
+ 
       end subroutine set_state_hatched_FL
 
 
@@ -1141,7 +1133,7 @@ c     ----------------------------------------------------------------
       
 
 
-      subroutine evaluate_survival_chance(state, space, dt,
+      subroutine evaluate_mortality_rate(state, space, dt,
      +                                    mortality_rate, die)
 c     ---------------------------------------------------
 c     Update the survival counter state%survival for this organism
@@ -1163,7 +1155,7 @@ c     ---------------------------------------------------
       else
          die = .false.
       endif
-      end subroutine evaluate_survival_chance
+      end subroutine evaluate_mortality_rate
 
 
 

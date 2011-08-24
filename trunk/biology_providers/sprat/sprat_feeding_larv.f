@@ -51,48 +51,6 @@ c     =================== biological parameters ===================
       
       real, parameter :: length_meta  = 32.0 ! [mm] lower size at metamorphosis 
 
-      real,parameter :: CS_0        =  1.1
-      real,parameter :: lpmax_inf   =  1.5249 ! [mm] (suspect misprint in FO.17:5.p333.2008)
-      real,parameter :: lpmax_scale = 14.0    ! [mm]
-      real,parameter :: lpmax_expo  = -1.63   ! should be negative
-
-      real,parameter :: HT_fac1 = 0.264
-      real,parameter :: HT_fac2 = 7.0151
-               
-c     avoid evaluating functions at lp=0      
-      real, parameter :: lpmin = 1.e-6       ! [mm] left bracket for rank search   
-
-c     .... metabolic parameters from  FO.17:5.p333.2008    
-      real, parameter :: std_metab_fac     = 0.00272*0.00463*227.0 
-      real, parameter :: std_metab_massexp = 0.80
-      real, parameter :: std_metab_q10     = 2.57  ! deg celcius
-      real, parameter :: std_metab_Tref    = 8.0   ! deg celcius
-
-c     FO.17:5.p333.2008: k = 2.5 @ l = 15 mm
-c                        k = 1.9 @ l = length0
-      real, parameter :: act_metab_fac     = 2.5
-      real, parameter :: act_metab_len     = 15.0 ! mm
-      real, parameter :: act_metab_dfac    = 0.6
-     
-      real, parameter :: AEinfty = 0.7   ! asymptotic assimilation efficiency
-      real, parameter :: AEreduc = 0.3   ! reduction factor in AE for small larvae
-      real, parameter :: AEdecay = 0.003 ! myg^-1
-
-c     FO.17:5.p333.2008: SDA(l = length0)             = 0.11
-c                        SDA(l = length_meta = 32 mm) = 0.14 
-      real, parameter :: SDAmin  = 0.11
-      real, parameter :: SDAmeta = 0.14  
-      real, parameter :: SDAslope=(SDAmeta-SDAmin)/(length_meta-length0)
-
-c     cmax parameterized for myg/12 h
-      real, parameter :: cmax_fac     = 1.315
-      real, parameter :: cmax_massexp = 0.83
-      real, parameter :: cmax_q10     = 2.872  ! deg celcius
-      real, parameter :: cmax_Tref    = 15.0   ! deg celcius
-
-c     encounter process parameters
-      real, parameter :: SV_relSSprey = 3.0       ! prey swim speed in body lengths per sec
-      real, parameter :: SV_visual_fraction = 0.5 ! fraction of encounter disc where prey are detected
       real, parameter :: min_condition_number = 0.4 ! FO.17:5.p333.2008
 c
 c     =================== define public scope ===================
@@ -198,6 +156,11 @@ c     --------------------------------------------------------------------
       REAL,intent(out),optional          :: dcsuc_dlp ! (d/dlp) capture_sucess 
 
       REAL                               :: lpmax ! max size an llarv can eat
+
+      real,parameter :: CS_0        =  1.1
+      real,parameter :: lpmax_inf   =  1.5249 ! [mm] (suspect misprint in FO.17:5.p333.2008)
+      real,parameter :: lpmax_scale = 14.0    ! [mm]
+      real,parameter :: lpmax_expo  = -1.63   ! should be negative      
 c     -------------------------------------------------------------------- 
       lpmax = lpmax_inf/(1.0 + (llarv/lpmax_scale)**lpmax_expo)
 
@@ -232,6 +195,9 @@ c
       REAL               :: w,dw_dlp 
       REAL,parameter     :: log10 = log(10.0)
       REAL,parameter     :: wmax = 5.0 ! numerical overflow limit
+
+      real,parameter :: HT_fac1 = 0.264
+      real,parameter :: HT_fac2 = 7.0151
 c     ------------------------------------------------------------------------
       w      = HT_fac2*log10*(lp/llarv)
       dw_dlp = HT_fac2*log10/llarv
@@ -283,6 +249,10 @@ c     ----------------------------------
       REAL,parameter     :: wturb = 0.0 ! current setting, later move to local_env
       REAL               :: alpha, RD, SSlarv, SSprey, V
       REAL               :: dRD_dlp, dSSprey_dlp, dV_dlp, prefac
+
+c     encounter process parameters
+      real, parameter :: SV_relSSprey = 3.0       ! prey swim speed in body lengths per sec
+      real, parameter :: SV_visual_fraction = 0.5 ! fraction of encounter disc where prey are detected      
 c     --------------------------------------
 c
 c     --- determine reactive distance RD       
@@ -328,6 +298,34 @@ c
       real, parameter                       :: hour12  = 12*3600.0
       real, parameter                       :: onehour = 3600.0 ! in seconds
       real                                  :: RS, k, dl, RMcosts
+
+c     .... metabolic parameters from  FO.17:5.p333.2008    
+      real, parameter :: std_metab_fac     = 0.00272*0.00463*227.0 
+      real, parameter :: std_metab_massexp = 0.80
+      real, parameter :: std_metab_q10     = 2.57  ! deg celcius
+      real, parameter :: std_metab_Tref    = 8.0   ! deg celcius
+
+c     FO.17:5.p333.2008: k = 2.5 @ l = 15 mm
+c                        k = 1.9 @ l = length0
+      real, parameter :: act_metab_fac     = 2.5
+      real, parameter :: act_metab_len     = 15.0 ! mm
+      real, parameter :: act_metab_dfac    = 0.6
+     
+      real, parameter :: AEinfty = 0.7   ! asymptotic assimilation efficiency
+      real, parameter :: AEreduc = 0.3   ! reduction factor in AE for small larvae
+      real, parameter :: AEdecay = 0.003 ! myg^-1
+
+c     FO.17:5.p333.2008: SDA(l = length0)             = 0.11
+c                        SDA(l = length_meta = 32 mm) = 0.14 
+      real, parameter :: SDAmin  = 0.11
+      real, parameter :: SDAmeta = 0.14  
+      real, parameter :: SDAslope=(SDAmeta-SDAmin)/(length_meta-length0)
+
+c     cmax parameterized for myg/12 h
+      real, parameter :: cmax_fac     = 1.315
+      real, parameter :: cmax_massexp = 0.83
+      real, parameter :: cmax_q10     = 2.872  ! deg celcius
+      real, parameter :: cmax_Tref    = 15.0   ! deg celcius
 c     ---------------------------------------------------      
 
 c     Compute metabolic costs RMcosts corresponding to time interval dt 

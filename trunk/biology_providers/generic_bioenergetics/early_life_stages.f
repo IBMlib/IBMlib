@@ -217,7 +217,8 @@ c     ---------------------------------------------------------------
 c      
 c     --- parse initdata(1:3) here to resolve which stage to initialize ---
 c
-      leni = len(initdata)
+      leni = len(trim(initdata))
+
       if (leni < 3) then
          stop "init_state_attributes: no stage specified"
       else
@@ -242,7 +243,7 @@ c
          state%active_stage = 3
       else
          write(*,*) "init_state_attributes: unsupported stage tag ", 
-     +               stage_tag
+     +               stage_tag, ">", trim(adjustl(trim(rest))), "<"
          stop 
       endif
 c
@@ -327,7 +328,7 @@ c
       state%survival = state%survival * exp(-mortality_rate*dt)
       if (die) call set_state_dead(state, space)  
 
-      if (.not.state%alive) return ! do not change stage if particle is dead
+      if (.not.state%alive) return ! do not change stage or state if particle is dead
       
       if (next .eqv. .true.) then
          if     (dt > 0) then

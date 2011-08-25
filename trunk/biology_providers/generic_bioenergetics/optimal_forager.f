@@ -222,13 +222,13 @@ c
      +            nforpt
       
       call setup_ingestion_db()
-     
+c     
 cc      ----- test section -----
-
+c
 c      call probe_local_environment((/0.0, 0.0, 1.0/),local_env)
 c      lp    = 0.5
 c      llarv = 10.0
-c      dlp   = 0.03
+c      dlp   = 0.01
 c      call test_lp_derivatives(lp, llarv, local_env, dlp)
 c      rprof = 0.56
 c      drp   = 0.01
@@ -430,11 +430,10 @@ c     --- determine ingestion rate - assume it is a visual predator
          irate = 0.0   ! no light -> no feeding
       endif
       
-      call grow_larvae(state%larvstate, local_env, irate, dt) ! growth in mass
-      call update_larval_length(state) ! now length/weight are in sync
+      call grow_larvae(state%larvstate, local_env, irate, dt) ! grow in mass, sync in length
       call inquire_stage_change(state%larvstate, next) 
-      call evaluate_mortality_rate(state, space, dt,
-     +                                    mortality_rate, die)
+      call evaluate_mortality_rate(state%larvstate, local_env, 
+     +                             mortality_rate, die)
 
 c      write(55,*) state%larvstate%length,  state%larvstate%weight  ! hack
 
@@ -478,20 +477,6 @@ c     ---------------------------------------------------
       call length_to_nominal_weight(state%larvstate%length, nomweight)
       phi = state%larvstate%weight / nomweight
       end subroutine get_condition_number
-      
-
-
-
-      subroutine update_larval_length(state)    
-c     ---------------------------------------------------
-c     Enforce that larval length can not decrease
-c     ---------------------------------------------------
-      type(feeding_larvae), intent(inout) :: state 
-      real :: lnom
-      call weight_to_nominal_length(state%larvstate%weight, lnom)
-      if (lnom > state%larvstate%length) state%larvstate%length = lnom
-      end subroutine update_larval_length
-
 
       
 
@@ -1131,32 +1116,6 @@ c
 c     ----------------------------------------------------------------
       end subroutine setup_ingestion_db
       
-
-
-      subroutine evaluate_mortality_rate(state, space, dt,
-     +                                    mortality_rate, die)
-c     ---------------------------------------------------
-c     Update the survival counter state%survival for this organism
-c     corresponding to time interval dt
-c     Currently impose condition number hard limit
-c     ---------------------------------------------------
-      type(feeding_larvae),intent(inout)     :: state
-      type(spatial_attributes),intent(inout) :: space
-      real,intent(in)                        :: dt
-      real,intent(out)                       :: mortality_rate
-      logical,intent(out)                    :: die
-c
-      real                                   :: phi
-c     ---------------------------------------------------
-      mortality_rate = 0.0 ! elaborate later
-      call get_condition_number(state, phi)
-      if (phi < min_condition_number) then
-         die = .true.
-      else
-         die = .false.
-      endif
-      end subroutine evaluate_mortality_rate
-
 
 
 c     subroutine calculate_predation_survival(state,space,pred_surv)

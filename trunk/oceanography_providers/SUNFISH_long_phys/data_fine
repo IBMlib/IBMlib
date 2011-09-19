@@ -1,0 +1,298 @@
+   ***** KUESTEN MODELL (DB-WO) *********                                       
+                                                                                
+  DIMENSION  DES FELDES:                                                        
+  OST -WEST :  198                                                              
+  NORD-SUED :  241                                                              
+                                 198                                            
+                            +-------->                                          
+                            !                                                   
+                            !                                                   
+                        241 !                                                   
+                            !                                                   
+                            V                                                   
+                                                                                
+  POSITION DES  ZETA-PUNKTES   FELD(1,1)  OBEN LINKS                            
+                 GGG MM SS                                                      
+     PHI       :  57 35 30N                                                     
+     LAMBDA    :   9 20 50E                                                     
+                                                                                
+  GITTERABSTAND: GGG MM SS                                                      
+     DELTA-PHI :   0  1  0                                                      
+     DELTA-LAM :   0  1 40                                                      
+                                                                                
+  SCHICHTDICKEN  (M)                                                            
+     SCHICHT  1:   2.                                                           
+     SCHICHT  2:   1.                                                           
+     SCHICHT  3:   1.                                                           
+     SCHICHT  4:   1.                                                           
+     SCHICHT  5:   1.                                                           
+     SCHICHT  6:   1.                                                           
+     SCHICHT  7:   1.                                                           
+     SCHICHT  8:   1.                                                           
+     SCHICHT  9:   1.                                                           
+     SCHICHT 10:   1.
+     SCHICHT 11:   1.
+     SCHICHT 12:   1.
+     SCHICHT 13:   1.
+     SCHICHT 14:   1.
+     SCHICHT 15:   1.
+     SCHICHT 16:   1.
+     SCHICHT 17:   1.
+     SCHICHT 18:   1.
+     SCHICHT 19:   1.
+     SCHICHT 20:   1.
+     SCHICHT 21:   1.
+     SCHICHT 22:   1.
+     SCHICHT 23:   1.
+     SCHICHT 24:   1.
+     SCHICHT 25:   1.
+     SCHICHT 26:   1.
+     SCHICHT 27:   1.
+     SCHICHT 28:   1.
+     SCHICHT 29:   1.
+     SCHICHT 30:   2.
+     SCHICHT 31:   2.
+     SCHICHT 32:   2.
+     SCHICHT 33:   2.
+     SCHICHT 34:   2.
+     SCHICHT 35:   2.
+     SCHICHT 36:   2.
+     SCHICHT 37:   2.
+     SCHICHT 38:   2.
+     SCHICHT 39:   2.
+     SCHICHT 40:   2.
+     SCHICHT 41:   2.
+     SCHICHT 42:   2.
+     SCHICHT 43:   2.
+     SCHICHT 44:   2.
+     SCHICHT 45:   2.
+     SCHICHT 46:   2.
+     SCHICHT 47:   2.
+     SCHICHT 48:   2.
+     SCHICHT 49:   2.
+     SCHICHT 50:   2.
+     SCHICHT 51:   2.
+     SCHICHT 52:   2.
+			
+  ZEITSCHRITT (S)                                                               
+     DELTA-T   :  45.                                                           
+                                                                                
+  AUSTAUSCHKOEFFIZIENTEN
+     AH        :   1.0
+     ALPHA0    :  10.0                                                          
+                                                                                
+  BODENREIBUNGSKOEFFIZIENT                                                      
+     R         :   0.0015                                                       
+                                                                                
+=============================================================================   
+ ANZAHL DER Z-RANDWERTE:    168                                                 
+                                        ZEILE SPALTE RANDTYP (1=W,2=N,3=E,4=S)  
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1                             1   43    2
+  RANDWERT:   2                             1   44    2
+  RANDWERT:   3                             1   45    2
+  RANDWERT:   4                             1   46    2
+  RANDWERT:   5                             1   47    2
+  RANDWERT:   6                             1   48    2
+  RANDWERT:   7                             1   49    2
+  RANDWERT:   8                             1   50    2
+  RANDWERT:   9                             1   51    2
+  RANDWERT:  10                             1   52    2
+  RANDWERT:  11                             1   53    2
+  RANDWERT:  12                             1   54    2
+  RANDWERT:  13                             1   55    2
+  RANDWERT:  14                             1   56    2
+  RANDWERT:  15                             1   57    2
+  RANDWERT:  16                             1   58    2
+  RANDWERT:  17                             1   59    2
+  RANDWERT:  18                             1   60    2
+  RANDWERT:  19                             1   61    2
+  RANDWERT:  20                             1   62    2
+  RANDWERT:  21                             1   63    2
+  RANDWERT:  22                             1   64    2
+  RANDWERT:  23                             1   65    2
+  RANDWERT:  24                             1   66    2
+  RANDWERT:  25                             1   67    2
+  RANDWERT:  26                             1   68    2
+  RANDWERT:  27                             1   69    2
+  RANDWERT:  28                             1   70    2
+  RANDWERT:  29                             1   71    2
+  RANDWERT:  30                             1   72    2
+  RANDWERT:  31                             1   73    2
+  RANDWERT:  32                             1   74    2
+  RANDWERT:  33                             1   75    2
+  RANDWERT:  34                             1   76    2
+  RANDWERT:  35                             1   77    2
+  RANDWERT:  36                             1   78    2
+  RANDWERT:  37                             1   79    2
+  RANDWERT:  38                             1   80    2
+  RANDWERT:  39                             1   81    2
+  RANDWERT:  40                             1   82    2
+  RANDWERT:  41                             1   83    2
+  RANDWERT:  42                             1   84    2
+  RANDWERT:  43                             1   85    2
+  RANDWERT:  44                             1   86    2
+  RANDWERT:  45                             1   87    2
+  RANDWERT:  46                             1   88    2
+  RANDWERT:  47                             1   89    2
+  RANDWERT:  48                             1   90    2
+  RANDWERT:  49                             1   91    2
+  RANDWERT:  50                             1   92    2
+  RANDWERT:  51                             1   93    2
+  RANDWERT:  52                             1   94    2
+  RANDWERT:  53                             1   95    2
+  RANDWERT:  54                             1   96    2
+  RANDWERT:  55                            91  198    3
+  RANDWERT:  56                            92  198    3
+  RANDWERT:  57                            93  198    3
+  RANDWERT:  58                            94  198    3
+  RANDWERT:  59                            95  198    3
+  RANDWERT:  60                            96  198    3
+  RANDWERT:  61                            97  198    3
+  RANDWERT:  62                            98  198    3
+  RANDWERT:  63                            99  198    3
+  RANDWERT:  64                           100  198    3
+  RANDWERT:  65                           101  198    3
+  RANDWERT:  66                           102  198    3
+  RANDWERT:  67                           103  198    3
+  RANDWERT:  68                           104  198    3
+  RANDWERT:  69                           105  198    3
+  RANDWERT:  70                           106  198    3
+  RANDWERT:  71                           107  198    3
+  RANDWERT:  72                           108  198    3
+  RANDWERT:  73                           109  198    3
+  RANDWERT:  74                           110  198    3
+  RANDWERT:  75                           111  198    3
+  RANDWERT:  76                           112  198    3
+  RANDWERT:  77                           113  198    3
+  RANDWERT:  78                           114  198    3
+  RANDWERT:  79                           115  198    3
+  RANDWERT:  80                           116  198    3
+  RANDWERT:  81                           117  198    3
+  RANDWERT:  82                           118  198    3
+  RANDWERT:  83                           119  198    3
+  RANDWERT:  84                           120  198    3
+  RANDWERT:  85                           121  198    3
+  RANDWERT:  86                           122  198    3
+  RANDWERT:  87                           123  198    3
+  RANDWERT:  88                           124  198    3
+  RANDWERT:  89                           125  198    3
+  RANDWERT:  90                           126  198    3
+  RANDWERT:  91                           127  198    3
+  RANDWERT:  92                           128  198    3
+  RANDWERT:  93                           129  198    3
+  RANDWERT:  94                           130  198    3
+  RANDWERT:  95                           131  198    3
+  RANDWERT:  96                           132  198    3
+  RANDWERT:  97                           133  198    3
+  RANDWERT:  98                           134  198    3
+  RANDWERT:  99                           135  198    3
+  RANDWERT: 100                           136  198    3
+  RANDWERT: 101                           137  198    3
+  RANDWERT: 102                           138  198    3
+  RANDWERT: 103                           151  198    3
+  RANDWERT: 104                           152  198    3
+  RANDWERT: 105                           153  198    3
+  RANDWERT: 106                           154  198    3
+  RANDWERT: 107                           155  198    3
+  RANDWERT: 108                           156  198    3
+  RANDWERT: 109                           157  198    3
+  RANDWERT: 110                           158  198    3
+  RANDWERT: 111                           159  198    3
+  RANDWERT: 112                           160  198    3
+  RANDWERT: 113                           161  198    3
+  RANDWERT: 114                           162  198    3
+  RANDWERT: 115                           163  198    3
+  RANDWERT: 116                           164  198    3
+  RANDWERT: 117                           165  198    3
+  RANDWERT: 118                           166  198    3
+  RANDWERT: 119                           167  198    3
+  RANDWERT: 120                           168  198    3
+  RANDWERT: 121                           169  198    3
+  RANDWERT: 122                           170  198    3
+  RANDWERT: 123                           171  198    3
+  RANDWERT: 124                           172  198    3
+  RANDWERT: 125                           173  198    3
+  RANDWERT: 126                           174  198    3
+  RANDWERT: 127                           175  198    3
+  RANDWERT: 128                           176  198    3
+  RANDWERT: 129                           177  198    3
+  RANDWERT: 130                           178  198    3
+  RANDWERT: 131                           179  198    3
+  RANDWERT: 132                           180  198    3
+  RANDWERT: 133                           181  198    3
+  RANDWERT: 134                           182  198    3
+  RANDWERT: 135                           183  198    3
+  RANDWERT: 136                           184  198    3
+  RANDWERT: 137                           185  198    3
+  RANDWERT: 138                           186  198    3
+  RANDWERT: 139                           187  198    3
+  RANDWERT: 140                           188  198    3
+  RANDWERT: 141                           189  198    3
+  RANDWERT: 142                           190  198    3
+  RANDWERT: 143                           191  198    3
+  RANDWERT: 144                           192  198    3
+  RANDWERT: 145                           193  198    3
+  RANDWERT: 146                           194  198    3
+  RANDWERT: 147                           195  198    3
+  RANDWERT: 148                           196  198    3
+  RANDWERT: 149                           197  198    3
+  RANDWERT: 150                           198  198    3
+  RANDWERT: 151                           199  198    3
+  RANDWERT: 152                           200  198    3
+  RANDWERT: 153                           201  198    3
+  RANDWERT: 154                           202  198    3
+  RANDWERT: 155                           203  198    3
+  RANDWERT: 156                           204  198    3
+  RANDWERT: 157                           205  198    3
+  RANDWERT: 158                           206  198    3
+  RANDWERT: 159                           207  198    3
+  RANDWERT: 160                           208  198    3
+  RANDWERT: 161                           209  198    3
+  RANDWERT: 162                           210  198    3
+  RANDWERT: 163                           211  198    3
+  RANDWERT: 164                           212  198    3
+  RANDWERT: 165                           213  198    3
+  RANDWERT: 166                           214  198    3
+  RANDWERT: 167                           215  198    3
+  RANDWERT: 168                           216  198    3
+                                                                                
+ ANZAHL DER U-RANDWERTE:      0                                                 
+                                        ZEILE SPALTE RANDTYP                    
+  ----------------------------------------------------------------------------  
+                                                                                
+ ANZAHL DER V-RANDWERTE:      0                                                 
+                                        ZEILE SPALTE RANDTYP                    
+  ----------------------------------------------------------------------------  
+                                                                                
+ ANZAHL DER Q-RANDWERTE:     13                                                 
+                                        ZEILE SPALTE TRANSPORT (M**3/S)         
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1    Odra / Oder            236  188    522.00                    
+  RANDWERT:   2    Ems, Dollart             1    1      0.00  dummy land value
+  RANDWERT:   3    Weser                    1    1      0.00   "
+  RANDWERT:   4    Elbe                     1    1      0.00   "
+  RANDWERT:   5    Eider                    1    1      0.00   "
+  RANDWERT:   6    Moerrumsan              91  194     27.00
+  RANDWERT:   7    Helgean                 99  181     48.00
+  RANDWERT:   8    Roenne aelv             80  126     21.00
+  RANDWERT:   9    Lagan                   64  131     71.00
+  RANDWERT:  10    Nissan                  59  129     40.00
+  RANDWERT:  11    Aetran                  48  116     46.00
+  RANDWERT:  12    Viskan                  42  110     30.00
+  RANDWERT:  13    Randers Fjord           65   33    100.00
+                                                                                
+ ANZAHL DER U-DAEMME:         0                                                 
+                                        ZEILE SPALTE                            
+  ----------------------------------------------------------------------------  
+                                                                                
+ ANZAHL DER V-DAEMME:         0                                                 
+                                        ZEILE SPALTE                            
+  ----------------------------------------------------------------------------  
+
+===============================================================                 
+ LAGE IM NAECHSTGROEBEREN GITTER:           I    J                              
+ -------------------------------------------------                              
+ Z(1,1) LIEGT BEI ZEILE(I), SPALTE (J) :   84   82                              
+ ANZAHL FEINER ZELLEN JE GROBE ZELLE   :    6    6                              
+ VERSCHIEBUNG VON Z(1,1) BZGL. GROB. Z.:   -3   -3                              

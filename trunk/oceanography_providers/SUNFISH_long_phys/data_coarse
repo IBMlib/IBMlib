@@ -1,0 +1,289 @@
+  ***  NORDSEE/OSTSEEMODELL *****                                               
+                                                                                
+  DIMENSION  DES FELDES:                                                        
+  OST -WEST :  207                                                              
+  NORD-SUED :  174                                                              
+                                 207                                            
+                            +-------->                                          
+                            !                                                   
+                            !                                                   
+                        174 !                                                   
+                            !                                                   
+                            V                                                   
+                                                                                
+  POSITION DES  ZETA-PUNKTES   FELD(1,1)  OBEN LINKS                            
+                 GGG MM SS                                                      
+     PHI       :  65 51 00N                                                     
+     LAMBDA    :   4 05 00W                                                     
+                                                                                
+  GITTERABSTAND: GGG MM SS                                                      
+     DELTA-PHI :   0  6  0                                                      
+     DELTA-LAM :   0 10  0                                                      
+                                                                                
+  SCHICHTDICKEN  (M)                                                            
+     SCHICHT  1:   8.                                                           
+     SCHICHT  2:   2.                                                           
+     SCHICHT  3:   2.                                                           
+     SCHICHT  4:   2.                                                           
+     SCHICHT  5:   2.                                                           
+     SCHICHT  6:   2.                                                           
+     SCHICHT  7:   2.                                                           
+     SCHICHT  8:   2.                                                           
+     SCHICHT  9:   2.                                                           
+     SCHICHT 10:   2.                                                           
+     SCHICHT 11:   2.                                                           
+     SCHICHT 12:   2.                                                           
+     SCHICHT 13:   2.                                                           
+     SCHICHT 14:   2.                                                           
+     SCHICHT 15:   2.                
+     SCHICHT 16:   2.                
+     SCHICHT 17:   2.                
+     SCHICHT 18:   2.                
+     SCHICHT 19:   2.                
+     SCHICHT 20:   2.                
+     SCHICHT 21:   2.                
+     SCHICHT 22:   2.                
+     SCHICHT 23:   2.                
+     SCHICHT 24:   2.                
+     SCHICHT 25:   2.                
+     SCHICHT 26:   2.                
+     SCHICHT 27:   2.                
+     SCHICHT 28:   2.                
+     SCHICHT 29:   2.                
+     SCHICHT 30:   2.                
+     SCHICHT 31:   2.                
+     SCHICHT 32:   2.                
+     SCHICHT 33:   2.                
+     SCHICHT 34:   2.                
+     SCHICHT 35:   2.                
+     SCHICHT 36:   2.                
+     SCHICHT 37:   2.                
+     SCHICHT 38:   4.                
+     SCHICHT 39:   8.                
+     SCHICHT 40:   8.                
+     SCHICHT 41:  25.                
+     SCHICHT 42:  25.                
+     SCHICHT 43:  50.                
+     SCHICHT 44:  50.                
+     SCHICHT 45:  50.                
+     SCHICHT 46:  50.                
+     SCHICHT 47:  50.                
+     SCHICHT 48:  50.                
+     SCHICHT 49:  50.                
+     SCHICHT 50:  50.                
+                                                                                
+  ZEITSCHRITT (S)                                                               
+     DELTA-T   :  90.                                                           
+                                                                                
+  AUSTAUSCHKOEFFIZIENTEN
+     AH        :   1.0
+     ALPHA0    :  10.0
+                                                                                
+  BODENREIBUNGSKOEFFIZIENT                                                      
+     R         :   0.0015                                                       
+                                                                                
+=============================================================================   
+ ANZAHL DER Z-RANDWERTE:     65                                                 
+                                        ZEILE SPALTE RANDTYP (1=W,2=N,3=E,4=S)  
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1                            75    7    2                         
+  RANDWERT:   2                            74    8    2                         
+  RANDWERT:   3                            73    9    2                         
+  RANDWERT:   4                            73   10    2                         
+  RANDWERT:   5                            73   11    2                         
+  RANDWERT:   6                            72   12    2                         
+  RANDWERT:   7                            71   13    2                         
+  RANDWERT:   8                            71   14    2                         
+  RANDWERT:   9                            71   15    2                         
+  RANDWERT:  10                            70   16    2                         
+  RANDWERT:  11                            69   17    2                         
+  RANDWERT:  12                            69   18    2                         
+  RANDWERT:  13                            69   19    2                         
+  RANDWERT:  14                            68   20    2                         
+  RANDWERT:  15                            67   21    2                         
+  RANDWERT:  16                            67   22    2                         
+  RANDWERT:  17                            67   23    2                         
+  RANDWERT:  18                            67   24    2                         
+  RANDWERT:  19                            67   25    2                         
+  RANDWERT:  20                            67   26    2                         
+  RANDWERT:  21                            67   27    2                         
+  RANDWERT:  22                            67   28    2                         
+  RANDWERT:  23                            67   29    2                         
+  RANDWERT:  24                            67   30    2                         
+  RANDWERT:  25                            67   31    2                         
+  RANDWERT:  26                            67   32    2                         
+  RANDWERT:  27                            67   33    2                         
+  RANDWERT:  28                            67   34    2                         
+  RANDWERT:  29                            67   35    2                         
+  RANDWERT:  30                            67   36    2                         
+  RANDWERT:  31                            67   37    2                         
+  RANDWERT:  32                            67   38    2                         
+  RANDWERT:  33                            67   39    2                         
+  RANDWERT:  34                            67   40    2                         
+  RANDWERT:  35                            67   41    2                         
+  RANDWERT:  36                            67   42    2                         
+  RANDWERT:  37                            67   43    2                         
+  RANDWERT:  38                            67   44    2                         
+  RANDWERT:  39                            67   45    2                         
+  RANDWERT:  40                            67   46    2                         
+  RANDWERT:  41                            67   47    2                         
+  RANDWERT:  42                            67   48    2                         
+  RANDWERT:  43                            67   49    2                         
+  RANDWERT:  44                            67   50    2                         
+  RANDWERT:  45                            67   51    2                         
+  RANDWERT:  46                            67   52    2                         
+  RANDWERT:  47                            67   53    2                         
+  RANDWERT:  48                            67   54    2                         
+  RANDWERT:  49                            67   55    2                         
+  RANDWERT:  50                            67   56    2                         
+  RANDWERT:  51                           158    1    1                         
+  RANDWERT:  52                           159    1    1                         
+  RANDWERT:  53                           160    1    1                         
+  RANDWERT:  54                           161    1    1                         
+  RANDWERT:  55                           162    1    1                         
+  RANDWERT:  56                           163    1    1                         
+  RANDWERT:  57                           164    1    1                         
+  RANDWERT:  58                           165    1    1                         
+  RANDWERT:  59                           166    1    1                         
+  RANDWERT:  60                           167    1    1                         
+  RANDWERT:  61                           168    1    1                         
+  RANDWERT:  62                           169    1    1                         
+  RANDWERT:  63                           170    1    1                         
+  RANDWERT:  64                           171    1    1                         
+  RANDWERT:  65                           172    1    1                         
+                                                                                
+ ANZAHL DER U-RANDWERTE:     19                                                 
+                                        ZEILE SPALTE RANDTYP                    
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1                            99  114    1                         
+  RANDWERT:   2                           100  114    1                         
+  RANDWERT:   3                           101  114    1                         
+  RANDWERT:   4                           102  114    1                         
+  RANDWERT:   5                           103  114    1                         
+  RANDWERT:   6                           104  114    1                         
+  RANDWERT:   7                           105  114    1                         
+  RANDWERT:   8                           106  114    1                         
+  RANDWERT:   9                           109  114    1                         
+  RANDWERT:  10                           110  114    1                         
+  RANDWERT:  11                           111  114    1                         
+  RANDWERT:  12                           112  114    1                         
+  RANDWERT:  13                           113  114    1                         
+  RANDWERT:  14                           114  114    1                         
+  RANDWERT:  15                           115  114    1                         
+  RANDWERT:  16                           116  114    1                         
+  RANDWERT:  17                           117  114    1                         
+  RANDWERT:  18                           118  114    1                         
+  RANDWERT:  19                           119  114    1                         
+                                                                                
+ ANZAHL DER V-RANDWERTE:      9                                                 
+                                        ZEILE SPALTE RANDTYP                    
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1                            83   89    4                         
+  RANDWERT:   2                            83   90    4                         
+  RANDWERT:   3                            83   91    4                         
+  RANDWERT:   4                            83   92    4                         
+  RANDWERT:   5                            83   93    4                         
+  RANDWERT:   6                            83   94    4                         
+  RANDWERT:   7                            83   95    4                         
+  RANDWERT:   8                            83   96    4                         
+  RANDWERT:   9                            83   97    4                         
+                                                                                
+ ANZAHL DER Q-RANDWERTE:     79                                                 
+                                        ZEILE SPALTE TRANSPORT (M**3/S)         
+  ----------------------------------------------------------------------------  
+  RANDWERT:   1    Kyroenjoki              26  155     44.00       q15_3
+  RANDWERT:   2    Lapuanjoki              23  160     33.00       q15_3
+  RANDWERT:   3    Kalajoki                17  168     28.00       q15_3
+  RANDWERT:   4    Pyhaejoki               14  171     28.00       q15_3
+  RANDWERT:   5    Siikajoki               11  173     41.00       q15_3
+  RANDWERT:   6    Oulujoki                 9  177    260.00       q15_3
+  RANDWERT:   7    Iijoki + Kiiminkijoki    7  177    220.00       q15_2
+  RANDWERT:   8    Simojoki                 4  175     38.00       q15_2
+  RANDWERT:   9    Kemijoki                 3  173    578.00       q15_2
+  RANDWERT:  10    Tornionjoki / Torne a    2  171    388.00       q15_1
+  RANDWERT:  11    Kalix aelv               2  166    290.00       q15_1
+  RANDWERT:  12    Rane aelv                2  160     44.00       q15_1
+  RANDWERT:  13    Lule aelv                5  159    508.00       q15_1
+  RANDWERT:  14    Pite aelv                8  155    170.00       q15_1
+  RANDWERT:  15    Skellefte aelv          13  153    160.00       q15_1
+  RANDWERT:  16    Kokemaeenjoki           43  154    221.00       q14_3
+  RANDWERT:  17    Ume aelv                23  146    423.00       q14_1
+  RANDWERT:  18    Oere aelv               25  143     35.00       q14_1
+  RANDWERT:  19    Gide aelv               28  140     35.00       q14_1
+  RANDWERT:  20    Angermanaelven          33  134    480.00       q14_1
+  RANDWERT:  21    Indalsaelven            36  131    439.00       q14_1
+  RANDWERT:  22    Ljungan                 38  131    140.00       q14_1
+  RANDWERT:  23    Ljusnan                 46  129    230.00       q14_1
+  RANDWERT:  24    Dalaelven               53  131    370.00       q14_1
+  RANDWERT:  25    Narva                   65  193    357.00       q11_5
+  RANDWERT:  26    Luga                    62  195     90.00       q11_5
+  RANDWERT:  27    Neva                    60  206   2600.00       q11_4
+  RANDWERT:  28    Kymijoki                55  188    368.00       q11_2
+  RANDWERT:  29    Kasari                  72  167     24.00       q11_1
+  RANDWERT:  30    Paernu                  76  172     48.00       q10_1
+  RANDWERT:  31    Salatsa                 81  171     30.00       q10_1
+  RANDWERT:  32    Gauya                   88  171     68.00       q10_1
+  RANDWERT:  33    Daugava + Lielupe       89  169    723.00       q10_2
+  RANDWERT:  34    Odra / Oder            122  112    522.00       q5_2
+  RANDWERT:  35    Rega                   118  117     21.00       q6_2
+  RANDWERT:  36    Parseta                117  120     28.00       q6_2
+  RANDWERT:  37    Vistula / Weichsel     116  140   1010.00       q7_4
+  RANDWERT:  38    Pregola / Pregel       113  144     87.00       q7_3
+  RANDWERT:  39    Neman / Memel          107  153    674.00       q7_2
+  RANDWERT:  40    Venta                   85  155     65.00       q7_1
+  RANDWERT:  41    Maelaren                67  136    156.00       q9_1
+  RANDWERT:  42    Nykoepingsan            73  129     21.00       q8  
+  RANDWERT:  43    Motala stroem           74  127     96.00       q8  
+  RANDWERT:  44    Eman                    89  125     28.00       q8  
+  RANDWERT:  45    Moerrumsan              99  114     27.00       q6_1
+  RANDWERT:  46    Helgean                100  112     48.00       q6_1
+  RANDWERT:  47    Roenne aelv             96  101     21.00       q2_3
+  RANDWERT:  48    Lagan                   94  103     71.00       q2_3
+  RANDWERT:  49    Nissan                  93  102     40.00       q2_3
+  RANDWERT:  50    Aetran                  91  100     46.00       q2_3
+  RANDWERT:  51    Viskan                  89   99     30.00       q2_3
+  RANDWERT:  52    Randers Fjord           94   88    100.00       q2_1
+  RANDWERT:  53    Goeta aelv              82   96    530.00       q2_2
+  RANDWERT:  54    Glomma                  68   91    600.00       q1_4
+  RANDWERT:  55    Oslofjord               64   89    300.00       q1_4
+  RANDWERT:  56    Lagen                   70   86    600.00       q1_4
+  RANDWERT:  57    Nidelv                  76   78    245.00       q0  
+  RANDWERT:  58    Otra + Tovdalselv       79   73    400.00       q1_4
+  RANDWERT:  59    Tay                     95    9    250.00       q0 
+  RANDWERT:  60    Firth of Forth          99    6    150.00       q0 
+  RANDWERT:  61    Tweed                  101   13    100.00       q0 
+  RANDWERT:  62    Tyne                   109   17     45.00       q0 
+  RANDWERT:  63    Tees                   113   19     40.00       q0 
+  RANDWERT:  64    Humber                 124   25    200.00       q0 
+  RANDWERT:  65    The Wash               131   28     50.00       q0 
+  RANDWERT:  66    Thames                 145   30    100.00       q0 
+  RANDWERT:  67    Seine                  165   27    400.00       q0 
+  RANDWERT:  68    Scheldt                145   46    150.00       q0 
+  RANDWERT:  69    Rhein, Meuse           142   47   2380.00       q0 
+  RANDWERT:  70    NSea channel           132   53     90.00       q0 
+  RANDWERT:  71    IJsselmeer, Waddenzee  128   57    500.00       q0 
+  RANDWERT:  72    Ems, Dollart           125   67    100.00       q0
+  RANDWERT:  73    Weser                  125   75    450.00       q0               
+  RANDWERT:  74    Elbe                   121   79    900.00       q0             
+  RANDWERT:  75    Eider                  117   78     37.00       q0              
+  RANDWERT:  76    Ringkobing Fjord       100   75    125.00       q0             
+  RANDWERT:  77    Kvina + Sira            78   64    300.00       q0             
+  RANDWERT:  78    Lysefjord               74   59    100.00       q0             
+  RANDWERT:  79    Boknafjord              67   60    485.00       q0            
+                                                                                
+ ANZAHL DER U-DAEMME:         0                                                 
+                                        ZEILE SPALTE                            
+  ----------------------------------------------------------------------------  
+                                                                                
+ ANZAHL DER V-DAEMME:         0                                                 
+                                        ZEILE SPALTE                            
+  ----------------------------------------------------------------------------  
+                                                                                
+===============================================================                 
+ LAGE IM NAECHSTGROEBEREN GITTER:           I    J                              
+ -------------------------------------------------                              
+ Z(1,1) LIEGT BEI ZEILE(I), SPALTE (J) :    2   52                              
+ ANZAHL FEINER ZELLEN JE GROBE ZELLE   :    2    2                              
+ VERSCHIEBUNG VON Z(1,1) BZGL. GROB. Z.:    0    0                              
+                                                                                
+

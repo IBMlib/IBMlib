@@ -1,0 +1,34 @@
+&cfglist
+  narea  = 2
+  nfjord = 0
+/
+&cfgfn
+  cfgfile_in = "data_coarse"
+  bathyfile_in = "coarse_grid_depth"
+  timelevel_in = 1
+  nestinglevels_in = 1
+  nestingto_in = 2
+/
+&cfgfn
+  cfgfile_in = "data_fine"
+  bathyfile_in = "fine_grid_depth"
+  timelevel_in = 2
+  nestinglevels_in = 0
+  nestingto_in = 0
+/
+&optionlist	
+  coldst = .false.
+  ldebug = .true.
+  spinup = .true.
+  turbmodeltype = 4
+  stabfunctype = 4
+  prodtype = 2 
+  dynamicnest = .true.
+  sgrs = .false.
+  wrs = .false.
+  toutput = 3600.
+  usezbcl = .true.
+  kalman = .false.
+  sstrs = .false.
+  ReadNOA = .false.
+/

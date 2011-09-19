@@ -24,5 +24,5 @@ LINKFLAGS = -i4
 LINKLIBS  += -L/usr/local/include 
 
 
-UNFORMATTED_LITTLE_ENDIAN = -convert little_endian
-
+export LITTLE_ENDIAN = -convert little_endian
+export BIG_ENDIAN    = -convert big_endian

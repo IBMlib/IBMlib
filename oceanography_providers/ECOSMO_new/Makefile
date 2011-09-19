@@ -10,7 +10,7 @@
 #           to actual used compiler for the PBI to work
 #
 ############################################################
-FCFLAGS += $(UNFORMATTED_LITTLE_ENDIAN) # add local compiler flag, defined in compiler_defaults.mk
+FCFLAGS += $(LITTLE_ENDIAN) # add local compiler flag, defined in compiler_defaults.mk
 LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o ecosmo_pbi.o 
 
 GENERIC_MESH = ../generic_elements

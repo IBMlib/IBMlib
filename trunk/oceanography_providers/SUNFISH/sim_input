@@ -1,4 +1,6 @@
 ! --------------------------------------------------------------------
+!   You need to add these input to your control file to use this PBI
+!
 !   PBI expects these files:
 !     grid descriptor : PATH2/grid_desc_sunfish  (file name optional)
 !     physics data    : PATH1/tempdat.X_YYYYMMDDHH.00.nc 

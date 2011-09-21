@@ -1,0 +1,8 @@
+! --------------------------------------------------------------------
+!   PBI expects these files:
+!     grid descriptor : PATH2/grid_desc_sunfish  (file name optional)
+!     physics data    : PATH1/tempdat.X_YYYYMMDDHH.00.nc 
+!     biogeochem data : PATH1/biodat.X_YYYYMMDDHH.nc
+! --------------------------------------------------------------------
+hydroDBpath = PATH1   ! files at PATH1/tempdat.X_YYYYMMDDHH.00.nc 
+grid_desc   = PATH2/grid_desc_sunfish    ! or what ever it is called

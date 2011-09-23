@@ -251,6 +251,8 @@ c       status = 3: dry point / rank deficit situation not permitting interpolat
 c                   Return result = padval for deriv = 0  
 c    
 c     tested: deriv=0,3
+c     asc@23Sep2011: added slicing 1:ibot for "zgrid => ccdepth ..." to avoid dependence
+c                    on that ccdepth is initialized below bottom. search_sorted assumes an increasing array
 c     --------------------------------------------------------------------
       real, intent(in)     :: geo(:),array(:,:,:)
       integer, intent(in)  :: deriv  ! 0=value; (1,2,3) = along (x,y,z)
@@ -320,7 +322,7 @@ c
          if (wetmask(cx(i),cy(i))>0) then
             valid(i) = .true.
             ibot     = bottom_layer(cx(i),cy(i)) ! ibot >= 1
-            zgrid    => ccdepth(cx(i),cy(i),:)   ! range = 1:nz
+            zgrid    => ccdepth(cx(i),cy(i),1:ibot)   ! range = 1:ibot<=nz
             call search_sorted_list(z,zgrid,iz) ! 0<=iz<=nz
             ! ---- handle projection extrapolation 
             !      but do not flag flag vertical extrapolation

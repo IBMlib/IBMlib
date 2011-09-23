@@ -9,7 +9,8 @@ c
 c     The data set contains no NPZD data
 c    
 c     TODO:  
-c     Currently turbulence + deriv is fixed to zero - update
+c       only syncronize if buffers changed
+c       Currently turbulence + deriv is fixed to zero - update
 c       test interpolationes
 c       validate w sign
 c
@@ -19,7 +20,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     plugin for reading native compressed cmod output (rename data, avoid mixing types)
       use read_cmod, u_cmod=>u,v_cmod=>v,w_cmod=>w,z_cmod=>z,s_cmod=>s,
      +               t_cmod=>t,wu_cmod=>wu,wv_cmod=>wv,
-     +               m1_cmod=>m1,hz_cmod=>hz,cellw_cmod=>cellw 
+     +               m1_cmod=>m1,hz_cmod=>hz,cellw_cmod=>cellw,
+     +               undef_cmod=>undef
 
       use mesh_grid, 
      +          interpolate_currents_cc => interpolate_currents  ! use face-centered local
@@ -59,6 +61,7 @@ c      public :: interpolate_wind    ! currently unused
 c     -------------------- module data --------------------  
       
       real,parameter :: molecular_diffusivity = 1.e-9 ! unit m2/s
+      real           :: unsetlim ! safe value to detect undef values by real comparisons, like (abs(myval)<unsetlim)
 c
 c     ------ data frame handler ------
       
@@ -93,7 +96,7 @@ c     ------------------------------------------
 
       call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
       write(*,*) "init_physical_fields: hydrographic database path =", 
-     +           trim(hydroDBpath)
+     +           trim(adjustl(hydroDBpath))
     
       call read_grid_desc()   ! incl allocation of 3D arrays and init_horiz_grid_transf
 c
@@ -127,6 +130,12 @@ c
       endif
       vdiffus = rdum
 c
+c     set a safe value unsetlim so that unset values can be detected by 
+c     real comparisons, like 
+c            if (myval > unsetlim) then <take_actions> 
+c
+      unsetlim = 0.999*undef_cmod ! module data
+
  563  format("init_physical_fields: read const  ",a,"=", e12.5," m2/s")
  564  format("init_physical_fields: using const ",a,"=", e12.5," m2/s")
 
@@ -156,7 +165,7 @@ c
 c       grid point (ix,iy) = (1,1) is at (lambda1,phi1)
 c     ---------------------------------------------------
       character*99         :: data_set_id
-      integer              :: ix,iy,iz,idx1d,j
+      integer              :: ix,iy,iz,idx1d,j,ibot
       
       real                 :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
 c     ---------------------------------------------------
@@ -164,7 +173,7 @@ c     ---------------------------------------------------
 
       call read_control_data(simulation_file,"cmod_data_set",
      +                       data_set_id)
-      write(*,*) "Using cmod data set:", adjustl(trim(data_set_id))
+      write(*,*) "Using cmod data set: ", trim(adjustl(data_set_id))
 
 c.....set grid scale/dimensions (held globally in module regular_lonlat_grid)
 c     get_grid_descriptors is defined in module read_cmod
@@ -210,7 +219,8 @@ c     ----------------------------------------------------------------
       bottom_layer =  0     ! default dry
 c     do not assign a value to ccdepth0/acc_width0 to be able to spot unknown dry point violations
 
-      acc_width0(:,:,1) = 0. ! sea surface (DSLM=0)    
+      acc_width0(:,:,1)  = 0.   ! sea surface (DSLM=0) 
+      acc_width0(:,:,2:) = 1.e6 ! acc_width0 must be inceasing
       do ix=1,nx
          do iy=1,ny
             if (m1_cmod(data_set_handler)%p(ny+1-iy, ix, 1) > 0) then  ! wet/dry longitunal point test  
@@ -218,6 +228,7 @@ c
 c              Vertical loop for wet points. At loop exit iz will point to first dry layer
 c              F90 std condition for full do-loop termination is iz=nz+1
 c            
+               
                do iz=1,nz 
                   idx1d = m1_cmod(data_set_handler)%p(ny+1-iy, ix, iz)
                   if (idx1d > 0) then                             ! wet/dry signal for cmod   
@@ -228,13 +239,18 @@ c
                   else
                      exit 
                   endif   
-               enddo
-               bottom_layer(ix,iy) = iz-1 ! last wet layer
-               wdepth0(ix,iy) = acc_width0(ix,iy,1+bottom_layer(ix,iy))
+               enddo  ! iz loop
+
+               ibot                = iz-1 ! last wet layer
+               bottom_layer(ix,iy) = ibot
+               wdepth0(ix,iy) = acc_width0(ix,iy,1+ibot)                    
+c              
+c              
+c        
 
             endif ! wet/dry longitunal point
-         enddo
-      enddo
+         enddo    ! iy loop
+      enddo       ! ix loop
 
       write(*,*) "read_grid_desc: transferred cmod bathymetry"    
 c
@@ -245,6 +261,7 @@ c
       elsewhere
          wetmask = 0 ! dry
       end where 
+
 c     ------------------------------------------       
       end subroutine read_grid_desc
 
@@ -282,6 +299,7 @@ c     -----------------------------------------------------------
       type(clock), pointer             :: aclock
       type(clock)                      :: dummy_clock 
       integer                          :: year,month,day,hour,isec
+      character(len=1),parameter       :: sep = "/"   ! linux path separator
 c     ------------------------------------------
       aclock => get_master_clock()
       if (present(time)) then
@@ -293,26 +311,24 @@ c
 c     resolve file name
 c
       call set_clock(dummy_clock, aclock)
-      call add_seconds_to_clock(dummy_clock, -1800)
+      call add_seconds_to_clock(dummy_clock, 43200-1800)
       call get_date_from_clock(dummy_clock, year, month, day)
       call get_second_in_day(dummy_clock, isec)
       if (isec >= 43200) then  ! must be >=
-         write(fname, 824) year, month, day, 0
-      else ! get next day by adding 86400 to day  start
          write(fname, 824) year, month, day, 12
+      else ! get next day by adding 86400 to day  start
+         write(fname, 824) year, month, day, 0
       endif
  824  format("archive.",i4.4,i2.2,i2.2,i2.2)
-      full_fname = adjustl(trim(hydroDBpath))// adjustl(trim(fname))
- 
+      full_fname = trim(adjustl(hydroDBpath))//sep//trim(adjustl(fname))
 c
 c     resolve time frame to pick from file
 c     round toward nearest hour:  hour = intdiv((isec+1800)/3600)
 c
       call set_clock(dummy_clock, aclock)
       call add_seconds_to_clock(dummy_clock, 1800)
-      call get_date_from_clock(dummy_clock, year, month, day)
       call get_second_in_day(dummy_clock, isec)
-      hour = isec/3600 ! integer division
+      hour = isec/3600 ! integer division        
 c     
       call update_buffers(full_fname,year,month,day,hour)
       call syncronize_data()
@@ -343,6 +359,13 @@ c     ------------------------------------------
       logical :: not_ok
       real    :: u_fill,v_fill,w_fill
 c     ------------------------------------------ 
+c     
+c     padding of arrays. Current vectors are face centered, scalars cell centered
+c     pad currents with zeros to allow interpolation up to boundaries
+c
+      u = 0.0    ! pad with zeros to allow interpolation up to coastlines
+      v = 0.0    ! pad with zeros to allow interpolation up to coastlines 
+      w = 0.0    ! pad with zeros to allow interpolation up to surf/bott
 c
 c     transfer raw data from cmod compact to mesh_grid 
 c
@@ -359,10 +382,24 @@ c
                v(ix,iy,iz)        = v_cmod(data_set_handler)%p(j)
                w(ix,iy,iz)        = w_cmod(data_set_handler)%p(j)
                temp(ix,iy,iz)     = t_cmod(data_set_handler)%p(j)
-               salinity(ix,iy,iz) = s_cmod(data_set_handler)%p(j)
+               salinity(ix,iy,iz) = s_cmod(data_set_handler)%p(j)              
              enddo    
          enddo
-      enddo
+      enddo     
+
+c
+c     avoid tricky current interpolations where the number of wet layers change
+c
+      where (u > unsetlim) 
+         u=0
+      end where
+      where (v > unsetlim) 
+         v=0
+      end where
+      where (w > unsetlim) 
+         w=0
+      end where
+      
 c
 c     postprocess data, suncronize auxillary fields, pad holes
 c      

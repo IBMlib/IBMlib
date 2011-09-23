@@ -11,4 +11,5 @@
 
 !     physics data        : PATH/archive.YYYYMMDDhh 
 ! --------------------------------------------------------------------
-hydroDBpath = PATH
+hydroDBpath   = PATH
+cmod_data_set = coarse     ! value of X above

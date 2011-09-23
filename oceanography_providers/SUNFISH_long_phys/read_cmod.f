@@ -109,7 +109,7 @@ c     -----------------------  set module public scope -----------------------
       public :: update_buffers
       public :: m1,hz,cellw
       public :: u,v,w,z,s,t,wu,wv     ! do not make *_i4 buffers public
-
+      public :: undef
 c     ========================================================================
                                   contains 
 c     ========================================================================
@@ -131,14 +131,19 @@ c     namelists
       namelist /cfgfn/   cfgfile_in, bathyfile_in, timelevel_in,    
      +                   nestinglevels_in, nestingto_in
 c----------------------------------------------------------------------------+ 
-      prefix = adjustl(trim(path)) // "/" ! linux delimiter
+
+      prefix = trim(adjustl(path)) // "/" ! apply linux delimiter
+      write(*,*) "init_read_cmod: path = ", trim(prefix)
 c     Get the ocean model configuration --------------------------------------
       lun = io_new_unit()
       open (unit=lun, file=trim(prefix)//'cfg.nml', 
      +      status='old', iostat=ios)
-      if (ios /= 0) stop 'File cfg.nml not found' ! removed default setting, require explicit input
+      if (ios /= 0) then
+         write(*,*) "init_read_cmod: config file not found"
+         write(*,*) "file name = ",trim(prefix)//'cfg.nml'
+         stop  ! removed default setting, require explicit input
+      endif
 
-      write(*,*) "init_read_cmod: path = ", trim(prefix)
 
 c     apply settings from cfg file:
       read (unit=lun, nml=cfglist, iostat=ios)
@@ -268,6 +273,7 @@ c
          call read_wet(trim(prefix)//bathyfile(ia),
      +        iw2(ia),iw3(ia),mmx(ia),nmx(ia), 
      +        kmx(ia),m1(ia)%p,hz(ia)%p)
+         allocate( cellw(ia)%p(0:iw3(ia)) ) ! hz is allocated in read_wet
          cellw(ia)%p = hz(ia)%p ! copy data before hzmod transforms hz
          call hzmod(m1(ia)%p,hz(ia)%p,iw3(ia),mmx(ia),nmx(ia),kmx(ia))
       enddo
@@ -388,16 +394,21 @@ c     --------------------------------------------------------------------------
       real,intent(out)         :: lambda1, dlambda, phi1, dphi
       integer,intent(out)      :: nx,ny,nz
       integer                  :: ia
+      character(len=256)       :: target_name
 c     ----------------------------------------------------------------------------+     
+      write(target_name,974) trim(adjustl(data_set_id))
+ 974  format("data_",a) 
+
       do ia = 1,narea
-         if (adjustl(trim(data_set_id)) == 
-     +       adjustl(trim(cfgfile(ia)))) then
-            exit ! do loop
+         if (trim(adjustl(target_name)) == 
+     +       trim(adjustl(cfgfile(ia)))) then
+            exit   ! do loop
          endif
       enddo
 
-      if (ia>narea) then  ! standrad condition when loop terminates
-         write(*,*) "get_grid_descriptors: no match for ",data_set_id
+      if (ia>narea) then  ! standard condition when loop terminates without exit
+         write(*,*) "get_grid_descriptors: no match for ",
+     +               trim(adjustl(data_set_id))
          stop
       else
          data_set_handler = ia
@@ -433,14 +444,14 @@ c     --------------------------------------------------------------------------
       tcur = time_index( current_frame )
       treq = time_index( request_time  )
       newfile   = .false.
-      if (adjustl(trim(fname)) /= adjustl(trim(current_file))) then
+      if (trim(adjustl(fname)) /= trim(adjustl(current_file))) then
          newfile   = .true. 
          if (iunit>0) close(iunit)                               ! we opened it previously
          if (iunit<0) iunit = io_new_unit()                      ! first time, pick a free unit 
          open(iunit,file=fname, form='unformatted',status='old',
      +               iostat=ios )                                ! keep same logical unit
          if (ios /= 0) then
-            write(*,*) "error opening data file ", adjustl(trim(fname))
+            write(*,*) "error opening data file ", trim(adjustl(fname))
             stop
          endif
          call reset_tempfile(iunit)
@@ -663,7 +674,7 @@ c      wu,wv   wind               = m/s
 c      positive directions of currents,wind are east/north
 c
 c     NOTE: in readtmp.f90 current output unit is cm/s
-c           divided uscal,wscal by factor 100
+c           divided uscal,wscal by factor 100 because IBMlib prefers SI units
 c----------------------------------------------------------------------------+
       integer, intent(in)                 :: iwet2,iwet3
       real(8), intent(out), dimension(0:) :: u,v,w,s,t,z

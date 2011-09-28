@@ -1,0 +1,60 @@
+netcdf calcs_5km_dye_y9_1d_uvzetaAKt_10_avg {
+dimensions:
+	xi_u = 249 ;
+	eta_rho = 506 ;
+	s_rho = 32 ;
+	time = UNLIMITED ; // (360 currently)
+	eta_v = 505 ;
+	xi_rho = 250 ;
+	s_w = 33 ;
+variables:
+	float u(time, s_rho, eta_rho, xi_u) ;
+		u:long_name = "averaged u-momentum component" ;
+		u:units = "meter second-1" ;
+	float v(time, s_rho, eta_v, xi_rho) ;
+		v:long_name = "averaged v-momentum component" ;
+		v:units = "meter second-1" ;
+	float zeta(time, eta_rho, xi_rho) ;
+		zeta:long_name = "averaged free-surface elevation" ;
+		zeta:units = "meter" ;
+	float AKt(time, s_w, eta_rho, xi_rho) ;
+		AKt:long_name = "averaged temperature vertical diffusion coefficient" ;
+		AKt:units = "meter2 second-1" ;
+
+// global attributes:
+		:type = "ROMS averages file" ;
+		:title = "US West Coast, 5km resolution" ;
+		:grid_file = "uswc_r72_grd.nc" ;
+		:init_file = "calcs_5km_rgit_2000_Y8_rst.nc" ;
+		:VertCoordType = "NEW" ;
+		:theta_s = 7.f ;
+		:theta_b = 0.f ;
+		:hc = 150.f ;
+		:Cs_w = -1.f, -0.8035222f, -0.6456478f, -0.518792f, -0.4168604f, -0.3349558f, -0.2691435f, -0.2162615f, -0.1737693f, -0.1396254f, -0.1121896f, -0.09014358f, -0.07242834f, -0.05819274f, -0.04675288f, -0.03755916f, -0.03016987f, -0.02423003f, -0.01945426f, -0.01561313f, -0.0125221f, -0.01003266f, -0.008025212f, -0.00640332f, -0.005089061f, -0.004019294f, -0.003142625f, -0.002416936f, -0.001807364f, -0.001284621f, -0.0008235959f, -0.000402138f, 0.f ;
+		:Cs_r = -0.896394f, -0.7202724f, -0.5787547f, -0.4650418f, -0.3736708f, -0.3002519f, -0.241258f, -0.1938547f, -0.1557647f, -0.1251581f, -0.1005645f, -0.08080216f, -0.06492183f, -0.05216051f, -0.04190512f, -0.03366296f, -0.02703806f, -0.02171215f, -0.01742934f, -0.01398389f, -0.01121026f, -0.008975196f, -0.007171328f, -0.005711991f, -0.004527072f, -0.003559647f, -0.002763236f, -0.002099579f, -0.001536791f, -0.001047835f, -0.0006092193f, -0.0001998723f ;
+		:ntimes = 4320 ;
+		:ndtfast = 45 ;
+		:dt = 600.f ;
+		:dtfast = 13.33333f ;
+		:nwrt = 5184000 ;
+		:ntsavg = 414721 ;
+		:navg = 144 ;
+		:visc2 = 0.f ;
+		:visc2_units = "meter2 second-1" ;
+		:tnu2 = 0.f ;
+		:tnu2_units = "meter2 second-1" ;
+		:rdrg = 0.0003f ;
+		:rdrg_units = "meter second-1" ;
+		:rdrg2 = 0.f ;
+		:rdrg2_units = "nondimensional" ;
+		:rho0 = 1000.f ;
+		:rho0_units = "kilogram meter-3" ;
+		:gamma2 = 1.f ;
+		:SRCS = "KRNSRC main.F step2D_FB.F read_inp.F sta_par.F timers.F setup_kwds.F check_switches1.F check_srcs.F check_switches2.F set_weights.F set_scoord.F init_scalars.F init_arrays.F setup_grid1.F setup_grid2.F visc_rescale.F set_nudgcof.F analytical.F ana_grid.F ana_initial.F zetabc.F u2dbc_im.F v2dbc_im.F obc_volcons.F pre_step3d4S.F step3d_t3S.F step3d_uv1.F step3d_uv2.F prsgrd32AC1.F rhs3d35S.F set_depth.F omega.F visc3d_GP.F t3dmix.F ana_vmix.F u3dbc_im.F v3dbc_im.F t3dbc_im.F rho_eos.F ab_ratio.F alfabeta.F lmd_vmix.F lmd_kpp.F lmd_kpp_init.F lmd_swr_frac.F bvf_mix.F diag.F wvlcty.F grid_stiffness.F exchange.F mpi_setup.F mpi_exchange8WA.F lenstr.F get_date.F init_agedye.F CalcPar.F carbon.F co2calc_SWS.F def_bgc_flux.F drtsafe.F init_biopar.F init_scalars_bgcflux.F init_scalars_npzdoc.F init_scalars_physflux.F o2sato.F set_bgc_flux_avg.F ta_iter_SWS.F wrt_bgc_flux_avg.F wrt_bgc_flux_his.F def_phys_flux.F set_phys_flux_avg.F wrt_phys_flux_his.F wrt_phys_flux_avg.F biology.F bio_diag.F atm_pco2.F calendar.F init_scalars_bec.F ecosys_bec.F ecosys_bec_init.F get_dust.F get_iron.F set_bec_flux_avg.F wrt_bec_flux_avg.F wrt_bec_flux_his.F init_scalars_becflux.F def_bec_flux.F IOSRC nf_fread.F nf_read_bry.F set_cycle.F checkdims.F insert_node.F closecdf.F put_global_atts.F get_grid.F get_initial.F def_grid.F wrt_grid.F def_rst.F wrt_rst.F def_his.F wrt_his.F set_avg.F wrt_avg.F def_station.F wrt_station.F get_forces.F get_all_bry.F get_tclima.F get_uclima.F get_ssh.F get_smflux.F get_stflux.F get_srflux.F get_sst.F get_dqdt.F get_sss.F get_agedye.F SRCS $(KRNSRC) $(IOSRC)" ;
+		:CPPS = "<cppdefs.h> USWC_CENTRAL SOLVE3D UV_ADV UV_COR MIX_GP_UV SALINITY NONLIN_EOS TS_DIF2 MIX_GP_TS UV_VIS2 SPLIT_EOS TCLIMATOLOGY TNUDGING QCORRECTION SFLX_CORR LMD_MIXING LMD_RIMIX LMD_CONVEC CURVGRID SPHERICAL MASKING OBC_NORTH OBC_SOUTH OBC_M3ORLANSKI LMD_KPP AVERAGES LMD_NONLOCAL OBC_WEST OBC_M2FLATHER OBC_TORLANSKI M2NUDGING M3NUDGING UCLIMATOLOGY DIURNAL_SRFLUX CLIMAT_TS_MIXH NEW_S_COORD VFLX_CORR SPONGE PASSIVE_TRACER AGE_DYE_TRACER DBLEPREC <rhs3d35S.F>                    UPSTREAM <compute_horiz_tracer_fluxes.h> UPSTREAM <compute_vert_tracer_fluxes.h> AKIMA_V <lmd_kpp.F> INT_AT_RHO_POINTS LIMIT_UNSTABLE_ONLY" ;
+		:history = "Mon Jun 27 15:15:41 2011: ncks -v AKt calcs_5km_dye_y9_1d_AKt_10_avg.nc calcs_5km_dye_y9_1d_uvzetaAKt_10_avg.nc\n",
+			"Mon Jun 27 13:53:34 2011: ncrcat -v AKt /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m01.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m02.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m03.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m04.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m05.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m06.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m07.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m08.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m09.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m10.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m11.nc /mnt_work/nardus/loher/USWC5km/Comp_Ariane_Dye_1step_Release/output_1d/avg_y9_m12.nc calcs_5km_dye_y9_1d_AKt_10_avg.nc" ;
+		:nco_openmp_thread_number = 1 ;
+		:NCO = "4.0.7" ;
+data:
+}

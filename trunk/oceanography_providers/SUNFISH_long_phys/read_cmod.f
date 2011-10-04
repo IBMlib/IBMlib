@@ -451,8 +451,12 @@ c     --------------------------------------------------------------------------
          open(iunit,file=fname, form='unformatted',status='old',
      +               iostat=ios )                                ! keep same logical unit
          if (ios /= 0) then
-            write(*,*) "error opening data file ", trim(adjustl(fname))
+            write(*,'(a,a)') "error opening data file ", 
+     +                       trim(adjustl(fname))
             stop
+         else
+            write(*,'(a,a)') "update_buffers: opened new data file", 
+     +                       trim(adjustl(fname))
          endif
          call reset_tempfile(iunit)
          current_file = fname
@@ -484,6 +488,7 @@ c     --------------------------------------------------------------------------
 c     ----------------------------------------------------------------------------+
       rewind(lun)
       read(lun) aufdat ! advance file pointer to first frame 
+      write(*,*) "reset_tempfile: ready to read first frame"
       end subroutine reset_tempfile
 
 

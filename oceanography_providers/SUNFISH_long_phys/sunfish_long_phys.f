@@ -327,6 +327,7 @@ c     round toward nearest hour:  hour = intdiv((isec+1800)/3600)
 c
       call set_clock(dummy_clock, aclock)
       call add_seconds_to_clock(dummy_clock, 1800)
+      call get_date_from_clock(dummy_clock, year, month, day)
       call get_second_in_day(dummy_clock, isec)
       hour = isec/3600 ! integer division        
 c     

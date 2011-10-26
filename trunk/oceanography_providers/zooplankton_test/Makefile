@@ -2,12 +2,12 @@
 #              Makefile for physical_fields.mod 
 ############################################################
 
-
+OBJ = ztest_Stonehaven
 
 physical_fields.a: physical_fields.o
 	ar rcs physical_fields.a physical_fields.o
 
-physical_fields.mod physical_fields.o: ztest.f
+physical_fields.mod physical_fields.o: $(OBJ).f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o
 
 

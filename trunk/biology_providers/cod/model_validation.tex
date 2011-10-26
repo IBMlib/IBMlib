@@ -1,0 +1,63 @@
+\documentclass[dvips,a4,graphicx]{article}          %% uncomment if embedded
+\title{Validation of Cod model implementation}    %% uncomment if embedded
+\author{A. Christensen(asch@aqua.dtu.dk)}           %% uncomment if embedded 
+\begin{document}                                    %% uncomment if embedded
+\maketitle                                          %% uncomment if embedded
+\section{Validation of Cod model implementation}   
+\subsection{Egg stage}   
+\begin{itemize}
+  \item Ref \cite{Daewel2011} Fig 3a:
+\end{itemize}
+\subsection{Non-feeding larvae}      
+\subsection{Feeding larvae}    
+\begin{itemize}
+  \item Ref \cite{Daewel2011} Fig 3b: 
+  Figure reproduced reasonable
+  Premise in  Fig 3b is zbiomass = 100 mgC/m3 = 100/1e6/0.32 kgDW/m3 = 0.00031 kgDW/m3.
+  This is implemented by {\tt local\_env%zbiomass = 100./1e6/0.32 ! kgDW/m3 converted from mgC/m3}
+  using {\tt call test\_foraging\_window\_llarv(ref\_larv,local\_env,7.0,20.0,0.1)
+  Capture success (CS) and handling time (HT) is only depends on predator/prey size ratio
+  and therefor optimal foraging window only depends on larval size and prey size spectrum
+  which depends on seasonal slope, but not directly on temperature. 
+  Prey size spectrum representation is different in 
+  current implementation (continuous spectrum + seasonal slope) and Ref \cite{Daewel2011}.
+  Temperature independce of foraging window was also confirmed as expected.
+ 
+  \item Ref \cite{Daewel2011} Fig 5a:
+
+  Figure reproduced reasonable for temperature T = 4 $\circ$C and T = 12 $\circ$C
+  however, growth tends to be a somewhat smaller than Ref \cite{Daewel2011} Fig 5a.
+  The reason has not been identified, but the deviation is within the range that
+  can be captured by minor parameter tweeking, e.g. reducing SDA to 0.3 instead of 0.35
+  or increasing AE by 10 \%. We note that the growth equation eq 1 in  Ref \cite{Daewel2011}
+  is different from Ref \cite{Lough2005}, eventhough parameters are imported directly from this 
+  paper. We use the growth equation from Ref \cite{Lough2005} in this implementation
+%  using zoo plankton density 150 mgC/m3 (oceanography provider {\tt zooplankton\_test/ztest\_const.f}
+
+\end{itemize}
+%% ==============================================================
+\begin{thebibliography}{99}
+%% ==============================================================
+\bibitem{Daewel2008}
+Daewel Ute; Peck Myron A.; Kuehn Wilfried; et al:
+Coupling ecosystem and individual-based models to simulate the influence 
+of environmental variability on potential growth and survival of larval sprat 
+(Sprattus sprattus L.) in the North Sea
+\newblock FISHERIES OCEANOGRAPHY \textbf{17}(5), 333--351 (2008)
+%% --------------------------------------------------------------
+\bibitem{Daewel2011}
+Daewel Ute; Peck Myron A.; Schrum Corinna:
+Life history strategy and impacts of environmental variability on early 
+life stages of two marine fishes in the North Sea: an individual-based 
+modelling approach
+\newblock CANADIAN JOURNAL OF FISHERIES AND AQUATIC SCIENCES \textbf{68}(3), 426--443 (2011)
+%% --------------------------------------------------------------
+\bibitem{Lough2005}
+Lough RG; Buckley LJ; Werner FE; et al.
+A general biophysical model of larval cod (Gadus morhua) growth applied to populations on Georges Bank
+\newblock FISHERIES OCEANOGRAPHY  \textbf{14}(4), 241--262 (2005)
+%% --------------------------------------------------------------
+\end{thebibliography}
+
+  
+\end{document}                                      %% uncomment if embedded

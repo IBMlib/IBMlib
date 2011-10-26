@@ -1,10 +1,13 @@
-############################################################
-#                Makefile for particle_state.mod
+############################################################################
+#           Makefile for particle_state.mod for sprat
+#     
+#     This makefile compiles either multi stage or only feeding larvae setup
+#     This is selectedby setting LOCAL_OBJ below
 #
 #     $Rev:  $
 #     $LastChangedDate: $
 #     $LastChangedBy: $ 
-############################################################
+############################################################################
 ONLY_LARVAE = feeding_larval_stage_2_particle_state.o  numerical_1d_integrals.o  particle_state_base.o  prey_community.o  larval_properties.o  feeding_larval_stage.o 
 
 MULTI_STAGE = numerical_1d_integrals.o  particle_state_base.o  prey_community.o  larval_properties.o  feeding_larval_stage.o  yolksac_properties.o  egg_properties.o  released_egg_stage.o  yolksac_larval_stage.o  early_life_stages.o
@@ -12,11 +15,13 @@ MULTI_STAGE = numerical_1d_integrals.o  particle_state_base.o  prey_community.o 
 #
 # >>>>>>>> select which variant you want to build by setting LOCAL_OBJ <<<<<<<<<<<
 # 
-LOCAL_OBJ   = $(MULTI_STAGE)    
+LOCAL_OBJ   = $(ONLY_LARVAE)  
+
+SOURCES     = $(addsuffix .f, $(basename $(LOCAL_OBJ)))
 
 GENERIC_BIOENERGETICS = ../generic_bioenergetics
 
-particle_state.a: dependences.mk $(LOCAL_OBJ) 
+particle_state.a: $(SOURCES) dependences.mk $(LOCAL_OBJ) 
 	ar rcs particle_state.a $(LOCAL_OBJ) 
 
 particle_state.mod:
@@ -61,7 +66,7 @@ include $(COMMON_RULES)
 
 
 clean: FORCE
-	rm -f  *.o  *.a  *.mod  dependences.mk
+	rm -f  *.o  *.a  *.mod  dependences.mk $(SOURCES)   # SOURCES are soft links
 
 FORCE:
 

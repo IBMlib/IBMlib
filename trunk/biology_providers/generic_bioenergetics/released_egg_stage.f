@@ -40,7 +40,7 @@ c     ----------------------------------------------------------------
       public :: released_egg ! make type state_attributes visible outside
 
 
-c.....Particle state interface: (stand-alone)
+c.....Particle sub state interface: (for multi stage manager)
       public :: init_released_egg_stage  ! module operator
       public :: close_released_egg_stage ! module operator
       public :: init_state_attributes_egg

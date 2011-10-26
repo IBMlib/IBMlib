@@ -1,0 +1,11 @@
+! =========================================================
+! Sample parameter file for task_provider test_state.f
+!
+! Other parts of the setup may need other parameters not
+! found below
+! =========================================================
+start_time           = 2005 03 01 0  !  year  month  day  second_of_day
+end_time             = 2005 06 01 0  !  year  month  day  second_of_day
+particle_time_step   = 1800          ! seconds
+position             = 3.1  55.5 4.0 ! lon lat depth
+

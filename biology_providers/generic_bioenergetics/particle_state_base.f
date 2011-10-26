@@ -21,7 +21,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     --- simple container class (public scope)
       type local_environment   
         real    :: temp     ! degrees Celcius
-        real    :: zbiomass ! bulk zoo plankton density [myg DW/liter]
+        real    :: zbiomass ! bulk zoo plankton density [kg DW / m3]
         logical :: light
         integer :: julday   ! Julian day, for seasonal patterns
       end type

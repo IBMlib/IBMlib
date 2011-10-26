@@ -1,6 +1,6 @@
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Growth/survival of larvae based on bioenergetics
+c     Growth/survival of larvae based one bioenergetics
 c     ---------------------------------------------------
 c     $Rev: $
 c     $LastChangedDate: $
@@ -42,6 +42,11 @@ c     depend on predator/prey size ratio. This is the basis for
 c     precalculating foraging windows, depending only on larval size
 c     and feeding profitability - otherwise the optimal diet determination
 c     must be generalized (slower).
+c     The specific functions capture_sucess, handling_time, search_volume  
+c     must be parameterized as continuous functions with a consistent derivative
+c     for prey sizes lp in the range:
+c       lp_min_search_value <= lp <= lpmaxfactor*llarv
+c     
 c
 c     Units: weight  = myg DW
 c            length  = mm
@@ -90,8 +95,6 @@ c     ----------------------------------------------------------------
       type feeding_larvae
       private
          type(larval_physiology) :: larvstate         ! defined in module larval_properties 
-c         real                    :: time_since_growth ! = sum(dt) - for growth aggregation
-c         real                    :: tempxdt           ! = sum(temp*dt) - for averaging ambient temperaturE
       end type
       public :: feeding_larvae ! make type state_attributes visible outside
 
@@ -100,6 +103,13 @@ c     Class state_attributes is for the
 c     particle state interface and contains all attributes 
 c     related to the state of a particle beyond 
 c     spatial aspects.
+c     If used in a stage manager class that provides state_attributes
+c     itself, state_attributes in this module should be excluded at
+c     use association like:
+c        use feeding_larval_stage,  ONLY: ...
+c     or diverted like:
+c        use feeding_larval_stage,  state_attributes_FL => state_attributes
+c     to avoid name space conflict
 c     -----------------------------------------------
 
       type state_attributes
@@ -119,10 +129,6 @@ c
       public :: state_attributes ! make type state_attributes visible outside
 
 
-
-
-
-
 c.....Particle state interface: (stand-alone)
    
       public :: init_particle_state  ! module operator
@@ -136,6 +142,7 @@ c.....Particle state interface: (stand-alone)
       public :: get_property         ! currently void
       public :: get_metadata_state   ! currently void
 
+c.....Particle sub state interface: (for multi stage manager)
       public :: init_feeding_larval_stage
       public :: close_feeding_larval_stage
       public :: init_state_attributes_FL
@@ -145,7 +152,8 @@ c.....Particle state interface: (stand-alone)
 c.....All other subroutine than these below are private to the module
 
       interface get_property
-      module procedure get_prop_state
+      module procedure get_prop_SA
+      module procedure get_prop_FL
       end interface
       
       interface init_state_attributes
@@ -179,11 +187,12 @@ c     ==============================================================
       integer               :: particle_counter ! module counter for generating IDs for particles
 
       integer               :: nforpt ! sampling point for ingration integrals
-      real, parameter       :: growth_increment_interval = 86400 ! later move to input
+      
 
-      real,parameter        :: lp_min_search_value = 1.e-3 ! [mm] lower prey size, for optimality search
-
+      real,parameter        :: lp_min_search_value = 0.0 ! [mm] lower prey size, for optimality searches
+      REAL,parameter        :: lpmaxfactor         = 1.0 ! max prey/pred size ratio, for optimality searches 
 c
+      logical               :: precalc_ingestion_DB = .false. ! later move to input file
       real,allocatable      :: ingestion_ref_DB(:,:,:)   ! (llarv,logZ,julian_day)
       real,allocatable      :: llarv_grid(:)
       real,allocatable      :: logZ_grid(:)              ! log base = e
@@ -204,26 +213,36 @@ c     ---------------------------------------------------------------
 c     
       type(local_environment) :: local_env ! for testing
       type(larval_physiology) :: ref_larv  ! for testing
-      real                    :: lp,llarv,dlp ,drp,rprof,irate
-      real                    :: dllarv, dlogZ, djday
-      integer                 :: m,mpt,i0,j0,k0,i1,j1,k1
+      real                    :: lp,llarv,dlp ,drp,rprof
+      real                    :: irate,irateDB,irate_max
+      real                    :: lp_rmax, rmax, svol, dum
+      real                    :: dllarv, dlogZ, djday,z
+      integer                 :: m,mpt,i0,j0,k0,i1,j1,k1,i
 c     ---------------------------------------------------------------
       write (*,*) trim(get_particle_version())
 c     
 c     --- pass init to sub modules
 c     
       call init_larval_properties() ! module init
-
       particle_counter = 1      ! ID for next larvae (inactive when embedded)
+
+
 c     
       call read_control_data(ctrlfile,"ingestion_integral_sampling",
      +     nforpt)
       write(*,*) "init_particle_state: ingestion integral sampling =",
      +            nforpt
       
-      call setup_ingestion_db()
+      call read_control_data(ctrlfile,"precalc_ingestion_DB",
+     +                       precalc_ingestion_DB)
+      if (precalc_ingestion_DB) then
+         call setup_ingestion_db()
+      else
+         write(*,*) "init_particle_state: optimal ingestion rate "//
+     +              "calculated dynamically"
+      endif
 c     
-cc      ----- test section -----
+cc     ==================  test section ==================
 c
 c      call probe_local_environment((/0.0, 0.0, 1.0/),local_env)
 c      lp    = 0.5
@@ -234,6 +253,44 @@ c      rprof = 0.56
 c      drp   = 0.01
 c      call test_rprof_derivatives(llarv, rprof, local_env, drp)
 c      stop 555
+c
+c      ------------ foraging window ------------
+c
+c      local_env%zbiomass = 100./1e6/0.32 ! kgDW/m3 converted from mgC/m3
+c      local_env%temp     = 18.0
+c      local_env%julday   = 100  
+c      call test_foraging_window_llarv(ref_larv,local_env,7.0,20.0,0.1)
+c
+c      ------------ convergence test on nforpt ------------
+c
+c      local_env%zbiomass = 200./1e6/0.32 ! kgDW/m3 converted from mgC/m3
+c      local_env%temp     = 10.0
+c      local_env%julday   = 100  
+c      ref_larv%length    = 15.0
+c      do nforpt=2,30
+c         call calculate_ingestion_rate(ref_larv,local_env,irate,rprof) 
+c         write(*,*) nforpt,irate,rprof
+c      enddo
+c      ------------ test DB interpolation ------------
+c      local_env%zbiomass = exp(-10.0) ! kgDW/m3 converted from mgC/m3
+c      local_env%temp     = 10.0
+c      local_env%julday   = 101
+c      ref_larv%length    = 15.0
+c      call calculate_ingestion_rate(ref_larv,local_env,irate,rprof) 
+c      call interpolate_ingestion_rate(ref_larv,local_env,irateDB) 
+c      write(*,*) irate, irateDB
+c
+c      ------------ food utilization degree ------------
+c      local_env%zbiomass = 100./1e6/0.32  ! kgDW/m3 converted from mgC/m3
+c      local_env%temp     = 10.0
+c      local_env%julday   = 101
+c      ref_larv%length    = 15.0
+c      call find_rank_maximum(ref_larv%length, local_env, lp_rmax, rmax)
+c      call search_volume(lp_rmax, ref_larv%length, local_env, svol, dum) !  (svol unit = mm3/sec) 
+c      irate_max = local_env%zbiomass * svol    ! kgDW/m3 * mm3/sec = mygDW/sec
+c      call calculate_ingestion_rate(ref_larv,local_env,irate,rprof) 
+c      write(*,*) irate/irate_max
+      
 
       end subroutine init_feeding_larval_stage
 
@@ -259,7 +316,12 @@ c     (e.g. memory deallocation, MPI finalisation, final dumps etc.)
 c     Only deallocate own data, i.e. data allocated in this module
 c     ---------------------------------------------------------------
       write(*,*) "close_particle_state():"
+
       particle_counter               = 0
+
+      if (allocated(ingestion_ref_DB)) deallocate(ingestion_ref_DB)
+      if (allocated(llarv_grid))       deallocate(llarv_grid)
+      if (allocated(logZ_grid))        deallocate(logZ_grid)  
 c
 c     --- pass init to sub modules reversely
 c
@@ -287,6 +349,8 @@ c     ---------------------------------------------------------------
       character*(*),intent(in)               :: initdata
       integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------------
+      state%survival   = 1.0
+      state%alive      = .true.
       state%orig_boxID = emitboxID   ! store releasing box
       state%particleID = particle_counter    
       particle_counter = particle_counter + 1 ! module data
@@ -415,17 +479,22 @@ c
       type(local_environment)                 :: local_env
       real                                    :: xyz(3)
       integer                                 :: status
-      real                                    :: irate
+      real                                    :: irate, rprof
 c     --------------------------------------------------------------
       if (dt<0) stop "negative dt values currently blocked"
 
       call get_tracer_position(space, xyz)
-      call probe_local_environment(xyz, local_env)
+      call probe_local_environment(xyz, local_env) ! cache to avoid repeated interpolations
      
 c     --- determine ingestion rate - assume it is a visual predator     
       if (local_env%light) then 
-         call interpolate_ingestion_rate(state%larvstate,local_env,
-     +                                   irate)                 ! currently just average, no Poisson        
+         if (precalc_ingestion_DB) then
+            call interpolate_ingestion_rate(state%larvstate,local_env,
+     +                                      irate)         ! currently just average, no Poisson  
+         else
+            call calculate_ingestion_rate(state%larvstate, local_env, 
+     +                                    irate, rprof)   
+         endif
       else
          irate = 0.0   ! no light -> no feeding
       endif
@@ -455,12 +524,10 @@ c     --------------------------------------------------------------
       end subroutine 
 
       subroutine write_state_attributes(state)
-c     --------------------------------------------------------------
-c     log output of state
-c     --------------------------------------------------------------
       type(state_attributes), intent(in) :: state 
       end subroutine 
 
+      
 
 c     ==============================================================
 c     ========      internal (non public) subroutines       ========
@@ -627,7 +694,7 @@ c     Calculate the intake rate irate [myg/sec] based on optimal foraging theory
 c     for a reference larvae in state ref_larv when subject to 
 c     local environment local_env.
 c     0 <  rprof < 1 is the relative profitability corresponding to the optimal feeding rate irate
-c     This algorithm localizes the feeding profitability level corresponding
+c     This algorithm localizes the relative feeding profitability level rprof corresponding
 c     to optimal gain using bisection of gain function value/slope
 c     ------------------------------------------------------------------
       type(larval_physiology),intent(in) :: ref_larv
@@ -638,26 +705,48 @@ c
       REAL                               :: llarv
       real                               :: p, g,dgdp
       real                               :: pleft,pright,gleft,gright
-      integer                            :: ist, nsteps,i
-      real, parameter                    :: pleft_min = 1.0e-6  ! initial left search bracket 
-      real, parameter                    :: pleft_max = 0.999 9 ! initial right search bracket 
-      real, parameter                    :: p_resol   = 1.e-7
+      real                               :: wdist
+      integer                            :: ist, nsteps,i,ib
+      
+      real, parameter                    :: wdist0 = 0.1   ! initial left/right search bracket 
+      
+      real, parameter                    :: multifac      = 0.303
+      integer, parameter                 :: max_loc_steps = 20
+      real, parameter                    :: p_resol      = 1.e-7  ! resolution limit on gain maximum
       logical                            :: printinfo
 c     ------------------------------------------------------------------
       llarv     = ref_larv%length 
-      pleft     = pleft_min
-      pright    = pleft_max 
-      
-c     --- check bracket assertions --
-      call eval_gain(llarv,pleft,local_env, gleft, dgdp)    
-      if (dgdp < 0) write(*,211) "left"
-      
-      call eval_gain(llarv,pright,local_env, gright, dgdp)    
-      if (dgdp > 0) write(*,211) "right"
-        
- 211  format("calculate_ingestion_rate: warning: invalid ",a,
-     +       " bracket - continuing optimization")
+c      
+c     --- establish profitability search bracket [pleft,pright] 
+c         for gain maximum by expanding toward 
+c         absolute limits p=0 and p=1
+c      
+      wdist = wdist0
+      do ib = 1, max_loc_steps
+         pleft = wdist
+         call eval_gain(llarv,pleft,local_env, gleft, dgdp)  
+         if (dgdp > 0) exit ! pleft is a valid left delimiter
+         wdist = wdist*multifac
+      enddo
+      if (dgdp <= 0) then
+         write(*,211) "left"
+         stop
+      endif
 
+      wdist = wdist0
+      do ib = 1, max_loc_steps
+         pright = 1.0 - wdist
+         call eval_gain(llarv,pright,local_env, gright, dgdp)    
+         if (dgdp < 0) exit ! pright is a valid right delimiter
+         wdist = wdist*multifac
+      enddo
+      if (dgdp >= 0) then
+         write(*,211) "right"
+         stop
+      endif
+ 211  format("calculate_ingestion_rate: unable to establish ",a,
+     +       " bracket for gain maximum ")
+   
 c
 c     Bisect maximum gain interval 
 c
@@ -674,7 +763,7 @@ c
             gright = g
          endif
 c         write(*,*) "[",pleft,">",g,"<",pright, "]"
-      enddo
+      enddo     
 c
 c     Finally set irate = max gain 
 c
@@ -693,6 +782,7 @@ c     Interpolate (upper limit) optimal ingestion rate from ingestion_ref_DB
 c     which was initialized in setup_ingestion_db
 c     This interpolator assumes regular llarv,logZ,jday grids
 c     Extract grid spacing/size dynamically rather than storing it as module data
+c
 c     subroutine is validated
 c     ------------------------------------------------------------------
       type(larval_physiology),intent(in) :: larvstate
@@ -708,11 +798,16 @@ c     ------------------------------------------------------------------
 c     
 c     locate grid coordinates in ingestion_ref_DB(nllarv,nlogZ,njday)
 c
+      if (.not.precalc_ingestion_DB) then
+         write(*,*) "interpolate_ingestion_rate: precalc_ingestion_DB=F"
+         stop 
+      endif
+
       llarv = larvstate%length
       nllarv = size(llarv_grid)
       if ((llarv < llarv_grid(1)).or.(llarv > llarv_grid(nllarv))) then
          write(*,*) "interpolate_ingestion_rate: " //
-     +              "extrapolating for dimension llarv"
+     +              "extrapolating for dimension llarv, llarv=",llarv
       endif
       dllarv = llarv_grid(2)-llarv_grid(1) ! regular grid
       i0     = 1 + int((llarv-llarv_grid(1)) / dllarv)
@@ -725,7 +820,7 @@ c
       nlogZ  = size(logZ_grid)
       if ((logZ < logZ_grid(1)).or.(logZ > logZ_grid(nlogZ))) then
          write(*,*) "interpolate_ingestion_rate: " //
-     +              "extrapolating for dimension logZ"
+     +              "extrapolating for dimension logZ, logZ=",logZ
       endif
       dlogZ  = logZ_grid(2)-logZ_grid(1)   ! regular grid
       j0     = 1 + int((logZ-logZ_grid(1)) / dlogZ)
@@ -738,7 +833,7 @@ c
       njday = size(jday_grid)              ! integer
       if ((jday < jday_grid(1)).or.(jday > jday_grid(njday))) then
          write(*,*) "interpolate_ingestion_rate: " //
-     +              "extrapolating for dimension jday"
+     +              "extrapolating for dimension jday, jday=",jday
       endif
       djday = jday_grid(2)-jday_grid(1) ! regular grid
       k0     = 1 + int((jday-jday_grid(1)) / djday)
@@ -868,21 +963,23 @@ c     --------------------------------------
 c     Locate prey length lp corresponding to the 
 c     prey rank maximum rmax for a larvae 
 c     with larval length llarv using rank slope bisection
+c     to within accuracy lp_resolution
 c
-c     Assert lp_min_search_value < lp < llarv to establish a search bracket
+c     Assert lp_min_search_value <= lp <= llarv to establish a search bracket
 c     --------------------------------------
       REAL,intent(in)                    :: llarv ! larval length [mm]
       type(local_environment),intent(in) :: local_env ! ambient conditions
       REAL,intent(out)                   :: lp    ! prey length at rank maximum [mm]
       REAL,intent(out)                   :: rmax  ! rank maximum [myg/second]
 c
+       
       REAL,parameter     :: lp_resolution = 1.e-6 ! [mm]
    
       REAL               :: lpleft,lpright,rnk,drnk_dlp
       integer            :: nsteps, ist
 c     -------------------------------------
       lpleft  = lp_min_search_value  ! assert (d/dlp) rank (lleft)  > 0
-      lpright = llarv                ! assert (d/dlp) rank (lright) < 0
+      lpright = lpmaxfactor*llarv    ! assert (d/dlp) rank (lright) < 0
 c     --- check assertions ---
       call rank(lpleft, llarv, local_env, rnk, drnk_dlp)   
       if (drnk_dlp < 0) then   ! 
@@ -925,6 +1022,9 @@ c
 c     Assume optimal foraging window is a contiguous interval 
 c     Assume optimal foraging window is within the
 c     search interval [lp_min_search_value, lpmaxfactor*llarv]
+c 
+c     Intercept singuar limit rprof -> 1
+c     Currently do not intercept limit rprof -> 0
 c     -------------------------------------------------------- 
       REAL,intent(in)                    :: llarv                   ! larval length [mm]
       type(local_environment),intent(in) :: local_env ! ambient conditions
@@ -933,18 +1033,24 @@ c     --------------------------------------------------------
       REAL,intent(out)                   :: dlplow_drp, dlphigh_drp ! derivatives of foraging window [mm]
 c
       REAL               :: lp_rmax,rmax,minrank,rnk,drnk_dlp
-      REAL,parameter     :: lpmaxfactor = 1.0 ! max prey/pred size ratio 
       REAL               :: lplow_limit, lphigh_limit 
-      REAL,parameter     :: infty = 1.0e30 ! value returned in singular limit
+
+      REAL,parameter     :: rprof_singular = 1.e-4 ! interception limit when rprof too close to 1
+      REAL,parameter     :: infty = 1.0e30         ! deriv value returned in singular limit
 c     -------------------------------------------------------- 
 c
 c     locate rank maximum as delimiter for locating lplow,lphigh
 c
       call find_rank_maximum(llarv, local_env, lp_rmax, rmax) 
+
+      if ((rprof>1.0).or.(rprof<0.0)) then
+         write(*,*) "find_foraging_window: rprof=", rprof
+         stop "find_foraging_window: rprof range error"
+      endif
 c
 c     Capture singular limit rprof=1, where lplow=lphigh=lp_rmax
 c
-      if (abs(rprof-1.0)<1.e-4) then
+      if (abs(rprof-1.0) < rprof_singular) then
          lplow         = lp_rmax
          lphigh        = lp_rmax
 c        --- set derivatives to infinity with sign corresponding to left side limit of rprof->1
@@ -979,52 +1085,95 @@ c
 c     use llarv and local_env from embedding scope
 c     ------------------------------------------------
       real,intent(in)    :: xleft, xright ! input solution bracket
-      real,intent(in)    :: r0            ! function offset
+      real,intent(in)    :: r0            ! rank value to solve for
       real,intent(out)   :: x             ! solution 
-      real               :: s0,s1,s,f,df,dx, rnk,drnk_dlp
-      real               :: x0,x1,xlast   ! dynamical bracket
-      REAL,parameter     :: dxlimit = 1.0e-6
-      integer            :: iter
+      real               :: s0,s1,s,f,df,dx,rnk0,rnk1,drnk_dlp
+      real               :: x0,x1,resi,relresid      ! dynamical bracket
+      logical            :: do_bisec, converged
+      character*2        :: steptyp
+      REAL,parameter     :: dx_limit       = 1.0e-6 ! resolution limit on x
+      REAL,parameter     :: relresid_limit = 1.0e-4 ! resolution limit on rank==r0
+      integer            :: iter,i
       integer,parameter  :: max_iter = 20 ! suspend newton search, if exceeded
-c     --------
+      logical,parameter  :: log = .false. ! switch on to generate convergence trace
+c     ------------------------------------------------
       iter = 1
       x0 = xleft   ! copy initial bracket
       x1 = xright  ! copy initial bracket
-      
+      if (log) write(*,317)
+
 c     ---- check assertions ----
       if (x1<x0) stop "newton_search: invalid bracket"
-      call rank(x0, llarv, local_env, rnk)
-      s0 = sign(1.0, rnk-r0)
-      call rank(x1, llarv, local_env, rnk)
-      s1 = sign(1.0, rnk-r0)
-      if ((s0*s1)>0) stop "newton_search: root not bracket"
-c      
+      call rank(x0, llarv, local_env, rnk0)
+      s0 = sign(1.0, rnk0-r0)
+      call rank(x1, llarv, local_env, rnk1)
+      s1 = sign(1.0, rnk1-r0)
+      if ((s0*s1)>0) stop "newton_search: root not bracketed"
+c     -------------------------------------------------------- 
 c     locate the solution x: xleft <= x0 < x < x1 < xright
+c       x0,x1 : dynamic bracket on root
+c       x     : current value on root
+c       dx    : current estimate on proximity to root
+c     --------------------------------------------------------
+      
 c
-      dx    = x1-x0         ! an upper bound, to enter while loop
-      x     = 0.5*(x0 + x1) ! set value in case already abs(dx) < dxlimit
-      do while (abs(dx) > dxlimit) ! Newton loop 
+c        ---- 0) loop initialization ----
+c
+      x       = 0.5*(x0 + x1)   
+      dx      = x1-x0           ! set value in case already abs(dx) < dxlimit
+c
+      do                ! hybrid Newton/bisection loop
+c
+c        ---- 1) evaluate current point x ----
+c
          call rank(x, llarv, local_env, rnk, drnk_dlp)
-         dx    = -(rnk-r0)/drnk_dlp  ! Newton step
-         x     = x + dx   
-         if ((x<x0).or.(x>x1).or.(iter>max_iter)) then ! bisection fall back
-            xlast = x
-            x     = 0.5*(x0 + x1)
-            dx    = x - xlast
-            call rank(x, llarv, local_env,rnk)
-            s   = sign(1.0, rnk-r0)
-            if (s0*s > 0) then ! update left bracket + sign
-               x0 = x
-               s0 = s
-            else               ! update right bracket + sign
-               x1 = x
-               s1 = s
-            endif
-         endif    ! bisection fall back
-c         write(*,*) x0,x1,x,dx
-         iter = iter+1
-         
+c
+c        ---- 2) check convergence / print log  ----
+c         
+         resi      = rnk-r0
+         relresid  = abs(resi/max(r0, 1.e-4))
+         if (log) write(*,318) iter,x0,x,x1,abs(dx),relresid,steptyp
+
+         converged = ((abs(dx)<dx_limit).and.(relresid<relresid_limit))
+         if (converged) then
+c            write(32,*) iter
+            exit
+         endif
+c
+c        ---- 3) update bracket from last evaluation  ----
+c
+         s     = sign(1.0, rnk-r0)
+         if (s0*s > 0) then     ! update left bracket + sign
+            x0 = x
+            s0 = s
+         else                   ! update right bracket + sign
+            x1 = x
+            s1 = s
+         endif
+c
+c        ---- 4) generate next point x and step monitor dx ----
+c
+         if ((drnk_dlp /= 0.0).and.(iter <= max_iter)) then
+            dx       = -(rnk-r0)/drnk_dlp   ! Newton step  
+            x        = x + dx
+            steptyp  = "nw"
+            do_bisec = ((x<x0).or.(x>x1))   ! discard Newton step beyond bracket
+         else
+            do_bisec = .true.   ! Newton step undefined, apply bisection fallback
+         endif
+c     
+         if (do_bisec .or. (iter>max_iter)) then ! bisection fallback 
+            x        = 0.5*(x0 + x1)      
+            dx       = x1-x0
+            steptyp  = "bi"
+         endif
+         iter            = iter+1
+
       enddo ! while     
+
+ 317  format(20("-"),"newton_search",20("-"))
+ 318  format(i3," [",3(f12.7),"]  adx=",f12.7," rres=",f12.7,2x,a2)
+
       end subroutine newton_search ! local function to find_foraging_window
       end subroutine find_foraging_window
 
@@ -1104,7 +1253,7 @@ c
                local_env%julday = jday_grid(k)
                call calculate_ingestion_rate(ref_larv, local_env, 
      +                                       irate, rprof) 
-               write(*,532) llarv_grid(i), logZ_grid(j), 
+               if (verbose>0) write(*,532) llarv_grid(i), logZ_grid(j), 
      +                      int(jday_grid(k)), irate, rprof
                ingestion_ref_DB(i,j,k)  = irate
             enddo
@@ -1129,6 +1278,38 @@ c     end subroutine calculate_predation_survival
 c     ==============================================================
 c     testing/validation subroutines
 c     ==============================================================
+
+
+      subroutine test_foraging_window_llarv(ref_larv, local_env, 
+     +                                  llarv_min, llarv_max, dllarv)
+c     ---------------------------------------------------------------
+c     For a larvae ref_larv subject to local environment local_env  
+c     scan over larval length to assess optimal feeding conditions
+c     larval length scan is on a regular grid [llarv_min,llarv_max] 
+c     with sampling spacing dllarv
+c     ---------------------------------------------------------------
+      type(larval_physiology),intent(inout) :: ref_larv
+      type(local_environment),intent(in)    :: local_env 
+      real,intent(in)                       :: llarv_min,llarv_max  ! [mm]
+      real,intent(in)                       :: dllarv               ! [mm]
+c
+      real                    :: llarv0,irate,rprof
+      real                    :: lplow, dlplow_drp,lphigh, dlphigh_drp
+c     ---------------------------------------------------------------
+      llarv0          = ref_larv%length ! save orig value
+      ref_larv%length = llarv_min
+      do while (ref_larv%length < llarv_max)
+         call calculate_ingestion_rate(ref_larv,local_env,irate,rprof)
+         call find_foraging_window(ref_larv%length,local_env,rprof,
+     +                  lplow, dlplow_drp,
+     +                  lphigh, dlphigh_drp)
+         write(*,*) ref_larv%length,1e3*lplow,1e3*lphigh,rprof,irate
+         ref_larv%length = ref_larv%length + dllarv
+      end do
+      ref_larv%length = llarv0 !  restore orig value
+
+      end subroutine test_foraging_window_llarv
+
 
 
       subroutine test_lp_derivatives(lp, llarv, local_env, dlp)
@@ -1286,15 +1467,65 @@ c     ==============================================================
 c     output interface - to be filled in later
 c     ==============================================================
 
-
-      subroutine get_prop_state(state,var,bucket,status)
-c------------------------------------------------------------  
+      
+      subroutine get_prop_SA(state,var,bucket,status)
+c--------------------------------------------------------------------------
+c     Dig out current/virtual data from object using get_property interface
+c     into bucket given the request var
+c     Return status = 0, if data was delivered
+c     Return status = 1, if data could not be resolved 
+c
+c     Pass unhandled data requests onto state%larvae
+c--------------------------------------------------------------------------
       type(state_attributes),intent(in) :: state
       type(variable),intent(in)         :: var
       type(polytype), intent(out)       :: bucket
       integer, intent(out)              :: status
+c
+      integer,parameter                 :: namlen = 999
+      character(len=namlen)             :: name
+      character*(*),parameter           :: survival = "survival"
+c------------------------------------------------------------
+      name = adjustl(get_name(var))
+      if (name(1:len(survival)) == survival) then
+         call construct(bucket, survival, state%survival)
+         status = 0 ! data was extracted successfully
+      else  ! pass other requests of larval sub component
+         call get_prop_FL(state%larvae,var,bucket,status)
+      endif
+      end subroutine get_prop_SA
+
+
+      subroutine get_prop_FL(state,var,bucket,status)
 c------------------------------------------------------------  
-      end subroutine
+c     Dig out current/virtual data from object using get_property interface
+c     into bucket given the request var
+c     Return status = 0, if data was delivered
+c     Return status = 1, if data could not be resolved 
+c
+c     Pass unhandled data requests onto state%larvae
+c--------------------------------------------------------------------------
+      type(feeding_larvae),intent(in)   :: state
+      type(variable),intent(in)         :: var
+      type(polytype), intent(out)       :: bucket
+      integer, intent(out)              :: status
+c
+      integer,parameter                 :: namlen = 999
+      character(len=namlen)             :: name  
+      character*(*),parameter           :: std_length = "std_length"
+      character*(*),parameter           :: dry_weight = "dry_weight"
+c------------------------------------------------------------
+      name = adjustl(get_name(var))
+      if      (name(1:len(std_length)) == std_length) then
+         call construct(bucket, std_length, state%larvstate%length)
+         status = 0 ! data was extracted successfully
+      elseif  (name(1:len(dry_weight)) == dry_weight) then
+         call construct(bucket, dry_weight, state%larvstate%weight)
+         status = 0 ! data was extracted successfully
+      else  ! unhandled, bail out
+         status = 1 
+      endif
+      end subroutine get_prop_FL
 
 
       subroutine get_metadata_state(var_name,var,status)

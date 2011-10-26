@@ -40,7 +40,7 @@ c     ----------------------------------------------------------------
       public :: yolksac_larvae ! make type state_attributes visible outside
 
 
-c.....Particle state interface: (stand-alone)
+c.....Particle sub state interface: (for multi stage manager)
       public :: init_yolksac_larval_stage  ! module operator
       public :: close_yolksac_larval_stage ! module operator
       public :: init_state_attributes_YL

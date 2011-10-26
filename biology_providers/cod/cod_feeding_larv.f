@@ -43,7 +43,7 @@ c     --------------------------------------------------------------------
 c     =================== biological parameters ===================
 
       real, parameter :: length0  = 5.5         ! [mm] first exogeneous feeding, ref Ione_1996
-      real, parameter :: w2lxpo   = 0.247       ! ref Lough_2005
+      real, parameter :: w2lxpo   = 0.247       ! ref Werner 1996
       real, parameter :: l2wxpo   = 1.0/w2lxpo  ! implied
       real, parameter :: weight0  = 68.670     ! [myg] (length0/1.935)**l2wxpo - ref Daewel_2011)
      
@@ -307,11 +307,17 @@ c     ingestion/stomach evacuation dynamics is based on exact
 c     ODE solution for time interval dt:
 c
 c      d(stomach) 
-c      -----------  = [irate - evac_rate*gut_capacity] * H(0 < stomach < gut_capacity)
+c      -----------  = [irate - evac_rate*gut_capacity] * H(0 <= stomach <= gut_capacity)
 c          dt
 c
 c     where H(true/false) = 1/0. Ingestion rate is capped to evac_rate*gut_capacity, 
-c     if  stomach >= gut_capacity
+c     if stomach >= gut_capacity. Rate of evacuated food: evrate (from stomach to uptake system)
+c     is given by
+c       
+c                / if (stomach>0)   evac_rate*gut_capacity 
+c     evrate  = |
+c                \ if (stomach=0)   irate  
+c
 c     ---------------------------------------------------
       type(larval_physiology),intent(inout) :: self 
       type(local_environment),intent(in)    :: local_env ! ambient conditions
@@ -319,8 +325,8 @@ c     ---------------------------------------------------
       real, intent(in)                      :: dt        ! seconds 
 c      
       real            :: growth, max_growth
-      real            :: ingestion, AE
-      real            :: RS, k, dl, RMcosts,w
+      real            :: ingestion, AE, ppfood, snext
+      real            :: RS, k, dl, RMcosts
       real            :: gut_capacity,tempfac,gut_evac_rate
       real            :: dt1,empty_space,net_rate
       real            :: b,c
@@ -330,15 +336,15 @@ c
 
       real, parameter :: metab_conv    = 0.00463*227.0 ! muLO2 -> myg DW conversion
       real, parameter :: act_metab_fac = 2.5  ! activity multiplier
-      real, parameter :: AEinfty = 0.7   ! asymptotic assimilation efficiency
+      real, parameter :: AEinfty = 0.8   ! asymptotic assimilation efficiency
       real, parameter :: AEreduc = 0.4   ! reduction factor in AE for small larvae
       real, parameter :: AEdecay = 0.003 ! myg^-1
 
-      real, parameter :: SDA = 0.35      ! [1]     ref: Daewel_2011 
-      real, parameter :: Q10_GER = 3.0   ! [1/sec] ref: Daewel_2011 
+      real, parameter :: SDA     = 0.3   ! [1]     ref: Daewel_2011 
+      real, parameter :: Q10_GER = 2.5   ! [1/sec] ref: Daewel_2011 
 c
 c     ---------------------------------------------------      
-      w = self%weight 
+   
       
 c     Compute metabolic costs RMcosts corresponding to time interval dt 
 c     at ambient conditions local_env
@@ -347,10 +353,9 @@ c     Q10 def: R2 = R1*Q10**((T2-T1)/10)
 c
 c     --- RS = standard metabolic rate RS as myg/hour at night
  
-
-      b = 1.029  - 0.00774*log(w)
-      c = 0.1072 - 0.0032*log(w)
-      RS = metab_conv * 0.00114 * w**b * exp(c*local_env%temp) ! myg/hour (ref Lough_2005)
+      b = 1.029  - 0.00774*log(self%weight)
+      c = 0.1072 - 0.0032*log(self%weight)
+      RS = metab_conv * 0.00114*(self%weight**b)*exp(c*local_env%temp) ! myg/hour (ref Lough_2005)
 c
 c     activity (==light) correction
 c      
@@ -367,35 +372,38 @@ c
       RMcosts = k*RS*(dt/onehour)  ! [myg] for time interval dt 
 
 c      
-c     Compute actual ingestion <= irate*dt and update stomach_content 
-c     The analysis splits on whether stomach_content exceeds gut_capacity
-c     during time interval dt. gut_evac_rate is linear evacuation as fraction of gut_capacity/sec
-c
-      gut_capacity  = 3.24 + 0.064*w   ! [myg] ref Lough_2005
-      tempfac       = Q10_GER**((local_env%temp-12.0)/10.0) ! 
-      gut_evac_rate = 1.792 * (self%length)**(-0.828) * tempfac  ! [1/sec] ref: Peck_2007 
+c     Update stomach_content and compute the amount of preproceeed food ppfood
+c     that is made available for uptake in time interval dt.
+c     Implicitly calculate the actual ingestion <= irate*dt as limited by gut capacity 
+c     
+      gut_capacity  = 3.24 + 0.064*self%weight    ! [myg] ref Lough_2005
+      tempfac       = Q10_GER**((local_env%temp-12.0)/10.0) !  ref: Peck_2007 
+      gut_evac_rate = 1.792*(self%length)**(-0.828)*tempfac/onehour  ! [1/sec] ref: Peck_2007 
 
-      net_rate    = irate - gut_evac_rate*gut_capacity
-      empty_space = gut_capacity - self%stomach_content
-      if (net_rate*dt > empty_space) then ! we'll hit the roof within dt
-         dt1 = empty_space/net_rate ! time where we hit the roof 
-         dt1 = max(0.0, min(dt1,dt)) ! 0/0 protextion - ensure 0 < dt1 < dt
-         ingestion    = irate*dt1 + gut_evac_rate*gut_capacity*(dt-dt1) ! < irate*dt 
-         self%stomach_content = gut_capacity ! end with full stomach
-      else
-         ingestion    = irate*dt ! there is room in stomach, eat at max rate
-         self%stomach_content = self%stomach_content + net_rate*dt
-         self%stomach_content = max(0.0, self%stomach_content) ! never go negative
+      net_rate    = irate - gut_evac_rate*gut_capacity   ! (d/dt) stomach_content
+      if (net_rate < 0.0) then ! compute time dt1 where stomach is empty
+         dt1 = min(dt, max(0.0, -self%stomach_content/net_rate)) ! 0/0 protection - ensure 0 < dt1 < dt
+         ppfood = irate*dt - dt1*net_rate
+      else                    ! stomach will not go empty during dt  
+         ppfood = gut_evac_rate*gut_capacity*dt 
       endif
+      snext                = self%stomach_content + net_rate*dt
+      self%stomach_content = max(0.0, min(snext, gut_capacity)) ! enforce BC on stomach_content
 
 c     ---- assess assimilation efficiency AE
-      AE  = AEinfty*(1.0 - AEreduc*exp(-AEdecay*(w-weight0)))
+      AE  = AEinfty*(1.0 - AEreduc*exp(-AEdecay*(self%weight-50.0)))  ! Daewel2011, eq A.7
 
 c     ---- assess standard dynamic action SDA (no variability with size/temp ??)
       
 c     ---- combine pieces into a potential growth ----
-      growth = ingestion*AE*(1.0 - SDA) - RMcosts   ! [myg] for time interval dt 
-
+c          Apply the growth equation from Lough_2005 which is different from Daewel_2011
+c          Daewel_2011: growth = ppfood*AE*(1.0 - SDA) - RMcosts   ! [myg] for time interval dt 
+c          Lough_2005:  growth = (1.0 - SDA)*(ppfood*AE - RMcosts) ! [myg] for time interval dt
+c          Lough_2005 sets SDA=0, if (ppfood*AE - RMcosts) is negative. Keep nonzero value to
+c          emulate submaintenance matabolism that is not present in Lough_2005 model
+c          
+      growth = (1.0 - SDA)*(ppfood*AE - RMcosts) ! [myg] for time interval dt  growth increment from 
+     
 c     potentially impose a max growth here as well
 
 c     ---- update larval weight for time interval dt      

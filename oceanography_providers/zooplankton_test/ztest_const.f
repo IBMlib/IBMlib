@@ -1,22 +1,22 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Zooplankton access test module
+c     Zooplankton access test module 
+c     Constant spatial/temporal environment
 c
-c     Implements seasonal variability in the Stonehaven time series
-c     partly following Marc Hufnagls parameterization (Hufnagl and Peck 2011)
+c     Read these tag from input file:
+c         water_depth         =  < water depth in meters >
+c         water_temperature   =  < water temperature in deg Celcius >
+c         zooplankton_biomass =  < average zooplankton biomass in kg DW/m3 >
+c
 c     ---------------------------------------------------
 c     $Rev: 361 $
 c     $LastChangedDate: 2011-07-20 15:09:15 +0200 (Wed, 20 Jul 2011) $
 c     $LastChangedBy: asch $ 
-c
-c     depth          = constant wdepth 
-c     no coast line (all water, no land)
-c     water temp     = seasonal trigonometric (no stratification)
-c     turbulence     = 0
-c     currents       = 0
-c     all other interpolations = 0
+c    
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
+      use run_context, only: ctrlfile => simulation_file
+      use input_parser
       use time_tools           ! import clock type
       use constants
       use geometry
@@ -43,48 +43,13 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: get_pbi_version
 
 c     -------------------- module data --------------------  
-     
+        
+
+      real :: wdepth   ! water depth in meters
+      real :: wtemp    ! water temperature in deg Celcius
+      real :: avgzoo   ! average zoo plankton biomass in kg DW/m3
       
 
-c     --- parameters for trigonometric seasonal temperature cycle ---
-
-      real, parameter :: avg_wtemp         = 10.0  ! yearly average - deg Celcius
-      real, parameter :: wtemp_amp         = 3.9   ! oscillation amp - deg Celcius
-      real, parameter :: jday_with_maxtemp = 215.0 ! jday with maximum 
-      
-c     --- parameters for seasonal cycle of total zooplanton abundance 
-c
-c      real, parameter :: avg_logN          = 3.23  ! yearly average - log10(N[1/m3])
-c      real, parameter :: logN_amp          = 0.57  ! oscillation amp - log10(N[1/m3])
-c      real, parameter :: jday_with_maxlogN = 195.0 ! jday with maximum 
-c
-c      phase  = day2rad*(jday - jday_with_maxlogN)
-c      log10N = avg_logN + logN_amp*cos(phase)   ! log base == 10
-c      N      = 10**log10N   ! unit = 1/m3
-c
-c     --- parameters for seasonal cycle of slope b of zooplanton spectrum
-c         N[1/m3/mm] = a*lprey**b  (b<0)
-      real, parameter :: SS_slope_avg = -1.85 
-      real, parameter :: SS_slope_amp =  0.7
-      real, parameter :: SS_dayoffset = -175+365/2. ! cosine offset     
-      real, parameter :: lp_SSmin = 0.02 ! mm, lower Microplankton size limit
-      real, parameter :: lp_SSmax = 2.0  ! mm, upper Mesoplankton size limit    
-
-c     --- zooplanton length-weight key (assumed seasonally constant)
-c         m = prey_mass0 *(lprey/prey_len0 )**prey_expo
-c         Daewel etal 2008: log10 (m/ygC) = 2.772 * log10(lprey/ym) - 7.476
-c         Carbon-to-DW factor = 0.32
-c         yg-to-kg  factor    = 1.e9
-c         prey_mass0 [kgDW]   = (prey_len0*1000)**2.772 / 10**7.476 / 0.32 / 1.e9
-
-      real, parameter :: prey_len0     = 1.0            ! [mm]
-      real, parameter :: prey_expo     = 2.772          ! from Daewel etal 2008
-      real, parameter :: prey_mass0    = 2.161971784e-8 ! [kg] DW at prey_len0  - see above comments  
-
-      real, parameter :: wdepth   = 40.0 ! water depth in meters
-       
-      real, parameter :: day2rad  = 2*pi/365.0
-      
       type(clock), target  :: master_clock ! simulation master clock
 
 
@@ -98,10 +63,17 @@ c     ------------------------------------------
       type(clock), intent(in),optional :: time 
       if (present(time)) master_clock = time
       write(*,*) trim(get_pbi_version()) 
+      call read_control_data(ctrlfile,"water_depth",         wdepth)
+      call read_control_data(ctrlfile,"water_temperature",   wtemp)
+      call read_control_data(ctrlfile,"zooplankton_biomass", avgzoo)
+      write(*,*) "init_physical_fields: water depth =",wdepth,"m"
+      write(*,*) "init_physical_fields: water temp  =",wtemp, "degC"
+      write(*,*) "init_physical_fields: zooplankton =",avgzoo,"kgDW/m3"
+
       end subroutine 
 c     ------------------------------------------ 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "Stonehaven zooplankton PBI vers: $Rev: 361 $"
+      get_pbi_version =  "Zooplankton pbi version: $Rev: 361 $"
       end function
 c     ------------------------------------------ 
       subroutine close_physical_fields()
@@ -127,6 +99,9 @@ c     ------------------------------------------
       endif
       end subroutine 
 c     ------------------------------------------ 
+
+
+
 
 
       subroutine null_r3_interpolation(xyz, r3, status)
@@ -174,47 +149,18 @@ c     --------------------------------------------------
 c     For testing, make lookup in monthly average table
 c     Currently just define rvec(1), other components == 0
 c     Ignore leap year (may cause minute discontinuity at new year)
-c
-c     Current parameterization based on Hufnagl and Peck 2011
-c
-c     zooplankton unit = kg dry weight / m3
 c     -------------------------------------------------- 
       real, intent(in)     :: xyz(:)
       real, intent(out)    :: rvec(:)
       integer, intent(out) :: status
-      integer :: jday
-      real    :: log10N,N,a,slope,phase,xp,s1,s0,xppr,zbio
-      real, parameter :: xc1 = 0.005 ! avg in Hufnagl and Peck 2011 
-      real, parameter :: xc2 = 100.0 ! avg in Hufnagl and Peck 2011 
-      real, parameter :: xc3 = 190.0 ! avg in Hufnagl and Peck 2011 
-      real, parameter :: xc4 = 160.0 ! not variable in Hufnagl and Peck 2011 
+      integer :: jday,ilow,iup
+      real    :: s,scon,dz
 c     -------------------------------------------------- 
       if (is_wet(xyz)) then
-         call get_julian_day(master_clock, jday)
-c        --- lookup seasonal slope in zooplankton spectrum (slope)---
-         phase  = day2rad*(jday - SS_dayoffset)
-         slope  = SS_slope_avg + SS_slope_amp*cos(phase) ! slope < 0
-c        --- lookup seasonal zooplankton abundance (N [1/m3]) ---
-         N = xc1 + xc4*( (1./(xc2*sqrt(2*pi))**2)*   !  Hufnagl and Peck 2011 eq 25
-     +            exp(-(jday-xc3)**2/2./xc2**2) )    ! [indv/ml] 
-         N = N*1.e6                                  ! [indv/ml] -> [indv/m3] 
-
-c        --- convert N to biomass zbio, applying slope
-         xp     = 1.0+slope
-         xppr   = 1.0+slope+prey_expo
-         s1     = lp_SSmax/prey_len0 
-         s0     = lp_SSmin/prey_len0 
-         a      = N*xp / prey_len0 / (s1**xp - s0**xp) ! unit = 1/m3/mm
-c        
-         zbio    = a*prey_mass0*prey_len0*(s1**xppr - s0**xppr)/xppr ! unit = DW kg/m3
-         rvec(1) = zbio
-         status  = 0  ! all OK
-
+         rvec(1) = avgzoo
+         status  = 0
       else
-
-         status  = 1  ! non wet access 
-         rvec    = 0. ! default value
-         
+         status = 1
       endif
 c
       end subroutine  
@@ -229,10 +175,13 @@ c     ------------------------------------------
       real, intent(in)     :: xyz(:)
       real, intent(out)    :: r
       integer, intent(out) :: status
-      integer :: jday
-      call get_julian_day(master_clock, jday)
-      r = avg_wtemp + wtemp_amp*cos(day2rad*(jday-jday_with_maxtemp))
-      status = 0    
+c     ---------------------
+      if (is_wet(xyz)) then
+         r = wtemp
+         status  = 0
+      else
+         status = 1
+      endif
       end subroutine  
 
 
@@ -246,9 +195,8 @@ c     ------------------------------------------
       end subroutine 
 c     ------------------------------------------ 
       LOGICAL function is_wet(xyz)
-      real, intent(in)     :: xyz(:)
-      real,parameter       :: tol = 1.e-5
-      if ((xyz(3)> -tol).and.(xyz(3)<wdepth+tol)) then
+      real, intent(in)     :: xyz(:) 
+      if ((xyz(3)>0).and.(xyz(3)<wdepth)) then
          is_wet = .true.
       else
          is_wet = .false.
@@ -277,26 +225,3 @@ c     ------------------------------------------
 c     ------------------------------------------ 
    
       end module
-
-c$$$      program test_module
-c$$$c     =================================================================================
-c$$$c     ifort ztest_Stonehaven.f time_tools.o constants.o  geometry.o libtime/libtime77.a
-c$$$c     =================================================================================
-c$$$      use time_tools
-c$$$      use physical_fields
-c$$$      implicit none
-c$$$      integer             :: jday,istat
-c$$$      real                :: xyz(3), rvec(1)
-c$$$      type(clock)         :: start_time
-c$$$      type(clock),pointer :: current_time 
-c$$$
-c$$$      call set_clock(start_time, 1990,1,1,0)
-c$$$      call init_physical_fields(start_time)
-c$$$      current_time => get_master_clock()
-c$$$
-c$$$      do jday=1,365
-c$$$         call interpolate_zooplankton (xyz, rvec, istat) 
-c$$$         write(*,*) jday,log(rvec(1))
-c$$$         call add_seconds_to_clock(current_time, 86400)
-c$$$      enddo
-c$$$      end program

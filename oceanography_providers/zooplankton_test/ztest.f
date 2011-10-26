@@ -59,6 +59,8 @@ c
      +     18.6544,  5.6966,  5.697, 
      +      8.2614,  4.4058,  2.2864/)
       
+      >>>> please verify that units are kg DW/m3 <<<<
+
 
       real, parameter :: wdepth   = 40.0 ! water depth in meters
        

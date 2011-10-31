@@ -572,10 +572,17 @@ c     float v(time, depth, lat, lon) ;  "m/s"  positive north
 c     float w(time, depth, lat, lon) ;  "m/s", positive up 
 c     float z(time, lat, lon) ;         "m"    positive down (!)
 c     float t(time, depth, lat, lon) ;  "degC" 
-c     float zoo(time, depth, lat, lon) ;"Zooplankton: 10^-3 mol N/liter" 
+c     float zoo(time, depth, lat, lon) ;"Zooplankton: 10^-3 mol N/m3" (there is an erro)
 c                
 c     The is currently no horizontal diffusivity in the set (set it to zero)
-c
+c     Unit of zoo in netCDF files: 10^-3 mol N/m3 (correspondance with Marie Maar @ NERI,
+c     there is an error in meta data attributes in provided data files, stating that 
+c     bulk zooplankton unit is 10^-3 mol N/liter)
+c     Convert zoo to kg DW/m3 (IBMlib unit) using Wiebe (1975) Fish. Bull., 73:777-786.
+c     where N(mass/vol) = 0.074 DW(mass/vol)
+c     X [mmol N/m3] = X 14./1000 [g N/m3] = X 14./1000/0.074 [g DW/m3] 
+c                   = X 14./1000/0.074/1000 [kg DW/m3]
+c                   = 
 c     fortran index order opposite CDL dump order
 c     fortran: fastests index left most
 c     ------------------------------------------
@@ -586,6 +593,7 @@ c     ------------------------------------------
       real    :: dz
       logical :: not_ok
       real    :: u_fill,v_fill,w_fill
+      real,parameter :: mmolN2kgDW = 14./1000/0.074/1000 ! conversion factor mmol N/m3 -> kg DW/m3
 c     ------------------------------------------ 
 c
 c     1) locate frame to pick - time frame map h1900_map already loaded in open_data_files
@@ -628,9 +636,10 @@ c
       call NetCDFcheck( nf90_get_var(ncid_zoo, varid, zoo, start3D))   
 
 c
-
 c     3) postprocess data, suncronize auxillary fields, pad holes
 c      
+      zoo = zoo*mmolN2kgDW  ! convert from mmol N/m3 -> kg DW/m3
+c 
 c     ---- currently no turbulent diffusivity in data set: 
 c          for now, this is read from input file in init_physical_fields
 c          and vdiffus/hdiffus is set to this value

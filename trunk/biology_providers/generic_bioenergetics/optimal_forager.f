@@ -123,7 +123,7 @@ c
          logical     :: alive                
          integer     :: death_day  ! Julian day     
          integer     :: sourceBox ! spatial release box
-         integer     :: particleID ! ensemble ID - negative is unset
+         integer     :: tracerID ! ensemble ID - negative is unset
 
       end type
       public :: state_attributes ! make type state_attributes visible outside
@@ -352,7 +352,7 @@ c     ---------------------------------------------------------------
       state%survival   = 1.0
       state%alive      = .true.
       state%sourceBox = emitboxID   ! store releasing box
-      state%particleID = particle_counter    
+      state%tracerID = particle_counter    
       particle_counter = particle_counter + 1 ! module data
 
       call init_state_attributes_FL(state%larvae, space, time_dir,             
@@ -1486,7 +1486,7 @@ c
       character(len=namlen)             :: name
       character*(*),parameter           :: survival   = "survival"   ! query name
       character*(*),parameter           :: sourceBox  = "sourceBox"  ! query name
-      character*(*),parameter           :: particleID = "particleID" ! query name
+      character*(*),parameter           :: tracerID   = "tracerID" ! query name
 c------------------------------------------------------------
       name = adjustl(get_name(var))
       if (name(1:len(survival)) == survival) then
@@ -1495,8 +1495,8 @@ c------------------------------------------------------------
       elseif (name(1:len(sourceBox)) == sourceBox) then
          call construct(bucket, sourceBox, state%sourceBox)
          status = 0 ! data was extracted successfully
-      elseif (name(1:len(particleID)) == particleID) then
-         call construct(bucket, particleID, state%particleID)
+      elseif (name(1:len(tracerID)) == tracerID) then
+         call construct(bucket, tracerID, state%tracerID)
          status = 0 ! data was extracted successfully
       else  ! pass other requests of larval sub component
          call get_prop_FL(state%larvae,var,bucket,status)

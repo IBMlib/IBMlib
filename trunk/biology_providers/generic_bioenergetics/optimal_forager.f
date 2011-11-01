@@ -122,7 +122,7 @@ c
          real        :: survival   ! 0 < survival < 1 of this particle 
          logical     :: alive                
          integer     :: death_day  ! Julian day     
-         integer     :: orig_boxID ! spatial release box
+         integer     :: sourceBox ! spatial release box
          integer     :: particleID ! ensemble ID - negative is unset
 
       end type
@@ -351,7 +351,7 @@ c     ---------------------------------------------------------------
 c     ---------------------------------------------------------------
       state%survival   = 1.0
       state%alive      = .true.
-      state%orig_boxID = emitboxID   ! store releasing box
+      state%sourceBox = emitboxID   ! store releasing box
       state%particleID = particle_counter    
       particle_counter = particle_counter + 1 ! module data
 
@@ -1484,11 +1484,19 @@ c--------------------------------------------------------------------------
 c
       integer,parameter                 :: namlen = 999
       character(len=namlen)             :: name
-      character*(*),parameter           :: survival = "survival"
+      character*(*),parameter           :: survival   = "survival"   ! query name
+      character*(*),parameter           :: sourceBox  = "sourceBox"  ! query name
+      character*(*),parameter           :: particleID = "particleID" ! query name
 c------------------------------------------------------------
       name = adjustl(get_name(var))
       if (name(1:len(survival)) == survival) then
          call construct(bucket, survival, state%survival)
+         status = 0 ! data was extracted successfully
+      elseif (name(1:len(sourceBox)) == sourceBox) then
+         call construct(bucket, sourceBox, state%sourceBox)
+         status = 0 ! data was extracted successfully
+      elseif (name(1:len(particleID)) == particleID) then
+         call construct(bucket, particleID, state%particleID)
          status = 0 ! data was extracted successfully
       else  ! pass other requests of larval sub component
          call get_prop_FL(state%larvae,var,bucket,status)
@@ -1512,8 +1520,8 @@ c--------------------------------------------------------------------------
 c
       integer,parameter                 :: namlen = 999
       character(len=namlen)             :: name  
-      character*(*),parameter           :: std_length = "std_length"
-      character*(*),parameter           :: dry_weight = "dry_weight"
+      character*(*),parameter           :: std_length = "std_length" ! query name
+      character*(*),parameter           :: dry_weight = "dry_weight" ! query name
 c------------------------------------------------------------
       name = adjustl(get_name(var))
       if      (name(1:len(std_length)) == std_length) then
@@ -1543,11 +1551,11 @@ c     ------------------------------------------------------------
       case ("sourceBox")
          call construct(var,"sourceBox","source box ID",
      +     units="-",fmt="(i6)",type="int")
-      case ("length")
-         call construct(var,"length","larval standard length",
+      case ("std_length")
+         call construct(var,"std_length","larval standard length",
      +     units="mm",fmt="(f8.3)",type="real")
-      case ("weight")
-         call construct(var,"weight","larval dry weight",
+      case ("dry_weight")
+         call construct(var,"dry_weight","larval dry weight",
      +     units="micro gram",fmt="(f12.3)",type="real")
       case ("survival")
          call construct(var,"survival","survival rate",

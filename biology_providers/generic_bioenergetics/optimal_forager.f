@@ -1537,18 +1537,21 @@ c     ------------------------------------------------------------
 c     ------------------------------------------------------------  
       status=0 !Defaults to variable found
       select case (var_name)
-       case ("tracerID")
+      case ("tracerID")
          call construct(var,"tracerID","tracer ID number",
      +     units="-",fmt="(i6)",type="int")
-       case ("sourceBox")
+      case ("sourceBox")
          call construct(var,"sourceBox","source box ID",
      +     units="-",fmt="(i6)",type="int")
-       case ("length")
+      case ("length")
          call construct(var,"length","larval standard length",
      +     units="mm",fmt="(f8.3)",type="real")
-       case ("weight")
+      case ("weight")
          call construct(var,"weight","larval dry weight",
      +     units="micro gram",fmt="(f12.3)",type="real")
+      case ("survival")
+         call construct(var,"survival","survival rate",
+     +     units="[0..1]",fmt="(f10.7)",type="real")   
       case default
         status=1  !Cannot find variable
       end select

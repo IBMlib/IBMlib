@@ -62,6 +62,9 @@ c      public :: interpolate_wind    ! currently unused
       public :: coast_line_intersection
       public :: get_pbi_version
 
+c     ----- non standards, particular for this PBI -----
+      public :: calc_zoo_stat
+
 c     -------------------- module data --------------------  
       
       real,parameter :: molecular_diffusivity = 1.e-9 ! unit m2/s
@@ -782,6 +785,48 @@ c     cell indices satisfy 1 <= (ix,iy,iz) <= (nx,ny,ibot)
       endif
 c     ------------------------------------------ 
       end subroutine interpolate_currents
+
+
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     Methods specific to this data set  
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      subroutine calc_zoo_stat(zavg,sigmaz,zmin,zmax)
+c     ------------------------------------------------------------ 
+c     Calculate basic statistical parameters of the 
+c     zooplankton field currently in buffer for all
+c     wet grid points (with equal weights)
+c     ------------------------------------------------------------   
+      real, intent(out) :: zavg    ! average zoo = <zoo>   [kg DW/m3] 
+      real, intent(out) :: sigmaz  ! sqrt(<(zoo-zavg)^2>)  [kg DW/m3] 
+      real, intent(out) :: zmin    ! min (zoo)             [kg DW/m3] 
+      real, intent(out) :: zmax    ! max (zoo)             [kg DW/m3] 
+      integer           :: ix,iy,iz,nwet
+      real              :: zavg2,zz
+c     ------------------------------------------------------------ 
+      zavg  = 0.0
+      zavg2 = 0.0
+      nwet  = 0
+      zmin  =  1.0e32
+      zmax  = -1.0e32
+      do ix=1,nx
+         do iy=1,ny
+            if (wetmask(ix,iy) > 0) then
+               do iz=1, bottom_layer(ix,iy)
+                  nwet  = nwet  + 1
+                  zz    = zoo(ix,iy,iz)
+                  zavg  = zavg  + zz
+                  zavg2 = zavg2 + zz**2
+                  zmin  = min(zmin,zz)
+                  zmax  = max(zmax,zz)
+               enddo
+            endif   
+         enddo
+      enddo
+      zavg   = zavg/nwet  ! assert nwet>0
+      zavg2  = zavg2/nwet ! assert nwet>0
+      sigmaz = sqrt(zavg2 - zavg**2)
+      
+      end subroutine calc_zoo_stat
 
 
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc

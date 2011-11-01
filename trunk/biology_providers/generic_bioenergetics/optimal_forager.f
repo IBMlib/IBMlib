@@ -1528,15 +1528,30 @@ c------------------------------------------------------------
       end subroutine get_prop_FL
 
 
+
       subroutine get_metadata_state(var_name,var,status)
-c------------------------------------------------------------  
+c     ------------------------------------------------------------  
       character(*), intent(in)   :: var_name
       type(variable),intent(out) :: var
       integer, intent(out)       :: status
-c------------------------------------------------------------  
+c     ------------------------------------------------------------  
+      status=0 !Defaults to variable found
+      select case (var_name)
+       case ("tracerID")
+         call construct(var,"tracerID","tracer ID number",
+     +     units="-",fmt="(i6)",type="int")
+       case ("sourceBox")
+         call construct(var,"sourceBox","source box ID",
+     +     units="-",fmt="(i6)",type="int")
+       case ("length")
+         call construct(var,"length","larval standard length",
+     +     units="mm",fmt="(f8.3)",type="real")
+       case ("weight")
+         call construct(var,"weight","larval dry weight",
+     +     units="micro gram",fmt="(f12.3)",type="real")
+      case default
+        status=1  !Cannot find variable
+      end select
       end subroutine get_metadata_state
-
-
-
 
       end module

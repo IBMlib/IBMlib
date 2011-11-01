@@ -1,0 +1,22 @@
+!-------------------------------------------------------------------
+!        Main simulation control file 
+!
+!        You also need to provide parameters that the other
+!        interfaces need
+!-------------------------------------------------------------------
+
+
+start_time  = 2004 02 02 0    !  year  month  day  second_of_day
+end_time    = 2004 02 10 0    !  year  month  day  second_of_day
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+final_state_ascii_file = final.txt  ! output file name for final frame
+! --- specify output data in desired column order (unit as optional 2nd arg)
+final_state_ascii_data = lon        
+final_state_ascii_data = lat 
+final_state_ascii_data = std_length 
+final_state_ascii_data = dry_weight 
+final_state_ascii_data = sourceBox 
+final_state_ascii_data = survival 
+final_state_ascii_data = tracerID

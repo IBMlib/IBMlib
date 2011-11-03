@@ -65,8 +65,8 @@ c     -----------
          write(*,211) who,intg     
          write(*,212) pos ! access parent scope
       endif
- 211  format("warning:probe_local_environment:",a,
-     +       "failed with status = ",i2)
+ 211  format("warning:probe_local_environment: ",a,
+     +       " failed with status = ",i2)
  212  format("interpolation position = ",3f12.7)
       end subroutine check_stat
       end subroutine probe_local_environment

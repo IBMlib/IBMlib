@@ -62,10 +62,12 @@ c     -----------
       character*(*),intent(in) :: who
       integer, intent(in)      :: intg
       if (intg>0) then
-         write(*,*) who, "failed with status = ",intg
-         write(*,*) "interpolation position =", pos ! access parent scope
-         stop 64221
+         write(*,211) who,intg     
+         write(*,212) pos ! access parent scope
       endif
+ 211  format("warning:probe_local_environment:",a,
+     +       "failed with status = ",i2)
+ 212  format("interpolation position = ",3f12.7)
       end subroutine check_stat
       end subroutine probe_local_environment
       

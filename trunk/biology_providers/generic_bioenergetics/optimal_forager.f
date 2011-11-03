@@ -794,6 +794,7 @@ c
       REAL                               :: dllarv,dlogZ,djday
       integer                            :: i0,i1,j0,j1,k0,k1
       integer                            :: nllarv,nlogZ,njday,deriv
+      real, parameter                    :: zbiomass_min = 1.0e-20 ! avoid log() error
 c     ------------------------------------------------------------------
 c     
 c     locate grid coordinates in ingestion_ref_DB(nllarv,nlogZ,njday)
@@ -816,7 +817,7 @@ c
       i1     = max(1,min(i1,nllarv))
       sllarv = (llarv - llarv_grid(i0))/dllarv
 c      
-      logZ   = log(local_env%zbiomass)
+      logZ   = log(max(local_env%zbiomass, zbiomass_min)) ! avoid log() error
       nlogZ  = size(logZ_grid)
       if ((logZ < logZ_grid(1)).or.(logZ > logZ_grid(nlogZ))) then
          write(*,*) "interpolate_ingestion_rate: " //

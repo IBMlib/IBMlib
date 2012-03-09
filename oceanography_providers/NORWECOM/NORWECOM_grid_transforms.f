@@ -427,11 +427,11 @@ c     --------------------------------------------------
       subroutine resolve_vector(xy,N,G)
 c------------------------------------------------------- 
 c     Handles the transformation from NORWECOM grid oriented
-c     vectors to geo grid oriented vectors
-c     Input: vector N located at NORWECOM grid position xyz,
+c     displacement vectors to geo grid oriented displacement vectors
+c     Input: displacement vector N located at NORWECOM grid position xyz,
 c       and with components N(1), N(2) and N(3) oriented along
 c       the NORWECOM axes x,y,z
-c     Output: vector G of the same magnitude as N, but represented
+c     Output: displacement vector G of the same magnitude as N, but represented
 c       instead in terms of the components G(1), G(2) and G(3) that
 c       are oriented parallel to the lon, lat, and depth axes
 c     The transformation between the two is given by 
@@ -447,15 +447,23 @@ c     Validity of the xyz range is not checked
 c------------------------------------------------------- 
       real, intent(in)   :: xy(:), N(:) ! shape (3+) 
       real, intent(out)  :: G(:)  ! shape (3+)
-      real               :: J(2,2), B(2,2), A(2,2)
+      real               :: J(2,2), C(2,2),B(2,2), A(2,2),ll(2),phi
 c     --------------------------------------------------
       call get_jacobian(xy,J)
-c     Calculate the normalisation matrix, B
+c     Convert NORWECOM position  to lon lat
+      call get_horiz_geo_coordinates(xy,ll)
+      phi=ll(2)*deg2rad 
+c     Calcualte the sphereical scaling matrix, B
       B=0.0
-      B(1,1) = 1/sqrt(J(1,1)**2 + J(2,1)**2)
-      B(2,2) = 1/sqrt(J(1,2)**2 + J(2,2)**2)
+      B(1,1)=cos(phi)
+      B(2,2)=1.0
+c     Calculate the normalisation matrix, C
+      C=0.0
+      C(1,1) = 1/sqrt(J(1,1)**2*cos(phi)**2 + J(2,1)**2)
+      C(2,2) = 1/sqrt(J(1,2)**2*cos(phi)**2 + J(2,2)**2)
 c     Calculate the transformation matrix, A
-      A = matmul(J,B)
+      A = matmul(J,C)
+      A = matmul(B,A)
 c     Now do the transformation
       G(1:2) = matmul(A,N(1:2))
       G(3) = N(3)   !No transform required 

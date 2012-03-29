@@ -47,6 +47,7 @@ c     -----------------------------------------------
         integer :: sourceBox
         real    :: size             !Can be interpreted as length or weight
         real    :: tempInt          !Temperature integral, in degree-days
+        real    :: lightInt         !Integrated hours of daylight,  in days
       end type
       public :: state_attributes
 
@@ -271,6 +272,7 @@ c     ----------------------------------------------------
       state%sourceBox = emitboxID       ! box of origin 
       state%tracerID  = tracerID        ! unique ID number
       state%tempInt = 0.0               ! temperature integral for calculating average temp
+      state%lightInt = 0.0              ! integrated time in the light
 
       !Take in size as an input parameter, but only if we are dealing with growth
       !otherwise set to -1
@@ -370,15 +372,22 @@ c     ----------------------------------
       type(state_attributes), intent(inout) :: state
       type(spatial_attributes), intent(in)  :: space
       real,intent(in)                       :: time_step
-      real  :: xyz(3),temp,ds
+      real  :: pos(3),temp,ds
       integer :: status
+      type(clock),pointer :: current_time
 c     -----------------
       !Get the local temperature of the particle
-      call get_tracer_position(space, xyz)
-      call interpolate_temp(xyz,temp,status)
+      call get_tracer_position(space, pos)
+      call interpolate_temp(pos,temp,status)
 
       !Increment temperatre integral 
       state%tempInt = state%tempInt + temp*abs(time_step)/86400. ! Temperature integral in deg.days
+      
+      !Integrate light integral ie feeding potential
+      current_time => get_master_clock()
+      if(is_light(current_time,pos)) then 
+        state%lightInt = state%lightInt + abs(time_step)/86400.
+      endif
 
       !Larval growth model
       if(do_growth) then
@@ -416,6 +425,8 @@ c     ------------------------------------------------------------
         call construct(bucket,"size",state%size)
       case ("tempInt")
         call construct(bucket,"tempInt",state%tempInt)
+      case ("lightInt")
+        call construct(bucket,"lightInt",state%lightInt)
       case default
         status=1   !Cannont find variable name
       end select
@@ -442,6 +453,9 @@ c     ------------------------------------------------------------
        case ("tempInt")
          call construct(var,"tempInt","temperature integral",
      +     units="deg C.day",fmt="(f6.2)",type="real")
+       case ("lightInt")
+         call construct(var,"lightInt","daylight hours integral",
+     +     units="day",fmt="(f6.2)",type="real")
       case default
         status=1  !Cannot find variable
       end select

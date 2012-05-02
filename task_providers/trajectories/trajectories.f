@@ -50,11 +50,16 @@ c     ------------ declarations ------------
       logical :: write_traj,write_release,write_final
       logical :: write_traj_rng
       type(time_period) :: write_period
+      character*200 :: ver_str 
+
+      call tic(stopwatch)
+c     ------------   Display version numbers  ------------
+      write(*,*) "Trajectories task provider:  $Rev$"
+      write(*,*) trim(get_pbi_version())
+      write(*,*) trim(get_particle_version())
 
 c     ------------   Initialise config file   ------------
-      call tic(stopwatch)
       call init_run_context()
-      write(*,*) "Trajectories task provider:  $Rev$"
 
 c     ------------   set clocks  ------------   
       call read_control_data(simulation_file, "start_time", idum4)

@@ -80,7 +80,7 @@ c     ===================================================
       include "NORWECOM_interpolators.f"
 
       character*200 function get_pbi_version()  
-      get_pbi_version =  "NORWECOM pbi. $Rev$ " 
+      get_pbi_version = "NORWECOM pbi. $Rev$ " 
       end function
 
 

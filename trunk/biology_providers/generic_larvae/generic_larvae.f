@@ -71,6 +71,7 @@ c     =================================================
 c     ========       module parameters         ========
 c     =================================================
       type(clock), pointer        :: current_time
+      real                        :: time_dir       !Time direction: -1 backtrack, 1 forward
       integer                     :: tracerID
       !Vertical release scheme
       logical                     :: do_release
@@ -94,6 +95,7 @@ c     ---------------------------------------------------------------
       integer :: start(256), nwords
       character*256  :: strbuf, release_scheme, growth_mdl
       character*256  :: vert_mdl_name, swim_mdl_name
+      real           :: time_step
 c     ---------------------------------------------------------------
 c     Display version
       write (*,*) trim(get_particle_version())
@@ -239,6 +241,17 @@ c --- Read swim model - but only if there is some vertical behaviour involved
             end select
          endif
       endif
+
+
+c --- Re-read time_step from configurtation file. This is not the most elegant approach
+c     to getting this information but it does work :-)
+      call read_control_data(ctrlfile, "time_step", time_step)
+      if(time_step < 0) then
+          time_dir = -1
+      else
+          time_dir = 1
+      endif 
+      write(*,*) "Time direction (-1 backwards, 1 forwards) = ",time_dir
       end subroutine init_particle_state
 
 
@@ -332,8 +345,7 @@ c     ----------------------------------
       !Choose type of active behaviour
       select case(vert_mdl)
       case (1) !----- "ABOVE" scheme ------
-        !Particles that fall below given depth swim upwards at a swimming
-        !speed of 5 mm/s. 
+        !Particles that fall below given depth swim upwards 
         call get_tracer_position(space, pos)
         if(pos(3)>vert_params(1)) then
             v_vert=-swim_speed         ! m/s
@@ -342,8 +354,7 @@ c     ----------------------------------
         endif
       case (2) !----- "DVM" schemes ------
         !A diel vertical migration (DVM) scheme between the day depth
-        !and night depth. Particles swim between target depths at a
-        !constant 5 mm/s. 
+        !and night depth. 
         !Get current time and position
         current_time => get_master_clock()
         call get_tracer_position(space,pos)
@@ -363,7 +374,12 @@ c     ----------------------------------
      +     "', is unknown."
         stop
       end select
-      v_active   = (/0.0, 0.0, v_vert/)
+
+      !Direction of swimming velocity vector is context specific. According to Uffe
+      !we should run the vertical component forward in time, even if we are backtracking
+      !The sign of the velocity therefore needs to be adjusted accordingly to ensure that
+      !this is the case. We achieve this by multipling by the time_dir variable
+      v_active   = (/0.0, 0.0, v_vert*time_dir/)
       end subroutine 
 
 

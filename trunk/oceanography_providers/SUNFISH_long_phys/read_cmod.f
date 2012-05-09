@@ -190,10 +190,16 @@ c     allocate and get file names, etc:
             endif
             nestinglevels(ia) = nlevs
 
+c
+c           ifort compiler notice:associated(pt) == T even if pt has not been allocated    
+c        
             if (nlevs > 0) then
                allocate( nestingto(ia)%p(nlevs) )
                nestingto(ia)%p(1:nlevs) = nestingto_in(1:nlevs)
+            else
+               nullify ( nestingto(ia)%p ) ! render nestingto(ia)%p in well defined state
             endif
+
 
             if (ia == mainarea .and. timelevel(ia) /= 1) then
                stop 'Error: Time level of main area must be 1'

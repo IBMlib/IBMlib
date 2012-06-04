@@ -205,6 +205,13 @@ c --- Read vertical behaviour scheme
            read(strbuf(start(2):),*) vert_params(1)
            read(strbuf(start(3):),*) vert_params(2)
            write(*,*) "DVM day/night target depths = ",vert_params(1:2)
+         case ("FIXED")
+           !Particle is fixed at some arbitrary input depth
+           vert_mdl =3
+           call check_nparams("vert_behaviour","FIXED",1,nwords-1)
+           read(strbuf(start(2):),*) vert_params(1)
+           write(*,*) "Larvae fixed at depth = ",vert_params(1)
+           do_vertical = .FALSE.
          case default
            call abort_run("init_particle_start","Vertical behaviour "
      +        " model '" //trim(vert_mdl_name) //"' is unknown.")
@@ -214,7 +221,7 @@ c --- Read vertical behaviour scheme
 
 c --- Read swim model - but only if there is some vertical behaviour involved
       if(do_vertical) then  !need a swim model
-         if(count_tags(ctrlfile,"swim_mdl")==0) then
+         if(count_tags(ctrlfile,"swim_mdl")==0)then
             call abort_run("init_particle_state","No swim_mdl is " //
      +         "specified. This should be specified to use active " //
      +         "vertical behaviour")
@@ -279,8 +286,12 @@ c     ---------locals ----------
       real :: init_size
       integer :: status, start(256), nwords
 c     ----------------------------------------------------
-      !Make particle mobile
-      call set_tracer_mobility_free(space)  
+      !Make particle mobile, unless we are using the fixed vertical position scheme
+      if(vert_mdl==3) then !No vertical movement
+         call set_tracer_mobility(space,1,1,0)  
+      else  !Otherwise free
+         call set_tracer_mobility_free(space)  
+      endif
       !Set states
       state%sourceBox = emitboxID       ! box of origin 
       state%tracerID  = tracerID        ! unique ID number

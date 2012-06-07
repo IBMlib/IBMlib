@@ -212,6 +212,14 @@ c --- Read vertical behaviour scheme
            read(strbuf(start(2):),*) vert_params(1)
            write(*,*) "Larvae fixed at depth = ",vert_params(1)
            do_vertical = .FALSE.
+         case ("TARGET")
+           !Particle swims towards some arbitary depth. The easy realisation
+           !of this is just a DVM where the target depths are the same
+           vert_mdl =2
+           call check_nparams("vert_behaviour","TARGET",1,nwords-1)
+           read(strbuf(start(2):),*) vert_params(1)
+           write(*,*) "Larvae target depth = ",vert_params(1)
+           vert_params(2)=vert_params(1)
          case default
            call abort_run("init_particle_start","Vertical behaviour "
      +        " model '" //trim(vert_mdl_name) //"' is unknown.")

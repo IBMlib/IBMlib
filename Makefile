@@ -130,6 +130,24 @@ IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but 
 IBMLIB_SRCS    += config.mk compiler_defaults.mk
 IBMLIB_PACKAGE = IBMlib_srcs.tgz
 
+
+help: FORCE
+	@echo ""
+	@echo "---------------------------------------------------"
+	@echo "IBMlib Make system"
+	@echo "---------------------------------------------------"
+	@echo "$$ Rev: 360 $ "
+	@echo "$$ LastChangedDate: 2011-07-20 11:28:45 +0200 (Wed, 20 Jul 2011) $ "
+	@echo "$$ LastChangedBy: asch $ "
+	@echo ""
+	@echo "all	  Makes the IBMlib executable"
+	@echo "remake     make clean; make all"
+	@echo ""
+	@echo "clean	  Removes all built files, including the executable"
+	@echo "package    Packages working copy of source files"
+	@echo "variables  Displays build variables"
+	@echo ""
+
 #
 #     Main task of this Makefile: EXECUTABLE - should be first target, to appear as default
 #     currently TASK appears as task.a - at some point we may homogenize 
@@ -141,6 +159,8 @@ IBMLIB_PACKAGE = IBMlib_srcs.tgz
 #     exactly opposite the make order. 
 #     Therefore hack: dublicate IBMLIB_OBJS to ensure a provider is also after using function ...
 #
+all: $(EXECUTABLE)
+
 $(EXECUTABLE): $(IBMLIB_OBJS)
 	@echo ""
 	$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
@@ -219,7 +239,7 @@ clean: FORCE
 		done
 
 remake:
-	make clean; make
+	make clean; make all
 	
 package:
 	tar cvfzh $(IBMLIB_PACKAGE) $(IBMLIB_SRCS) --exclude=.* --ignore-failed-read 

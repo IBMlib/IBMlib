@@ -4,7 +4,7 @@
 \section{Ecotox and bioenergetics modelling within IBMlib} 
 
 This document is an addition to documentation for module IBM (implementation IBMlib at DTU Aqua)
-submitted as deliverable 2.12 for EU FP7 MEECE. 
+submitted as deliverable 2.11 for EU FP7 MEECE. 
 
 \subsection{Generic bioenergetics} 
 
@@ -25,17 +25,18 @@ Currently, internal classes within generic\_bioenergetics have public scope (for
 
 Multi stage modelling is handled by a light weight bundling module that 
 combines independent stages described by classes in other modules. The multi stage module
-offers a class has independent stage class instances as components. The multi stage module
+offers a class has independent stage class instances as components. A multi stage instance
 manages which stage is currently active and handles overall attributes, like the survival chance
-of the organism, place and time of origin. The multi stage module interacts with independent stages
+of the organism, place and time of origin. The multi stage class interacts with independent stages
 via the particle\_sub\_state interface described below
 
-\subsubsection{Decorators} 
+\subsubsection{Stage components} 
 
-implement interface particle\_sub\_state by loading specific 
-  biological models/data from other contexts and compiling it into a
-  behavioral model (like optimal feeding larvae, optimal\_forager.f).
-  These module are generic, i.e. does not contain reference to a particular species.
+  Each ontogenetic stage is implemented in a module providing a particle\_sub\_state interface.
+  These implementations may be species specific or generic, e.g. implementing a behavioral model 
+ (like optimal feeding larvae, optimal\_forager.f).
+  Currently, the multi stage class expects three sub classes to be present at compilation time
+  (by selecting appropriate options in the make file)
 
   \begin{itemize}
   \item module feeding\_larval\_stage   
@@ -43,7 +44,7 @@ implement interface particle\_sub\_state by loading specific
   \item module released\_egg\_stage 
   \end{itemize}
 
-  Decorators may also by themselves provide the full particle\_state interface in parallel
+  Stage classes may also by themselves provide the full particle\_state interface in parallel
   with particle\_sub\_state interface. To use this, a module name conversion dummy should
   be used. Currently this is only available for the implementation optimal\_forager.f 
   implementating module feeding\_larval\_stage   
@@ -91,7 +92,7 @@ real, intent(out)                    :: v\_active(:) ! meter/second  \newline
 
 \end{itemize}
 
-Notes that the particle\_sub\_state interface is rather similar to the particle\_state interface, but that
+Note that the particle\_sub\_state interface is rather similar to the particle\_state interface, but that
 update\_particle\_state\_X features extra output parameters mortality\_rate, die, next. These
 parameters are needed by the multi stage manager to make stage transitions and manage overall
 properties, like survival of the organism. The particle\_sub\_state interface for a particular stage will only
@@ -137,8 +138,8 @@ The decrease in egg survival (hatch fraction) in the meta parameterization is re
           A_2     & = & 5.68092  \\
 \end{eqnarray*}
 with $T$ as $^\circ$C and copper concentration $c$ as yg/l.
-Copper-temperature interaction are skipped, because variability of K2(T)
-from experiments seem spurious, and $K2$ has been fixed to $K2  = 50 $yg/l.
+Copper-temperature interaction are skipped, because variability of $K_2$(T)
+from experiments seem spurious, and $K_2$ has been fixed to $K_2  = 50 $yg/l.
 
 This corresponds to an instantaneous mortality $Z(c,T)$ formulation as 
 \begin{equation}
@@ -148,14 +149,15 @@ where $g(c,T)$ is the egg development rate (expressed as fraction per time) with
 implicit assumption that egg loss is uniformly distributed over egg development phase
 (this assumption only matters, if dynamics within egg development phase is considered).
 Egg survival fraction as function of copper concentration is plotted in Fig. \ref{survANDhlen}(left)
+$g(c,T)$ is parameterized following Deawel et al. (2008).
 %% ===========================================================================
 \subsubsection{Decrease in larval hatch length} 
 
-The decrease in larval hatch length $L_h$in the meta parameterization is represented as 
+The decrease in larval hatch length $L_h$ in the meta parameterization is represented as 
 \begin{eqnarray*}
  L_h(c,T) = L_0 exp(- c / K_1(T)) + L_{\inf}  \\
- L_0      = 7 mm \\
- L_{\inf}  = 5 mm \\
+ L_0      = 7 {\ \rm mm} \\
+ L_{\inf}  = 5 {\ \rm mm} \\
  K_1(T)   = 0.00049 * T^{5.95} {\ \rm yg/l} \\
 \end{eqnarray*}
 with $T$ as $^\circ$C and copper concentration $c$ as yg/l.

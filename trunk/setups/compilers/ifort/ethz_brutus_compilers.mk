@@ -14,9 +14,9 @@
 
 # compiler settings   
 export FC        = ifort
-export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR)
+export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR) -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
 export FPPFLAGS  = -fpp 
-export NETCDF_DIR = /cluster/apps/netcdf/4.1.1/x86_64/intel_10.1.018/
+export NETCDF_DIR = /cluster/apps/netcdf/3.6.2/x86_64/intel
 
 MODDIRS = $(NETCDF_DIR)/include $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS)) 

@@ -72,6 +72,12 @@ c     ---- Boundary ondition handlers
       integer, parameter, public :: BC_reflect = 0 ! reflecting boundary conditions
       integer, parameter, public :: BC_sticky  = 1 ! sticky boundary conditions
       
+c     -----Vertical precision -----
+      real, parameter  :: vert_eps =1e-4    !Vertical precision - acts as a buffer
+                                            !zone around the surface and bottom to 
+                                            !avoid "on-the-line" errors due to 
+                                            !the finite precision of our calcs
+                                             
 
 c     ============  Behavioral configuration ============
 
@@ -285,7 +291,7 @@ c------------------------------------------------------------
       logical                                 :: surfenc, botenc
       logical                                 :: shoreenc, domainenc
 c------------------------------------------------------------
-     
+
 c.....Allow motion for "atsurface", but ignore motion for other special states 
 c     and immobile tracers
       if (tracattr%ashore .or. 
@@ -627,7 +633,6 @@ c---------------------------------------------------
       real, intent(in)                        :: dR(3)      
       logical                                 :: surfenc, botenc
       logical                                 :: shoreenc, domainenc
-
  
       real    :: pos(3), virpos(3), curpos(3), xyzref(3), xyzhit(3)
       integer :: ipos, istat
@@ -787,7 +792,7 @@ c     -----------------------------------------------------
 c     3) Enforce vertical boundary conditions, if tracer is not 
 c        advected ashore:
 c
-c        0(surface) < z <  wdepth(xyz)
+c        0(surface) + vert_eps < z <  wdepth(xyz) - vert_eps
 c
 c        At this point, the horizontal component of virpos corresponds to a wet point
 c        Assume sea bed is so flat that we need not compute exactly
@@ -807,17 +812,17 @@ c     -----------------------------------------------------
 c
 c.....check for and handle surface crossing
 c
-      if (zv<0) then            ! a surface crossing has occured
+      if (zv<vert_eps) then            ! a surface crossing has occured
 
          if (verbose>0) write(*,*) "surface crossing detected"
 
          surfenc              = .TRUE.
          if     (tracattr%surfaceBC == BC_sticky) then
-            virpos(3)  = 0.0    ! place tracer at surface
+            virpos(3)  = 0.0   ! place tracer at surface
             tracattr%mobility = (/1,1,0/) ! freeze tracer to water surface
             tracattr%atsurface = .TRUE.
          elseif (tracattr%surfaceBC == BC_reflect) then
-            zv        = -zv      ! surface reflection
+            zv        =  2*vert_eps -zv      ! surface reflection (about vert_eps)
             virpos(3) =  zv      ! handle ping pong situation at bottom, if relevant  
          else
             write(*,*) "add_constrained_step: invalid "//
@@ -828,8 +833,7 @@ c
       endif
 c
 c.....check for and handle bottom crossing
-c       
-      if (zv>depth) then        ! a bottom crossing has occured
+      if (zv>depth-vert_eps) then        ! a bottom crossing has occured
 
          if (verbose>0) write(*,*) "bottom crossing detected"
 
@@ -839,8 +843,8 @@ c
             tracattr%mobility = 0 ! freeze tracer to bottom
             tracattr%atbottom = .TRUE.
          elseif (tracattr%bottomBC == BC_reflect) then
-            zv = 2.0*depth - zv ! bottom reflection
-            if (surfenc.or.(zv<0)) then
+            zv = 2.0*(depth-vert_eps) - zv ! bottom reflection
+            if (surfenc.or.(zv<vert_eps)) then
                pingpong = .TRUE.
             else
                virpos(3) = zv

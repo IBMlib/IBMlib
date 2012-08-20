@@ -237,8 +237,8 @@ c     ------------------------------------------------------
       logical function grid_range_check(xy)
 c     ------------------------------------------------------
 c     Check xyz wrt. interpolation ranges in grid space:
-c           0.5 <= x < nx-1
-c           0.5 <= y < ny-1
+c           0.5 < x < nx-1
+c           0.5 < y < ny-1
 c     which is the relevant range for interpolation of all parameters
 c     Within this range position xy is always bracketed in each
 c     direction, allowing interpolation
@@ -249,9 +249,9 @@ c     ------------------------------------------------------
       integer :: cross(2)
 c     ------------------------------------------------------
       cross  = 0
-      if  (xy(1) < 0.5)    cross(1) = -1
+      if  (xy(1) <= 0.5)    cross(1) = -1
       if  (xy(1) >= nx-1.0) cross(1) =  1
-      if  (xy(2) < 0.5)    cross(2) = -1
+      if  (xy(2) <= 0.5)    cross(2) = -1
       if  (xy(2) >= ny-1.0) cross(2) =  1
       grid_range_check = .not.any(cross.ne.0)
       end function grid_range_check

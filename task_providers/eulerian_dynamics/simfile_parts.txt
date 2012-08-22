@@ -1,0 +1,46 @@
+!--------------------------------------------
+!  PHYSICAL_FIELDS_DIR   = $(IBMLIB_DIR)/oceanography_providers/SUNFISH_long_phys
+!  EULERIAN_DYNAMICS_DIR = $(IBMLIB_DIR)/eulerian_providers/demo
+!  TASK_DIR              = $(IBMLIB_DIR)/task_providers/eulerian_dynamics
+!--------------------------------------------
+
+
+! hydroDBpath   = /data/hydroDB/SUNFISH_long_phys/2007
+! cmod_data_set = coarse        ! value of X above
+
+
+!--------------- Simulation period (read by main)------------------
+
+start_time  = 2007 04 01 0    !  year  month  day  second_of_day
+end_time    = 2007 07 01 0    !  year  month  day  second_of_day
+time_step   = 300             ! seconds
+
+!--------------- Eulerian definition (read by main)------------------
+
+eulerian_box_SW           =  1.0 53.5  ! lon[deg]  lat[deg]  (currently no vertical selection)
+eulerian_box_NE           =  5.0 56.0  ! lon[deg]  lat[deg]  (currently no vertical selection)
+eulerian_data_init_value  =  1.88 0.0   ! Eulerian init concentration as gww/m3  (vertically layer wise)
+eulerian_data_DirichletBC =  1.88 0.0   ! Eulerian BC concentration as gww/m3  (vertically layer wise)
+
+!
+! --- advection_diffusion  parameters
+! 
+
+eulerian_div_corr         = .true.
+
+!
+! --- eulerian_production_rate parameters
+!
+
+eulerian_production_rate               = 2.18e-6    ! initial value, 1/sec 
+eulerian_production_ccap               = 3.76       ! initial value, gww/m3 
+eulerian_production_background_grazing = 3.08e-7    ! 0.02/86400   1/sec
+eulerian_production_mixfac             = 0.000      ! each time step
+eulerian_production_mix_start          = 1000        ! mix after this time step
+eulerian_production_consumption_target = 1.273e-05  ! 1.1/86400 gww/m2/sec (in grazing area)  
+eulerian_production_mass_target        = 15.0       ! gww/m2 (in grazing area) 
+eulerian_production_prod_target        = 1.736e-05  ! 1.5/86400 gww/m2/sec (in grazing area)
+eulerian_production_bioactive_minmax   = 1 1        ! first and last bioactive layer
+
+eulerian_grazing_distribution = grazing.dat ! file with lines:  lon[deg E]  lat[deg N]  grazing[1/s]
+

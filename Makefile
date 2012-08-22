@@ -56,7 +56,7 @@
 #        particle_state.mod (F90 module interface, in directory PARTICLE_STATE_DIR)
 #        particle_state.a   (all compiled objects of module, in directory PARTICLE_STATE_DIR)
 #        clean    
-#     An (optional) makefile link_opt.mk in PHYSICAL_FIELDS_DIR may define the following 
+#     An (optional) makefile link_opt.mk in PARTICLE_STATE_DIR may define the following 
 #     variables for link options to be used for the final stage linking:
 #        LINKFLAGS_STATE
 #        LINKLIBS_STATE      
@@ -66,7 +66,7 @@
 #     should be a makefile updating the targets:
 #        task.a (all compiled objects INCLUDING the main program, in directory PARTICLE_STATE_DIR)
 #        clean
-#     An (optional) makefile link_opt.mk in PHYSICAL_FIELDS_DIR may define the following 
+#     An (optional) makefile link_opt.mk in TASK_DIR may define the following 
 #     variables for link options to be used for the final stage linking:
 #        LINKFLAGS_TASK
 #        LINKLIBS_TASK     

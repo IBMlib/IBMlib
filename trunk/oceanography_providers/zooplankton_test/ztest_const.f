@@ -196,7 +196,7 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       LOGICAL function is_wet(xyz)
       real, intent(in)     :: xyz(:) 
-      if ((xyz(3)>0).and.(xyz(3)<wdepth)) then
+      if ((xyz(3) >= 0).and.(xyz(3) <= wdepth)) then
          is_wet = .true.
       else
          is_wet = .false.

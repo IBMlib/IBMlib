@@ -1,0 +1,12 @@
+##########################################################
+#   input file example for task = seasonal_indices
+##########################################################
+year_start          =  1997
+year_end            =  2006
+day_start           =  4
+month_start         =  2
+days_in_period      =  10
+vertical_resolution =  0.5   ! unit = meters
+sampling_points     =  NSammodyt_habitats_DMIgrid.lpn
+outputfile          =  testout.dat
+#

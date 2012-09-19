@@ -6,8 +6,7 @@ c     $Rev: 228 $
 c     $LastChangedDate: 2011-01-26 02:52:59 +0100 (Wed, 26 Jan 2011) $
 c     $LastChangedBy: asch $ 
 c
-c     TODO: load zooplankton Z4cD(time, z, lat, lon) = "Daily Mean Mesozooplankton C  mg C/m^3" 
-c           load             Z5cD(time, z, lat, lon) = "Daily Mean Microzooplankton C mg C/m^3" 
+c      
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
@@ -63,9 +62,13 @@ c     ------ data frame handler ------
       integer                    :: ncid         ! NetCDF file handler
       
 c     --- 3D grids ---
+      real, allocatable          :: zoobuf(:,:,:) 
+
 c     --- 2D grids ---    
 c     --- 1D grids ---
-    
+c     --- units    ---    
+      real, parameter            :: mgCm3_to_kgDWm3 = 1.0e-6/0.32 ! conversion factor for mgC/m3 -> kgDW/m3
+
 c     ===================================================
                             contains
 c     ===================================================
@@ -87,6 +90,7 @@ c     ------------------------------------------
       call load_grid_desc()  ! invokes init_horiz_grid_transf
       call init_mesh_grid()  ! allocate core arrays  
       
+      allocate( zoobuf(nx, ny, nz) )
 c     ---- specials for this data set / version ----
 
       
@@ -117,6 +121,8 @@ c     ------------------------------------------
       call close_mesh_grid()
       call reset_frame_handler()
       call close_horiz_grid_transf()
+c     --- local cleanup ---
+      deallocate( zoobuf )
 c     ------------------------------------------
       end subroutine 
 
@@ -312,7 +318,7 @@ c     float v(time, depth, lat, lon) ;  "m/s"  positive north
 c     float w(time, depth, lat, lon) ;  "m/s", positive up 
 c     float z(time, lat, lon) ;         "m"    positive down (!)
 c     float t(time, depth, lat, lon) ;  "degC" 
-c     float zoo(time, depth, lat, lon) ;"Zooplankton: 10^-3 mol N/liter" 
+c     float zoo(time, depth, lat, lon) ;"Zooplankton: kg DW/m3" 
 c                
 c     The is currently no horizontal diffusivity in the set (set it to zero)
 c
@@ -352,6 +358,14 @@ c          some data sets define data points at vertical faces
       call NetCDFcheck( nf90_get_var(ncid, varid,vdiffus(:,:,1:nz),
      +                  start=start3D)) ! wrong
       vdiffus(:,:,nz+1) = 1.e-9 ! render all elements defined
+c     ---- load zooplankton ----
+c          currently zooplankton is set to the sum of micro+meso  zooplankton    
+      call NetCDFcheck( nf90_inq_varid(ncid, "Z4cD", varid) ) ! Mesozooplankton
+      call NetCDFcheck( nf90_get_var(ncid, varid, zoo, start=start3D)) 
+      call NetCDFcheck( nf90_inq_varid(ncid, "Z5cD", varid) ) ! Microzooplankton
+      call NetCDFcheck( nf90_get_var(ncid,varid,zoobuf,start=start3D)) 
+      zoo = zoo + zoobuf        ! add micro and mesozooplankton
+      zoo = zoo*mgCm3_to_kgDWm3 ! convert biomass to unit kg DW / m3
 c
 c          NB: horizontal derivatives NOT implemented
 c          when spatially non constant hdiffus are applied,

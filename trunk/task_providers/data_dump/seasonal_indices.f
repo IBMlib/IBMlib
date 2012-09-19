@@ -27,6 +27,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       implicit none
 c     ------------ declarations ------------      
       type(clock),pointer  :: current_time
+      type(clock)          :: start_time
       integer :: year_start, year_end, this_year
       integer :: day_start, month_start, ndays
       integer :: nspts, iday, ispt, nvpts, ivpt
@@ -50,9 +51,9 @@ c     ------------ read spatial sampling set ------------
 c         set clock and update_physical_fields to ensure potential dynamic
 c         topography is set for dry point detection
 c
-      call init_physical_fields()
+      call set_clock(start_time,year_start,month_start,day_start,0)
+      call init_physical_fields(start_time)
       current_time => get_master_clock()
-      call set_clock(current_time,year_start,month_start,day_start,0)    ! for dry point detection
       call update_physical_fields()
 c
       call read_control_data(simulation_file,"sampling_points", fname)
@@ -125,7 +126,7 @@ c        do statistics on sampled data (zmax,temp)
          trms = sqrt(sum((temp-tavg)**2)/nspts/ndays)
          write(iunit, 275) this_year, tavg, trms, zavg, zrms         
       enddo ! this_year (year loop)
- 275  format(i5, 3x, 2f12.7, 3x,2e12.7)
+ 275  format(i5, 3x, 2f12.7, 3x,2e15.7)
       deallocate(zmax)
       deallocate(temp)
       deallocate(xyz)

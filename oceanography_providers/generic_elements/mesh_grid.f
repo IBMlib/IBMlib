@@ -73,7 +73,7 @@ c     --- 3D grids ---
       real,allocatable,public :: vdiffus(:,:,:)    ! vertical   diffusivity [m**2/s]              
       real,allocatable,public :: hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
       real,allocatable,public :: dslm(:,:)         ! current sea surface elevation over reference [m]
-      real,allocatable,public :: zoo(:,:,:)        ! Zooplankton [10^-3 mol N/liter]
+      real,allocatable,public :: zoo(:,:,:)        ! Zooplankton [kg DW/m3]
       real,allocatable,target,public :: ccdepth(:,:,:)    ! cell center depth water below surface [m]; pointer 
       real,allocatable,target,public :: acc_width(:,:,:)  ! accumulated water above this layer [m] dim=nz+1  
 

@@ -69,6 +69,8 @@ c     full grid dimensions, including grid specifier
       real, parameter          ::  ALPHA=58
       real, parameter          ::  lat_true=60
       real  PHINUL
+      
+      real, parameter          :: horz_buf=0.5    !Tolerance, in grid units, around practical boundary
 
 c.....lat/lon grid auxillaries      
       real, allocatable,public   :: xfacelen(:,:)  ! length of the southern face of cell  [m]
@@ -229,6 +231,11 @@ c     ------------------------------------------------------
       real,    intent(in)  :: geo(:)
       real    :: xyz(size(geo))
 c     ------------------------------------------------------
+      !Don't bother checking if its really obviously wrong
+      if(geo(2)<-90 .or. geo(2)>90) then
+         horizontal_range_check = .FALSE.
+         return         
+      endif
       call get_horiz_grid_coordinates(geo,xyz)
       horizontal_range_check = grid_range_check(xyz)
       end function horizontal_range_check
@@ -249,10 +256,10 @@ c     ------------------------------------------------------
       integer :: cross(2)
 c     ------------------------------------------------------
       cross  = 0
-      if  (xy(1) <= 0.5)    cross(1) = -1
-      if  (xy(1) >= nx-1.0) cross(1) =  1
-      if  (xy(2) <= 0.5)    cross(2) = -1
-      if  (xy(2) >= ny-1.0) cross(2) =  1
+      if  (xy(1) <= 0.5 + horz_buf)    cross(1) = -1
+      if  (xy(1) >= nx-1-horz_buf) cross(1) =  1
+      if  (xy(2) <= 0.5+horz_buf)    cross(2) = -1
+      if  (xy(2) >= ny-1-horz_buf) cross(2) =  1
       grid_range_check = .not.any(cross.ne.0)
       end function grid_range_check
 

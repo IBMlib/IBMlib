@@ -13,6 +13,8 @@ c       only syncronize if buffers changed
 c       Currently turbulence + deriv is fixed to zero - update
 c       test interpolationes
 c       validate w sign
+c       check sign on dslm: at some point cmod data has shifted from "positive down" to "positive up"
+c                           right now it is assumed dslm is "positive down" ... 
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields

@@ -19,6 +19,9 @@ c     * host 3D data arrays
 c     
 c     LOG: 
 c       stripped out time components (deal only with space/data) ASC Feb 16, 2011
+c     TODO:
+c       * introduce an "only" list for fields (applied at init time), to reduce memory usage
+c         as number of water quality parameters is steadily growing
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use horizontal_representation       ! injects nx,ny
       use horizontal_grid_transformations 
@@ -39,6 +42,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_salty   ! currently unused
 c      public :: interpolate_wind    ! currently unused
       public :: interpolate_zooplankton
+      public :: interpolate_oxygen
       public :: interpolate_wdepth
 
       public :: is_wet    
@@ -72,8 +76,9 @@ c     --- 3D grids ---
       real,allocatable,public :: salinity(:,:,:)   ! Salinity. [psu]
       real,allocatable,public :: vdiffus(:,:,:)    ! vertical   diffusivity [m**2/s]              
       real,allocatable,public :: hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
-      real,allocatable,public :: dslm(:,:)         ! current sea surface elevation over reference [m]
+      real,allocatable,public :: dslm(:,:)         ! current sea surface elevation over reference [m] (positive up)
       real,allocatable,public :: zoo(:,:,:)        ! Zooplankton [kg DW/m3]
+      real,allocatable,public :: oxygen(:,:,:)     ! O2 concentration [mmol/m3]
       real,allocatable,target,public :: ccdepth(:,:,:)    ! cell center depth water below surface [m]; pointer 
       real,allocatable,target,public :: acc_width(:,:,:)  ! accumulated water above this layer [m] dim=nz+1  
 
@@ -86,6 +91,7 @@ c     --- 3D grids ---
       real   :: padval_hdiffus  = default_padding 
       real   :: padval_dslm     = default_padding
       real   :: padval_zoo      = default_padding
+      real   :: padval_oxygen   = default_padding
 
 c     --- 2D grids ---
       
@@ -104,7 +110,7 @@ c     ===================================================
       subroutine init_mesh_grid(padding,
      +                     pad_u, pad_v, pad_w, pad_temp, pad_salinity, 
      +                     pad_vdiffus, pad_hdiffus, pad_dslm, pad_zoo, 
-     +                     pad_wdepth)
+     +                     pad_oxygen, pad_wdepth)
 c     ------------------------------------------------------
 c     Assumes (nx,ny,nz) has been set by client module
 c     Notice that module horizontal_grid_transformations must
@@ -131,6 +137,7 @@ c     ------------------------------------------------------
       real, intent(in), optional :: pad_hdiffus  
       real, intent(in), optional :: pad_dslm    
       real, intent(in), optional :: pad_zoo
+      real, intent(in), optional :: pad_oxygen
       real, intent(in), optional :: pad_wdepth
 c     ------------------------------------------------------
       write(*,*) "init_mesh_grid: allocate grid arrays: begin" 
@@ -143,6 +150,7 @@ c     ------------------------------------------------------
       allocate( vdiffus(nx,ny,nz+1) ) ! enable data points at vertical faces
       allocate( hdiffus(nx,ny,nz) ) 
       allocate( zoo(nx,ny,nz)     ) 
+      allocate( oxygen(nx,ny,nz)     ) 
       allocate( ccdepth(nx,ny,nz) )  
       allocate( acc_width(nx,ny,nz+1)   )
 
@@ -168,6 +176,7 @@ c
          padval_hdiffus  = padding 
          padval_dslm     = padding 
          padval_zoo      = padding
+         padval_oxygen   = padding
          padval_wdepth   = padding 
          write(*,*) "init_mesh_grid: default padding = ",padding
       else
@@ -186,6 +195,7 @@ c
       if(present(pad_hdiffus))  padval_hdiffus  = pad_hdiffus  
       if(present(pad_dslm))     padval_dslm     = pad_dslm   
       if(present(pad_zoo))      padval_zoo      = pad_zoo
+      if(present(pad_oxygen))   padval_oxygen   = pad_oxygen
       if(present(pad_wdepth))   padval_wdepth   = pad_wdepth
       
       write(*,*) "init_mesh_grid: resolved padding values:"
@@ -198,6 +208,7 @@ c
       write(*,*) "padval_hdiffus :", padval_hdiffus
       write(*,*) "padval_dslm    :", padval_dslm
       write(*,*) "padval_zoo     :", padval_zoo
+      write(*,*) "padval_oxygen  :", padval_oxygen
 
       end subroutine init_mesh_grid
        
@@ -216,6 +227,7 @@ c     ------------------------------------------------------
       if (allocated(hdiffus))      deallocate( hdiffus )
       if (allocated(dslm))         deallocate( dslm )
       if (allocated(zoo))          deallocate( zoo )
+      if (allocated(oxygen))       deallocate( oxygen )
       if (allocated(ccdepth))      deallocate( ccdepth )     
       if (allocated(acc_width))    deallocate( acc_width )     
       if (allocated(wdepth))       deallocate( wdepth )
@@ -589,6 +601,18 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       end subroutine 
 
+
+      subroutine interpolate_oxygen (geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r(:)
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      call interpolate_cc_3Dgrid_data(geo,oxygen,0,
+     +                         padval_oxygen,r(1),status)
+c     ------------------------------------------ 
+      end subroutine 
 
 
       subroutine interpolate_wdepth(geo, r, status) 

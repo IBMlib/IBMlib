@@ -1,0 +1,15 @@
+! --------------------------------------------------------------------
+!   You need to add these input to your control file to use this PBI
+!
+!   PBI expects these files in PATH:
+!     grid set descriptor:  PATH/cfg.nml   (file name fixed)
+
+!     For each grid X described in cfg.nml:
+!                           PATH/X_grid_depth  
+!                           PATH/data_X  
+!     currently X = "coarse" and "fine"
+
+!     physics data        : PATH/archive.YYYYMMDDhh 
+! --------------------------------------------------------------------
+hydroDBpath   = PATH
+cmod_data_set = coarse     ! value of X above

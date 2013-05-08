@@ -1,11 +1,12 @@
       module read_cmod_ergom
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
-c     Data Reading module for cmod/ERGOM time series provided in OPEC 
-c     derived from read_cmod.f, based
-c     on readtmp.f90 provided summer 2011 by Mikhail Dobrynin at DMI
-c     and bio2cdf.f90 + cmod2cdf.f90 provided 2012 by Zhenwen Wan at DMI
-c     Preserve units applied by cmod/ERGOM
+c     Data Reading module for HBM/ERGOM time series provided in OPEC 
+c     derived from read_cmod.f, based on readtmp.f90 provided summer 2011 by 
+c     Mikhail Dobrynin at DMI and bio2cdf.f90 + cmod2cdf.f90 provided 2012 by 
+c     Zhenwen Wan at DMI. HBM was earlier called cmod.
+c     Preserve units applied by HBM/ERGOM. 
+c     
 c
 c     Main public arrays: area refers to subgrid number 
 c       m1(area)%p(:,:,:):    3D to compressed 1D map of wet grid points (cmod indexing)
@@ -23,18 +24,46 @@ c         wu_i4(area)%p(:)    :    wind u stress
 c         wv_i4(area)%p(:)    :    wind v stress
 c         eco_i4(area)%p(:,:) :    biogeochemistry
 c
-c                  nh4(i,j,k)=eco(1,id3d(jm+1-j,i,k))/scale
-c                  no3(i,j,k)=eco(2,id3d(jm+1-j,i,k))/scale+nh4(i,j,k) !DIN
-c                  po4(i,j,k)=eco(3,id3d(jm+1-j,i,k))/scale
-c                  dia(i,j,k)=eco(4,id3d(jm+1-j,i,k))/scale
-c                  fla(i,j,k)=eco(5,id3d(jm+1-j,i,k))/scale
-c                  b_g(i,j,k)=eco(6,id3d(jm+1-j,i,k))/scale
-c                  dia(i,j,k)=2.0*(dia(i,j,k)+fla(i,j,k)+b_g(i,j,k)) !chl
-c                  zoo(i,j,k)=eco(7,id3d(jm+1-j,i,k))/scale
-c                  pom(i,j,k)=eco(8,id3d(jm+1-j,i,k))/scale
-c                  oxy(i,j,k)=eco(9,id3d(jm+1-j,i,k))/scale
+c         ERGOM State variables:
+c          nh4(im,jm,km)  nh4                        unit == mmol/m3 (more precisely umol/kg)
+c          no3(im,jm,km)  no3                        unit == mmol/m3 (more precisely umol/kg)
+c          po4(im,jm,km)  po4                        unit == mmol/m3 (more precisely umol/kg)
+c          dia(im,jm,km)  diatoms                    unit == mmol/m3 (more precisely umol/kg) 
+c          fla(im,jm,km)  flagellate                 unit == mmol/m3 (more precisely umol/kg)
+c          cya(im,jm,km)  cyanobacteria              unit == mmol/m3 (more precisely umol/kg)
+c          zo1(im,jm,km)  micro-zooplankton          unit == mmol/m3 (more precisely umol/kg)
+c          zo2(im,jm,km)  meso-zooplankton           unit == mmol/m3 (more precisely umol/kg)
+c          odt(im,jm,km)  organic detritus           unit == mmol/m3 (more precisely umol/kg)
+c          oxy(im,jm,km)  dissolved oxygen           unit == mmol/m3 (more precisely umol/kg)
+c          pom(im,jm,km)  particular organic matter  unit == mmol/m3 (more precisely umol/kg)
+c          dic(im,jm,km)  dissolved inorganic carbon unit == mmol/m3 (more precisely umol/kg)
+c          alk(im,jm,km)  alkalinity                 unit == mmol/m3 (more precisely umol/kg)
+c 
+c         ERGOM Derived variables:
+c          din(im,jm,km)  dissolved inorganic nitrogen unit == mmol/m3 (more precisely umol/kg)
+c          chl(im,jm,km)  chlorophyl                   unit == mmol/m3 (more precisely umol/kg) 
+c
+c         Unpacking of ERGOM buffers: 
+c            nh4(i,j,k)=eco(1,id3d(jm+1-j,i,k))/scale                
+c            no3(i,j,k)=eco(2,id3d(jm+1-j,i,k))/scale
+c            po4(i,j,k)=eco(3,id3d(jm+1-j,i,k))/scale                
+c            dia(i,j,k)=eco(4,id3d(jm+1-j,i,k))/scale
+c            fla(i,j,k)=eco(5,id3d(jm+1-j,i,k))/scale
+c            cya(i,j,k)=eco(6,id3d(jm+1-j,i,k))/scale
+c            zo1(i,j,k)=eco(7,id3d(jm+1-j,i,k))/scale
+c            zo2(i,j,k)=eco(8,id3d(jm+1-j,i,k))/scale
+c            odt(i,j,k)=eco(9,id3d(jm+1-j,i,k))/scale
+c            oxy(i,j,k)=eco(10,id3d(jm+1-j,i,k))/scale
+c            pom(i,j,k)=eco(11,id3d(jm+1-j,i,k))/scale
+c            dic(i,j,k)=eco(12,id3d(jm+1-j,i,k))/scale
+c            alk(i,j,k)=eco(13,id3d(jm+1-j,i,k))/scale
+cc           --- set derived variables 
+c            din(i,j,k)=no3(i,j,k) + nh4(i,j,k)  
+c            chl(i,j,k)=2.0*(dia(i,j,k)+fla(i,j,k)+cya(i,j,k))   
 c
 c     changes: 
+c        May 2013: implemented format change in ERGOM data frames, adding more state variables; read test on data_sample2 OK
+c
 c        free format -> fixed format
 c        removed station+interpolation+nesting logic
 c        removed exitme
@@ -85,11 +114,19 @@ c
 c     limits and other parameters -----------------------------------------------
 c
       integer(4)            :: narea  = 2        ! number of ocean model domains  
-      integer(4)            :: neco   = 9        ! number of biogeochem 3D variables
+      integer(4), parameter :: neco   = 13       ! number of biogeochem 3D stored variables
       real,       parameter :: dryval      = 0.0        ! assign this to dry cells in get_X
       real(8),    parameter :: undef       = 9999.9     ! assign this to variable
       real(8),    parameter :: test_undef  = 0.99*undef ! for test: if u>test_undef ...
       logical,    parameter :: ldebug = .false.  ! 
+
+      character(len=3), parameter :: eco_labels(neco) = 
+     +     (/"nh4", "no3", "po4", "dia", "fla", 
+     +       "cya", "zo1", "zo2", "odt", "oxy",
+     +       "pom", "dic", "alk"/)
+ 
+
+
 c
 c     allocatable arrays --------------------------------------------------------
 c
@@ -123,8 +160,8 @@ c
       integer            :: iunit_bio        = -1   ! assign at first read ()
       character(len=999) :: hydroDBpath      = " "  ! including trailing /
 
-      character(len=6), parameter :: physprefix = "phydat"
-      character(len=6), parameter :: bioprefix  = "biodat"
+      character(len=7), parameter :: physprefix = "physics"  ! new prefix May 2013
+      character(len=6), parameter :: bioprefix  = "biodat"     
       character*(*), parameter    :: griddef    = 'grid_def.dat'
 c      
 c     -----------------------  set module public scope -----------------------
@@ -138,7 +175,8 @@ c
       public :: test_undef          
       public :: get_z                              ! 2D physics 
       public :: get_u, get_v, get_w, get_s, get_t  ! 3D physics 
-      public :: get_oxy, get_zoo                   ! 3D biogeochemistry
+      public :: get_eco_3D                         ! 3D biogeochemistry
+      public :: check_buffer_bounds
       
 c     ========================================================================
                                   contains 
@@ -751,25 +789,6 @@ c     -------------------------------------------------------
       call get_X_3D(x, iset, t_i4, stscale)
       end subroutine get_t
 
-
-      subroutine get_oxy(x, iset)   ! oxygen [mmol O2/m3]
-c     -------------------------------------------------------
-      real, intent(out)   :: x(:,:,:)
-      integer, intent(in) :: iset   
-c     -------------------------------------------------------
-      call get_eco_3D(x, iset, 9, bscale)
-      end subroutine get_oxy
-
-
-      subroutine get_zoo(x, iset)   ! zooplankton [mmol N/m3]
-c     -------------------------------------------------------
-      real, intent(out)   :: x(:,:,:)
-      integer, intent(in) :: iset   
-c     -------------------------------------------------------
-      call get_eco_3D(x, iset, 7, bscale)
-      end subroutine get_zoo
-
-
 c 
 c     --------------- generic 2D uncompression  --------------------
 c
@@ -827,26 +846,79 @@ c     -------------------------------------------------------
       end subroutine get_X_3D
 
 
-      subroutine get_eco_3D(x, iset, slot, scale)
+      integer function get_eco_slot(property)
+c     -------------------------------------------------------
+c     Locate slot number of property in eco_labels
+c     If property is absent return -1
+c     -------------------------------------------------------
+      character(len=3), intent(in) :: property
+c     -------------------------------------------------------
+      do get_eco_slot = 1, neco
+         if (eco_labels(get_eco_slot) == property) return
+      enddo
+      get_eco_slot = -1 ! signal property is absent
+      end function get_eco_slot
+
+
+      recursive subroutine get_eco_3D(x, iset, property)
 c     -------------------------------------------------------
 c     Generic transformation from integer dry rep eco_i4 variable
-c     slot in set iset to 3D full rep x using rescaling by scale
+c     corresponding to property in set iset to 3D full rep x 
 c     -------------------------------------------------------   
-      real, intent(out)       :: x(:,:,:)
-      integer, intent(in)     :: iset    ! which area (data set) to pick
-      integer, intent(in)     :: slot    ! eco variable to pick
-      real, intent(in)        :: scale   ! int -> real transformation scale
-      integer                 :: i,j,k,m
+      real, intent(out)            :: x(:,:,:)
+      integer, intent(in)          :: iset    ! which area (data set) to pick
+      character(len=3), intent(in) :: property
+      integer                      :: i,j,k,m, slot
+      real, allocatable            :: x1(:,:,:), x2(:,:,:), x3(:,:,:)
 c     -------------------------------------------------------  
       if ((iset < 1).or.(iset > narea)) then
          write(*,*) "get_eco_3D: invalid set", iset
+         stop
       endif
       x = dryval
+c     --- first handle derived properties      
+      if      (property == "din") then      ! dissolved inorganic nitrogen
+         allocate( x1(size(x,1), size(x,2), size(x,3)) )
+         allocate( x2(size(x,1), size(x,2), size(x,3)) )
+         call get_eco_3D(x1, iset, "no3")
+         call get_eco_3D(x2, iset, "nh4")
+         x = x1 + x2
+         deallocate( x1 )
+         deallocate( x2 )
+         return
+      elseif  (property == "chl") then      ! chlorophyl
+         allocate( x1(size(x,1), size(x,2), size(x,3)) )
+         allocate( x2(size(x,1), size(x,2), size(x,3)) )
+         allocate( x2(size(x,1), size(x,2), size(x,3)) )
+         call get_eco_3D(x1, iset, "dia")
+         call get_eco_3D(x2, iset, "fla")
+         call get_eco_3D(x3, iset, "cya")
+         x = 2.0*(x1 + x2 + x3)
+         deallocate( x1 )
+         deallocate( x2 )
+         deallocate( x3 )
+         return
+      elseif  (property == "zoo") then      ! sum of micro and meso zooplankton
+         allocate( x1(size(x,1), size(x,2), size(x,3)) )
+         allocate( x2(size(x,1), size(x,2), size(x,3)) )  
+         call get_eco_3D(x1, iset, "zo1")
+         call get_eco_3D(x2, iset, "zo2")
+         x = x1 + x2
+         deallocate( x1 )
+         deallocate( x2 )
+         return
+      endif
+c     --- retrieve an ERGOM State variable
+      slot = get_eco_slot(property) 
+      if (slot < 1) then
+         write(*,*) "get_eco_3D: unknown property", property
+         stop
+      endif
       do k=1,kmx(iset)
          do j=1,mmx(iset)
             do i=1,nmx(iset)
                m = m1(iset)%p(mmx(iset)+1-j,i,k)
-               if(m > 0) x(i,j,k) = eco_i4(iset)%p(slot,m)/scale
+               if(m > 0) x(i,j,k) = eco_i4(iset)%p(slot,m)/bscale   ! bscale applies to all eco vars
             enddo
          enddo
       enddo
@@ -887,6 +959,8 @@ c     by applying get_X(). Buffers must have been loaded
 c     ------------------------------------------------------------------------
       integer, intent(in) :: iset
       real, allocatable   :: buf3d(:,:,:), buf2D(:,:)
+      integer             :: isl
+      character(len=3)    :: label
 c     --------------------------------------------------------------------------
       allocate( buf2D(nmx(iset), mmx(iset))            )
       allocate( buf3D(nmx(iset), mmx(iset), kmx(iset)) )
@@ -904,10 +978,11 @@ c
       write(*,*) minval(buf3D), "< s < ", maxval(buf3D)
       call get_t(buf3D, iset)
       write(*,*) minval(buf3D), "< t < ", maxval(buf3D)
-      call get_oxy(buf3D, iset)
-      write(*,*) minval(buf3D), "< oxy < ", maxval(buf3D)
-      call get_zoo(buf3D, iset)
-      write(*,*) minval(buf3D), "< zoo < ", maxval(buf3D)
+      do isl=1,neco
+         label = eco_labels(isl)
+         call get_eco_3D(buf3D, iset, label)
+         write(*,*) minval(buf3D), " < ",label, " < ", maxval(buf3D)
+      enddo
 c
       deallocate (buf2D)
       deallocate (buf3D)
@@ -997,4 +1072,21 @@ c$$$      enddo
 c$$$
 c$$$      call close_read_cmod_ergom()
 c$$$      end program test_read_cmod 
-      
+c$$$
+c$$$     
+c$$$      program test_read_cmod_minimal 
+c$$$      use read_cmod_ergom
+c$$$      use time_tools
+c$$$      implicit none
+c$$$      type(clock)  :: now 
+c$$$      logical      :: was_updated
+c$$$      integer      :: iset
+c$$$      call init_read_cmod_ergom("~/DTU/OPEC/DMIdata/data_sample2")
+c$$$      call set_clock(now, 1995, 3, 20, int(16.1*3600))
+c$$$      was_updated = update_buffers(now)
+c$$$      write(*,*) "buffer update", was_updated
+c$$$      do iset = 1, 2
+c$$$         write(*,*) "checking buffer bounds for iset = ", iset
+c$$$         call check_buffer_bounds(iset)
+c$$$      enddo
+c$$$      end program 

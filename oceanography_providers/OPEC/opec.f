@@ -41,9 +41,9 @@ c     test_undef: safe value > 0 to detect undef values by real comparisons, lik
       public :: interpolate_turbulence_deriv
       public :: interpolate_currents
       public :: interpolate_temp
-
-c      public :: interpolate_salty   ! currently unused
+      public :: interpolate_salty   
 c      public :: interpolate_wind    ! currently unused
+      public :: interpolate_oxygen
       public :: interpolate_zooplankton
       public :: interpolate_wdepth
       public :: is_wet    
@@ -318,8 +318,8 @@ c
       call get_z(dslm, data_set_handler)
       call get_s(salinity, data_set_handler)
       call get_t(temp, data_set_handler)
-      call get_oxy(oxygen, data_set_handler)
-      call get_zoo(zoo, data_set_handler)
+      call get_eco_3D(oxygen, data_set_handler, "oxy")
+      call get_eco_3D(zoo, data_set_handler, "zoo")   ! sum of zooplankton classes
 c
 c     avoid tricky current interpolations where the number of wet layers change
 c
@@ -371,8 +371,6 @@ c            Jun 16, 2011: capture rare cases where dz creates negative depths
          enddo
       enddo
 
-      stop "change zoo unit"
-      stop "change zoo oxygen"
 
       end subroutine syncronize_data
 

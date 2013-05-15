@@ -42,10 +42,24 @@ c     test_undef: safe value > 0 to detect undef values by real comparisons, lik
       public :: interpolate_currents
       public :: interpolate_temp
       public :: interpolate_salty   
-c      public :: interpolate_wind    ! currently unused
-      public :: interpolate_oxygen
-      public :: interpolate_zooplankton
+      public :: interpolate_wind_stress
       public :: interpolate_wdepth
+c
+      public :: interpolate_zooplankton
+      public :: interpolate_oxygen
+      public :: interpolate_nh4                       
+      public :: interpolate_no3                       
+      public :: interpolate_po4                        
+      public :: interpolate_diatoms                   
+      public :: interpolate_flagellates                 
+      public :: interpolate_cyanobacteria              
+      public :: interpolate_organic_detritus                   
+      public :: interpolate_part_org_matter 
+      public :: interpolate_DIC 
+      public :: interpolate_alkalinity  
+      public :: interpolate_DIN    
+      public :: interpolate_chlorophyl  
+c      
       public :: is_wet    
       public :: is_land
       public :: horizontal_range_check
@@ -134,7 +148,7 @@ c
  
 
       character*100 function get_pbi_version()  
-      get_pbi_version =  "SUNFISH (long physics)"//
+      get_pbi_version =  "OPEC "//
      +                   "pbi version: $Rev: 353 $"
       end function
 
@@ -187,7 +201,7 @@ c     get_grid_descriptors is defined in module read_cmod
 
 
       write(*,*) "read_grid_desc: allocate grid arrays: begin"
-      call init_mesh_grid()  ! incl allocation of 3D arrays
+      call init_mesh_grid(init_biogeochem = .true.)  ! incl allocation of phys + bio 3D arrays
       
 c     --- allocate specific auxillary arrays ---      
 
@@ -318,8 +332,22 @@ c
       call get_z(dslm, data_set_handler)
       call get_s(salinity, data_set_handler)
       call get_t(temp, data_set_handler)
-      call get_eco_3D(oxygen, data_set_handler, "oxy")
-      call get_eco_3D(zoo, data_set_handler, "zoo")   ! sum of zooplankton classes
+      call get_wu(u_wind_stress, data_set_handler)
+      call get_wv(v_wind_stress, data_set_handler)
+      call get_eco_3D(oxygen, data_set_handler,                "oxy")
+      call get_eco_3D(zoo, data_set_handler,                   "zoo")   ! sum of zooplankton classes
+      call get_eco_3D(nh4, data_set_handler,                   "nh4") 
+      call get_eco_3D(no3, data_set_handler,                   "no3")                      
+      call get_eco_3D(po4, data_set_handler,                   "po4")                      
+      call get_eco_3D(diatoms, data_set_handler,               "dia")            
+      call get_eco_3D(flagellates, data_set_handler,           "fla") 
+      call get_eco_3D(cyanobacteria, data_set_handler,         "cya")         
+      call get_eco_3D(organic_detritus, data_set_handler,      "odt")                
+      call get_eco_3D(part_org_matter, data_set_handler,       "pom") 
+      call get_eco_3D(dissolv_inorg_carbon, data_set_handler,  "dic")    
+      call get_eco_3D(alkalinity, data_set_handler,            "alk")
+      call get_eco_3D(dissolv_inorg_nitrogen, data_set_handler,"din") 
+      call get_eco_3D(chlorophyl, data_set_handler,            "chl") 
 c
 c     avoid tricky current interpolations where the number of wet layers change
 c

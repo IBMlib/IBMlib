@@ -19,7 +19,7 @@ physical_fields.a: dependences.mk $(LOCAL_OBJ)
 physical_fields.mod:
 
 # read_cmod.f must be compiled with big_endian option
-read_cmod.o: read_cmod.f
+read_cmod_ergom.o: read_cmod_ergom.f
 	$(FC) -c $(FCFLAGS) $(BIG_ENDIAN) $(FPPFLAGS) $< -o $@
 
 

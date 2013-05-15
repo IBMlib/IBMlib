@@ -1,0 +1,16 @@
+!#########################################################
+!   input file example for task = linear_extraction
+!#########################################################
+start_time         = 1997 1 3 0
+end_time           = 1997 1 4 0
+time_step          = 86400
+ICES_rectangle     = 33F3
+longitude_step     = 0.1667
+latitude_step      = 0.1 
+! longitude_range   = 3     4     0.1667  
+! latitude_range    = 52.0  52.5  0.1 
+vertical_stratum   = bottom
+! vertical_range    = 0 10 0.5
+extract_data       = temperature
+output_file        = out.dat
+#

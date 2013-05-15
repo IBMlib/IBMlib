@@ -521,8 +521,19 @@ result of a normal interpolation. Non zero values of status means an exception
 has occured at interpolating P at xyz, e.g. a domain violation. A specified value 
 will be assigned to P on exit, i.e. interpolation should always exit gracefully.
 
-\subsubsection{Physical fields}
+The interpolations ({\tt interpolate\_X}) offered by module physical\_fields
+are really divided into layers of core functions and extension sets. 
+Some interpolation services are also required by more specialized applications,
+e.g. zooplankton concentration for energy budget growth models of early 
+life stages. These interpolation services are not required by core particle tracking
+modules and therefore these interpolation services need only be provided in
+case the more specialized applications utilized in the current setup. Trying to 
+link a task requiring extension sets to a implementation of module physical\_fields
+offering only core physical fields functions will generate a compile time error.
+If this is not desired, dummy functions can be provided for extensions ({\tt interpolate\_X}).
+The core functions are the basic Physical interpolations are 
 
+\subsubsection{Core physical fields}
 \begin{itemize}
   \item {\tt interpolate\_turbulence(xyz, r3, status)}  m$^2$/s  \newline 
               
@@ -546,34 +557,8 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
 
     sea surface elevation above a reference level. Rigid lid
     data sets should return 0 for this field. 
-      
-  {\em Optional extensions} \newline
-
-    Some interpolation services are also required by more specialized applications,
-    e.g. zooplankton concentration for energy budget growth models of early 
-    life stages. These interpolation services are not required by core particle tracking
-    modules and therefore these interpolation services need only be provided in
-    case the more specialized applications utilized in the current setup.
-
-  \item {\tt interpolate\_wind(xy, r2, status)]} m/s \newline
-
-    surface wind vector with standard orientation in m/s
  
-  \item {\tt interpolate\_salty(xyz, r, status)} PSU   \newline  
-
-    Standard salinity
-
-  \item {\tt interpolate\_zooplankton(xy, rvec, status)]} kg dry weight/m$^3$ \newline
-
-    Zooplankton concentration. Currently bulk zooplankton concentration
-    is returned in element {\tt rvec(1)}. The protocol for this interpolation service
-    is under development.
-
-
-
 \end{itemize}
-
-
 
 \subsection{Public query subroutines/functions}
 
@@ -615,6 +600,68 @@ will be assigned to P on exit, i.e. interpolation should always exit gracefully.
    to generate multiple-reflection paths, if xyzref is a position on land.
 
 \end{itemize}
+
+\subsubsection{Optional extensions of physical field }   
+ 
+These extensions are not available as out from all circulation models, and therefore
+these interpolation services are optional. Currently, there are no defined subsets in extensions
+of physical properties
+
+\begin{itemize}    
+
+  \item {\tt interpolate\_windstress(xy, r2, status)]} ?? \newline
+
+    surface wind stress vector with oriented as standard horizontal vectors (longitunal, latitunal) (\ref{Vectororientationandunits}) 
+ 
+  \item {\tt interpolate\_salty(xyz, r, status)} PSU   \newline  
+
+    Standard salinity
+
+\end{itemize}
+\subsubsection{Optional Biogeochemistry }  
+
+Biogeochemistry are increasingly becoming available from coupled circulation-biogeochemistry models.
+Below is the current name space for the biogeochemistry subinterface of 
+Currently, there are no defined subsets in the biogeochemistry subinterface.
+
+\begin{itemize}    
+  \item {\tt interpolate\_zooplankton(xyz, rvec, status)]} kg dry weight/m$^3$ \newline
+
+    Zooplankton concentration. Currently bulk zooplankton concentration
+    is returned in element {\tt rvec(1)}. The protocol for this interpolation service
+    is under development.
+
+  \item {\tt interpolate\_oxygen(xyz, r, istat)} mmol/m$^3$ \newline
+    O$_2$ concentration
+
+  \item {\tt interpolate\_nh4(xyz, r, istat)  } mmol/m$^3$\newline
+    NH$_4$ concentration
+  \item {\tt interpolate\_no3(xyz, r, istat)}   mmol/m$^3$\newline
+    NO$_3^-$ concentration
+  \item {\tt interpolate\_po4(xyz, r, istat) }  mmol/m$^3$\newline
+    PO$_4^{3-}$ concentration
+  \item {\tt interpolate\_diatoms(xyz, r, istat) } mmol/m$^3$   \newline
+    Diatoms concentration
+  \item {\tt interpolate\_flagellates(xyz, r, istat)} mmol/m$^3$    \newline  
+    Flagellate concentration
+  \item {\tt interpolate\_cyanobacteria(xyz, r, istat)  }mmol/m$^3$\newline
+    Cyanobacteria concentration
+  \item {\tt interpolate\_organic\_detritus(xyz, extract\_data, istat)}  mmol/m$^3$\newline
+    Organic detritus concentration
+  \item {\tt interpolate\_part\_org\_matter(xyz, extract\_data, istat)} mmol/m$^3$  \newline
+    Particular organic matter concentration
+  \item {\tt interpolate\_DIC(xyz, extract\_data, istat)}  mmol/m$^3$\newline
+    Dissolved inorganic carbon concentration
+  \item {\tt interpolate\_alkalinity(xyz, extract\_data, istat)}   mmol/m$^3$\newline
+    Alkalinity
+  \item {\tt interpolate\_DIN(xyz, extract\_data, istat)}     mmol/m$^3$\newline
+    Dissolved inorganic nitrogen concentration
+  \item {\tt interpolate\_chlorophyl(xyz, r, istat) } mmol/m$^3$\newline
+    Chlorophyl concentration
+\end{itemize}
+
+
+
 
 .
 

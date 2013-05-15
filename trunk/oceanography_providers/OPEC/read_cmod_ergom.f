@@ -3,7 +3,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     Data Reading module for HBM/ERGOM time series provided in OPEC 
 c     derived from read_cmod.f, based on readtmp.f90 provided summer 2011 by 
-c     Mikhail Dobrynin at DMI and bio2cdf.f90 + cmod2cdf.f90 provided 2012 by 
+c     Mikhail Dobrynin at DMI and bio2cdf.f90 + cmod2cdf.f90 provided 2012 + 2013 by 
 c     Zhenwen Wan at DMI. HBM was earlier called cmod.
 c     Preserve units applied by HBM/ERGOM. 
 c     
@@ -120,9 +120,10 @@ c
       real(8),    parameter :: test_undef  = 0.99*undef ! for test: if u>test_undef ...
       logical,    parameter :: ldebug = .false.  ! 
 
-      character(len=3), parameter :: eco_labels(neco) = 
-     +     (/"nh4", "no3", "po4", "dia", "fla", 
-     +       "cya", "zo1", "zo2", "odt", "oxy",
+
+      character(len=3), parameter :: eco_labels(neco) =    ! there is only a slot here to raw variables
+     +     (/"nh4", "no3", "po4", "dia", "fla",            ! further labels are resolved by get_eco_3D
+     +       "cya", "zo1", "zo2", "odt", "oxy",            ! for derived variables
      +       "pom", "dic", "alk"/)
  
 
@@ -173,10 +174,11 @@ c
       public :: update_buffers
       public :: m1,hz,cellw
       public :: test_undef          
-      public :: get_z                              ! 2D physics 
+      public :: get_z, get_wu, get_wv              ! 2D physics 
       public :: get_u, get_v, get_w, get_s, get_t  ! 3D physics 
       public :: get_eco_3D                         ! 3D biogeochemistry
       public :: check_buffer_bounds
+      public :: create_hydro_file_tag              ! open for debugging
       
 c     ========================================================================
                                   contains 
@@ -312,7 +314,7 @@ c
 
 
 
-      subroutine get_grid_descriptors(sname, data_set_handler,
+      subroutine get_grid_descriptors(sname_in, data_set_handler,
      +                          lam1,dl, ph1,dp, nx,ny,nz) 
 c     ----------------------------------------------------------------------------+
 c     Interface query function to retrieve grid characteristics:
@@ -322,12 +324,14 @@ c     lambda1,dlambda, phi1,dphi : lower left grid point
 c     nx,ny,nz                   : grid dimensions
 c
 c     ----------------------------------------------------------------------------+
-      character*(*),intent(in) :: sname
+      character*(*),intent(in) :: sname_in
       integer,intent(out)      :: data_set_handler ! area number for this set
       real,intent(out)         :: lam1,dl,ph1,dp
       integer,intent(out)      :: nx,ny,nz
       integer                  :: ncpm
+      character(len=999)       :: sname
 c     ----------------------------------------------------------------------------+  
+      sname = trim(adjustl(sname_in)) ! avoid prefixed blanks gives trouble
       ncpm = min(len_trim(sname), len_trim(setname(1)))  
       do data_set_handler = 1, narea
          if (sname(1:ncpm) == setname(data_set_handler)(1:ncpm)) exit
@@ -440,7 +444,9 @@ c     Daily data are split in 4 chunks; data mapping: X = phydat/biodat
 c        X00.YYYYMMDD: hour =  1, 2, 3, 4, 5, 6 @ YYYYMMDD
 c        X06.YYYYMMDD: hour =  7, 8, 9,10,11,12 @ YYYYMMDD
 c        X12.YYYYMMDD: hour = 13,14,15,16,17,18 @ YYYYMMDD
-c        X18.YYYYMMDD: hour = 19,20,21,22,23    @ YYYYMMDD + 0 @ YYYYMM(DD+1)
+c        X18.YYYYMMDD: hour = 19,20,21,22,23    @ YYYYMMDD + 0 @ (YYYYMMDD + 1 day)
+c     Notice that last frame in X18.YYYYMMDD (hour 0) carries date tag corresponding 
+c     to YYYYMMDD + 1 day
 c     ----------------------------------------------------------------------------+
       type(clock), intent(in)         :: clck
       character(len=11), intent(out)  :: tag
@@ -451,15 +457,17 @@ c     --------------------------------------------------------------------------
      +                                       12,12,12,12,12,12,
      +                                       18,18,18,18,18   /)
       type(clock)          :: dummy_clock 
-      integer              :: isec
-c     ----------------------------------------------------------------------------+
+      integer              :: isec, yyyy,mm,dd
+c     ----------------------------------------------------------------------------+      
+      call set_clock(dummy_clock, clck)
+      call add_seconds_to_clock(dummy_clock, -1800) ! allow fetching date part for tag
+      call get_date_from_clock(dummy_clock, yyyy, mm, dd) ! for tag
       call set_clock(dummy_clock, clck)
       call add_seconds_to_clock(dummy_clock, 1800)  ! allow rounding by truncation
+      call get_date_from_clock(dummy_clock, year, month, day)
       call get_second_in_day(dummy_clock, isec)
       hour = int(isec/3600) ! cast by truncation
-      call add_seconds_to_clock(dummy_clock, -3600) ! allow fetching date part for tag
-      call get_date_from_clock(dummy_clock, year, month, day)
-      write(tag,433) qmap(hour),year,month,day
+      write(tag,433) qmap(hour),yyyy, mm, dd
  433  format(i2.2,".",i4.4,i2.2,i2.2)
 c     ----------------------------------------------------------------------------+
       end subroutine create_hydro_file_tag
@@ -743,6 +751,22 @@ c     -------------------------------------------------------
       call get_X_2D(x, iset, z_i4, zscale)
       end subroutine get_z
 
+      subroutine get_wu(x, iset)    ! zonal wind stress [ ?? ] - positive toward East
+c     -------------------------------------------------------
+      real, intent(out)   :: x(:,:)
+      integer, intent(in) :: iset   
+c     -------------------------------------------------------
+      call get_X_2D(x, iset, wu_i4, wuvscale)
+      end subroutine get_wu
+
+
+      subroutine get_wv(x, iset)    ! meridonal wind stress [ ?? ] - positive toward North
+c     -------------------------------------------------------
+      real, intent(out)   :: x(:,:)
+      integer, intent(in) :: iset   
+c     -------------------------------------------------------
+      call get_X_2D(x, iset, wv_i4, wuvscale)
+      end subroutine get_wv
 
       subroutine get_u(x, iset)    ! zonal current [meters/sec] - positive toward East
 c     -------------------------------------------------------
@@ -889,7 +913,7 @@ c     --- first handle derived properties
       elseif  (property == "chl") then      ! chlorophyl
          allocate( x1(size(x,1), size(x,2), size(x,3)) )
          allocate( x2(size(x,1), size(x,2), size(x,3)) )
-         allocate( x2(size(x,1), size(x,2), size(x,3)) )
+         allocate( x3(size(x,1), size(x,2), size(x,3)) )
          call get_eco_3D(x1, iset, "dia")
          call get_eco_3D(x2, iset, "fla")
          call get_eco_3D(x3, iset, "cya")
@@ -978,6 +1002,10 @@ c
       write(*,*) minval(buf3D), "< s < ", maxval(buf3D)
       call get_t(buf3D, iset)
       write(*,*) minval(buf3D), "< t < ", maxval(buf3D)
+      call get_wu(buf2D, iset)
+      write(*,*) minval(buf2D), "< wu < ", maxval(buf2D)
+      call get_wv(buf2D, iset)
+      write(*,*) minval(buf2D), "< wv < ", maxval(buf2D)
       do isl=1,neco
          label = eco_labels(isl)
          call get_eco_3D(buf3D, iset, label)
@@ -1072,8 +1100,31 @@ c$$$      enddo
 c$$$
 c$$$      call close_read_cmod_ergom()
 c$$$      end program test_read_cmod 
-c$$$
 c$$$     
+c$$$      program test_file_mapping
+c$$$      use read_cmod_ergom
+c$$$      use time_tools
+c$$$      implicit none
+c$$$      type(clock)       :: now 
+c$$$      character(len=11) :: tag
+c$$$      integer           :: isec,year, month, day, hour
+c$$$      do isec = 1, 86400, 100
+c$$$         call set_clock(now, 2003, 4, 5, isec)
+c$$$         call create_hydro_file_tag(now, tag, year, month, day, hour)
+c$$$         write(*,566) isec/3600., tag, year, month, day, hour
+c$$$      enddo
+c$$$ 566  format(f8.4,1x,a11,3x,4i5)
+c$$$      end program
+c$$$
+c$$$      call set_clock(now, 1995, 3, 20, int(16.1*3600))
+c$$$      was_updated = update_buffers(now)
+c$$$      write(*,*) "buffer update", was_updated
+c$$$      do iset = 1, 2
+c$$$         write(*,*) "checking buffer bounds for iset = ", iset
+c$$$         call check_buffer_bounds(iset)
+c$$$      enddo
+c$$$      end program 
+c$$$
 c$$$      program test_read_cmod_minimal 
 c$$$      use read_cmod_ergom
 c$$$      use time_tools

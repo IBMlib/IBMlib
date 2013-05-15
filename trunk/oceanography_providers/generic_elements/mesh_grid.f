@@ -4,7 +4,9 @@ c     This module represents data on a 3D array where the vertical
 c     mesh is perpendicular to the horizontal and the
 c     horizontal grid are a mesh (without further restrictions)
 c     This includes sigma and z-grid with open/closed surface
-c     
+c     Serves both the physical and biogeochemical interface.
+c     By default, only the physical interface is initialized by init_mesh_grid 
+c
 c     $Rev: $
 c     $LastChangedDate:  $
 c     $LastChangedBy: $ 
@@ -19,6 +21,7 @@ c     * host 3D data arrays
 c     
 c     LOG: 
 c       stripped out time components (deal only with space/data) ASC Feb 16, 2011
+c       made biogeochemical components optional                  ASC May 2013
 c     TODO:
 c       * introduce an "only" list for fields (applied at init time), to reduce memory usage
 c         as number of water quality parameters is steadily growing
@@ -39,12 +42,25 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_turbulence_deriv
       public :: interpolate_currents
       public :: interpolate_temp
-      public :: interpolate_salty   ! currently unused
-c      public :: interpolate_wind    ! currently unused
+      public :: interpolate_salty  
+      public :: interpolate_wind_stress    
+      public :: interpolate_wdepth
+c
       public :: interpolate_zooplankton
       public :: interpolate_oxygen
-      public :: interpolate_wdepth
-
+      public :: interpolate_nh4                       
+      public :: interpolate_no3                       
+      public :: interpolate_po4                        
+      public :: interpolate_diatoms                   
+      public :: interpolate_flagellates                 
+      public :: interpolate_cyanobacteria              
+      public :: interpolate_organic_detritus                   
+      public :: interpolate_part_org_matter 
+      public :: interpolate_DIC 
+      public :: interpolate_alkalinity  
+      public :: interpolate_DIN    
+      public :: interpolate_chlorophyl   
+c
       public :: is_wet    
       public :: is_land                 ! reexport from horizontal_representation
       public :: horizontal_range_check  ! reexport from horizontal_grid_transformations
@@ -77,10 +93,25 @@ c     --- 3D grids ---
       real,allocatable,public :: vdiffus(:,:,:)    ! vertical   diffusivity [m**2/s]              
       real,allocatable,public :: hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
       real,allocatable,public :: dslm(:,:)         ! current sea surface elevation over reference [m] (positive up)
-      real,allocatable,public :: zoo(:,:,:)        ! Zooplankton [kg DW/m3]
-      real,allocatable,public :: oxygen(:,:,:)     ! O2 concentration [mmol/m3]
       real,allocatable,target,public :: ccdepth(:,:,:)    ! cell center depth water below surface [m]; pointer 
       real,allocatable,target,public :: acc_width(:,:,:)  ! accumulated water above this layer [m] dim=nz+1  
+
+c     ---- optional biogeochemistry
+      logical                 :: incl_biogeochem = .false.     ! default: inactive
+      real,allocatable,public :: zoo(:,:,:)                    ! Zooplankton [kg DW/m3]
+      real,allocatable,public :: oxygen(:,:,:)                 ! O2 concentration [mmol/m3]
+      real,allocatable,public :: nh4(:,:,:)                    ! [mmol/m3]          
+      real,allocatable,public :: no3(:,:,:)                    ! [mmol/m3]                
+      real,allocatable,public :: po4(:,:,:)                    ! [mmol/m3]                 
+      real,allocatable,public :: diatoms(:,:,:)                ! [mmol/m3]                
+      real,allocatable,public :: flagellates(:,:,:)            ! [mmol/m3]                 
+      real,allocatable,public :: cyanobacteria(:,:,:)          ! [mmol/m3]                 
+      real,allocatable,public :: organic_detritus(:,:,:)       ! [mmol/m3]                         
+      real,allocatable,public :: part_org_matter(:,:,:)        ! particular organic matter [mmol/m3]       
+      real,allocatable,public :: dissolv_inorg_carbon(:,:,:)   ! dissolved inorganic carbon [mmol/m3]       
+      real,allocatable,public :: alkalinity(:,:,:)             ! [mmol/m3]       
+      real,allocatable,public :: dissolv_inorg_nitrogen(:,:,:) ! dissolved inorganic nitrogen [mmol/m3]          
+      real,allocatable,public :: chlorophyl(:,:,:)             ! [mmol/m3]       
 
       real   :: padval_u        = default_padding
       real   :: padval_v        = default_padding          
@@ -90,14 +121,16 @@ c     --- 3D grids ---
       real   :: padval_vdiffus  = default_padding             
       real   :: padval_hdiffus  = default_padding 
       real   :: padval_dslm     = default_padding
-      real   :: padval_zoo      = default_padding
-      real   :: padval_oxygen   = default_padding
+      real   :: padval_uwind    = default_padding
+      real   :: padval_vwind    = default_padding
+      real   :: padval_bgc      = default_padding      ! apply to all biogeochemistry
 
 c     --- 2D grids ---
       
       real,allocatable,public     :: wdepth (:,:)      ! current depth at cell-center, including dslm [m]
-
       integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
+      real,allocatable,public     :: u_wind_stress(:,:) ! u of wind stress[???] (positive east)
+      real,allocatable,public     :: v_wind_stress(:,:) !  v of wind stress[???]] (positive north)   
       public                      :: wetmask           ! hosted by horizontal_representation
 
       real   :: padval_wdepth   = default_padding 
@@ -109,8 +142,8 @@ c     ===================================================
                       
       subroutine init_mesh_grid(padding,
      +                     pad_u, pad_v, pad_w, pad_temp, pad_salinity, 
-     +                     pad_vdiffus, pad_hdiffus, pad_dslm, pad_zoo, 
-     +                     pad_oxygen, pad_wdepth)
+     +                     pad_vdiffus, pad_hdiffus, pad_dslm, pad_bgc, 
+     +                     pad_wdepth, init_biogeochem)
 c     ------------------------------------------------------
 c     Assumes (nx,ny,nz) has been set by client module
 c     Notice that module horizontal_grid_transformations must
@@ -118,7 +151,9 @@ c     be initialized directly from the top level physical_fields
 c     by calling init_horiz_grid_transf(<args>), since the
 c     specific arguments args depends directly on the grid type
 c     The top level physical_fields should also directly import this module
-c   
+c     By default (init_biogeochem == .false.), only the physical interface is 
+c     initialized by init_mesh_grid 
+c     
 c     Pad value setup for grid interpolations at invalid points:
 c       1) If no pad values are provided, the compiled-in value default_padding 
 c       2) If the overall pad value padding is specified, this will overwrite 1)
@@ -136,12 +171,13 @@ c     ------------------------------------------------------
       real, intent(in), optional :: pad_vdiffus               
       real, intent(in), optional :: pad_hdiffus  
       real, intent(in), optional :: pad_dslm    
-      real, intent(in), optional :: pad_zoo
-      real, intent(in), optional :: pad_oxygen
+      real, intent(in), optional :: pad_bgc
       real, intent(in), optional :: pad_wdepth
+      logical, intent(in), optional :: init_biogeochem
 c     ------------------------------------------------------
       write(*,*) "init_mesh_grid: allocate grid arrays: begin" 
 
+c     ----- physics -----
       allocate( u(nx,ny,nz)       )   
       allocate( v(nx,ny,nz)       )   
       allocate( w(nx,ny,nz)       )   
@@ -149,16 +185,38 @@ c     ------------------------------------------------------
       allocate( salinity(nx,ny,nz))  
       allocate( vdiffus(nx,ny,nz+1) ) ! enable data points at vertical faces
       allocate( hdiffus(nx,ny,nz) ) 
-      allocate( zoo(nx,ny,nz)     ) 
-      allocate( oxygen(nx,ny,nz)     ) 
       allocate( ccdepth(nx,ny,nz) )  
       allocate( acc_width(nx,ny,nz+1)   )
+
+c     ----- biogeochemistry -----
+      if (present(init_biogeochem)) incl_biogeochem = init_biogeochem ! else compile time value apply
+      if (incl_biogeochem) then
+         write(*,*) "init_mesh_grid: allocating optional biogeochem" 
+         allocate( zoo(nx,ny,nz)     ) 
+         allocate( oxygen(nx,ny,nz)  ) 
+         allocate( nh4(nx,ny,nz)  )     
+         allocate( no3(nx,ny,nz)  )       
+         allocate( po4(nx,ny,nz)  )                
+         allocate( diatoms(nx,ny,nz)  )           
+         allocate( flagellates(nx,ny,nz)  )             
+         allocate( cyanobacteria(nx,ny,nz)  )              
+         allocate( organic_detritus(nx,ny,nz)  )                        
+         allocate( part_org_matter(nx,ny,nz)  ) 
+         allocate( dissolv_inorg_carbon (nx,ny,nz)  )      
+         allocate( alkalinity(nx,ny,nz)  ) 
+         allocate( dissolv_inorg_nitrogen(nx,ny,nz)  )   
+         allocate( chlorophyl(nx,ny,nz)  ) 
+      else
+         write(*,*) "init_mesh_grid: biogeochem not allocated" 
+      endif
 
 c     --- 2D grids ---
 
       allocate( dslm(nx,ny)       )       
       allocate( wdepth(nx,ny)     ) 
       allocate( bottom_layer(nx,ny) )
+      allocate( u_wind_stress(nx,ny) )
+      allocate( v_wind_stress(nx,ny) )
       write(*,*) "init_mesh_grid: allocate grid arrays: OK"
 
       call init_horizontal_representation()
@@ -175,8 +233,7 @@ c
          padval_vdiffus  = padding             
          padval_hdiffus  = padding 
          padval_dslm     = padding 
-         padval_zoo      = padding
-         padval_oxygen   = padding
+         padval_bgc      = padding
          padval_wdepth   = padding 
          write(*,*) "init_mesh_grid: default padding = ",padding
       else
@@ -194,8 +251,7 @@ c
       if(present(pad_vdiffus))  padval_vdiffus  = pad_vdiffus                  
       if(present(pad_hdiffus))  padval_hdiffus  = pad_hdiffus  
       if(present(pad_dslm))     padval_dslm     = pad_dslm   
-      if(present(pad_zoo))      padval_zoo      = pad_zoo
-      if(present(pad_oxygen))   padval_oxygen   = pad_oxygen
+      if(present(pad_bgc))      padval_bgc      = pad_bgc
       if(present(pad_wdepth))   padval_wdepth   = pad_wdepth
       
       write(*,*) "init_mesh_grid: resolved padding values:"
@@ -207,8 +263,7 @@ c
       write(*,*) "padval_vdiffus :", padval_vdiffus
       write(*,*) "padval_hdiffus :", padval_hdiffus
       write(*,*) "padval_dslm    :", padval_dslm
-      write(*,*) "padval_zoo     :", padval_zoo
-      write(*,*) "padval_oxygen  :", padval_oxygen
+      write(*,*) "padval_bgc     :", padval_bgc
 
       end subroutine init_mesh_grid
        
@@ -226,13 +281,32 @@ c     ------------------------------------------------------
       if (allocated(vdiffus))      deallocate( vdiffus )
       if (allocated(hdiffus))      deallocate( hdiffus )
       if (allocated(dslm))         deallocate( dslm )
-      if (allocated(zoo))          deallocate( zoo )
-      if (allocated(oxygen))       deallocate( oxygen )
       if (allocated(ccdepth))      deallocate( ccdepth )     
       if (allocated(acc_width))    deallocate( acc_width )     
       if (allocated(wdepth))       deallocate( wdepth )
       if (allocated(bottom_layer)) deallocate( bottom_layer )
-      
+      if (allocated(u_wind_stress)) deallocate(u_wind_stress )
+      if (allocated(v_wind_stress)) deallocate(v_wind_stress )
+c
+      if (allocated( zoo )) deallocate( zoo )
+      if (allocated( oxygen )) deallocate( oxygen )
+      if (allocated( nh4 )) deallocate( nh4 )
+      if (allocated( no3 )) deallocate( no3 )
+      if (allocated( po4 )) deallocate( po4 )         
+      if (allocated( diatoms )) deallocate( diatoms )     
+      if (allocated( flagellates )) deallocate( flagellates )     
+      if (allocated( cyanobacteria )) deallocate(cyanobacteria)       
+      if (allocated( organic_detritus )) 
+     +                        deallocate( organic_detritus )        
+      if (allocated( part_org_matter)) 
+     +                        deallocate( part_org_matter )
+      if (allocated( dissolv_inorg_carbon )) 
+     +                        deallocate( dissolv_inorg_carbon )
+      if (allocated( alkalinity )) deallocate( alkalinity )
+      if (allocated( dissolv_inorg_nitrogen )) 
+     +                        deallocate( dissolv_inorg_nitrogen ) 
+      if (allocated( chlorophyl )) deallocate( chlorophyl )
+
       call close_horizontal_representation()
 
       end subroutine close_mesh_grid
@@ -538,11 +612,10 @@ c     ------------------------------------------
       call interpolate_cc_3Dgrid_data(geo,vdiffus,0,padval_vdiffus,
      +                                r3(3),statv)
       r3(2)   = r3(1) ! horizontal isotropy
-      status  = max(statv,stath) ! in the unextected case taht they differ ...
+      status  = max(statv,stath) ! in the unextected case that they differ ...
 c     ------------------------------------------ 
       end subroutine
 
- 
 
       subroutine interpolate_turbulence_deriv(geo, r3, status)
 c     ------------------------------------------ 
@@ -559,10 +632,6 @@ c     padval = 0 is hard coded for derivatives
       status  = statv 
 c     ------------------------------------------    
       end subroutine 
-
-
-
-
 
 
       subroutine interpolate_temp (geo, r, status) 
@@ -590,31 +659,6 @@ c     ------------------------------------------
       end subroutine 
 
 
-      subroutine interpolate_zooplankton (geo, r, status) 
-c     ------------------------------------------ 
-c     ------------------------------------------ 
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: r(:)
-      integer, intent(out) :: status
-c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,zoo,0,padval_zoo,r(1),status)
-c     ------------------------------------------ 
-      end subroutine 
-
-
-      subroutine interpolate_oxygen (geo, r, status) 
-c     ------------------------------------------ 
-c     ------------------------------------------ 
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: r(:)
-      integer, intent(out) :: status
-c     ------------------------------------------ 
-      call interpolate_cc_3Dgrid_data(geo,oxygen,0,
-     +                         padval_oxygen,r(1),status)
-c     ------------------------------------------ 
-      end subroutine 
-
-
       subroutine interpolate_wdepth(geo, r, status) 
 c     ------------------------------------------ 
 c     Multiply by is_land to ensure piecewise linear coastlines
@@ -631,6 +675,288 @@ c     ------------------------------------------
       end subroutine 
 
 
+      subroutine interpolate_wind_stress(geo, r2, status)
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r2(:)
+      integer, intent(out) :: status
+      integer              :: statu, statv
+c     ------------------------------------------
+      call interpolate_cc_2Dgrid_data(geo, u_wind_stress, 0, 
+     +                                padval_uwind, r2(1), statu)
+      call interpolate_cc_2Dgrid_data(geo, v_wind_stress, 0, 
+     +                                padval_vwind, r2(2), statv)
+      status  = max(statu, statv) ! in the unextected case that they differ ...
+c     ------------------------------------------ 
+      end subroutine interpolate_wind_stress
+
+
+
+      subroutine interpolate_zooplankton (geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r(:)
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,zoo,0,
+     +        padval_bgc,r(1),status)
+      else
+         write(*,*) "interpolate_zooplankton: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_oxygen (geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,oxygen,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_oxygen: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+      subroutine interpolate_nh4 (geo, r, status)  
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,nh4,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_nh4: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_no3(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,no3,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_no3: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine   
+
+           
+      subroutine interpolate_po4(geo, r, status)  
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,po4,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_po4: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine    
+
+              
+      subroutine interpolate_diatoms(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,diatoms,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_diatoms: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine        
+
+      
+      subroutine interpolate_flagellates(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,flagellates,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_flagellates: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine     
+
+      
+      subroutine interpolate_cyanobacteria (geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,cyanobacteria,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_cyanobacteria: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine  
+
+     
+      subroutine interpolate_organic_detritus(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,organic_detritus,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_organic_detritus: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine   
+
+           
+      subroutine interpolate_part_org_matter(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,part_org_matter,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_part_org_matter: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_DIC(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,dissolv_inorg_carbon,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_DIC: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_alkalinity(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,alkalinity,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_alkalinity: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_DIN(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,dissolv_inorg_nitrogen,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_DIN: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+
+
+      subroutine interpolate_chlorophyl(geo, r, status) 
+c     ------------------------------------------ 
+c     ------------------------------------------ 
+      real, intent(in)     :: geo(:)
+      real, intent(out)    :: r
+      integer, intent(out) :: status
+c     ------------------------------------------ 
+      if (incl_biogeochem) then
+         call interpolate_cc_3Dgrid_data(geo,chlorophyl,0,
+     +                 padval_bgc,r,status)
+      else
+         write(*,*) "interpolate_chlorophyl: "//
+     +              "biogeochem is not initialized"
+         stop
+      endif   
+c     ------------------------------------------ 
+      end subroutine 
+   
 
       LOGICAL function is_wet(geo)
 c     ------------------------------------------ 

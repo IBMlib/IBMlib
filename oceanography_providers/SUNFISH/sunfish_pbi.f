@@ -232,7 +232,7 @@ c.....grid scale/dimensions (held globally in module regular_lonlat_grid)
 
 
       write(*,*) "read_grid_desc: allocate grid arrays: begin"
-      call init_mesh_grid()  ! incl allocation of 3D arrays
+      call init_mesh_grid(init_biogeochem = .true.)  ! incl allocation of 3D arrays
       
 c     --- allocate specific auxillary arrays ---      
 

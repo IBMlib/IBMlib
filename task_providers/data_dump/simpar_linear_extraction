@@ -1,16 +1,49 @@
 !#########################################################
 !   input file example for task = linear_extraction
 !#########################################################
-start_time         = 1997 1 3 0
-end_time           = 1997 1 4 0
-time_step          = 86400
-ICES_rectangle     = 33F3
-longitude_step     = 0.1667
-latitude_step      = 0.1 
-! longitude_range   = 3     4     0.1667  
-! latitude_range    = 52.0  52.5  0.1 
-vertical_stratum   = bottom
-! vertical_range    = 0 10 0.5
-extract_data       = temperature
-output_file        = out.dat
+!
+###### the parameters initializes the PBI - they are specific to the PBI ###### 
+
+hydroDBpath   = /home/data/OPEC_test   ! refers to a specific PBI (OPEC)
+!hydroDBpath   = /data/AquaNAS02       ! refers to a specific PBI (OPEC)
+cmod_data_set = coarse                 ! refers to a specific PBI (OPEC)
+
+###### the parameters below here control the data extraction ######
+
+#  ==== set time period for average ====
+start_time         = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time           = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+time_step          = 2000              ! period between time samplings in seconds
+#  ==== horizontal: either ICES rec OR lon/lat range 
+ICES_rectangle     = 37F3              
+longitude_step     = 0.1667             ! longitude spacing between sampling points in degrees 
+latitude_step      = 0.1                ! latitude spacing between sampling points in degrees 
+!longitude_range    = 3     4     0.1667    ! in degrees E, format = lonmin lonmax longitude_step
+!latitude_range     = 52.0  52.5  0.1       ! in degrees N, format = latmin latmax latitude_step 
+#  ==== vertical: eihter a stratum OR a range
+vertical_stratum   = bottom             ! current stratum options: bottom, surface
+!vertical_range    = 0 10 0.5           ! range format = depthmin depthmax depth_step, in meters, positive downward, zero = sea surface
+#  ==== extract_data: currently choose from:
+#                temperature
+#                salinity
+#                currents
+#                windstress
+#                zooplankton (if biogeochemistry is available)
+#                oxy         (if biogeochemistry is available)
+#                nh4         (if biogeochemistry is available)
+#                no3         (if biogeochemistry is available)
+#                po4         (if biogeochemistry is available)
+#                dia         (if biogeochemistry is available)
+#                fla         (if biogeochemistry is available)  
+#                cya         (if biogeochemistry is available)
+#                odt         (if biogeochemistry is available)      
+#                pom         (if biogeochemistry is available)
+#                dic         (if biogeochemistry is available)
+#                alk         (if biogeochemistry is available)
+#                din         (if biogeochemistry is available)
+#                chl         (if biogeochemistry is available)
+#
+extract_data       = temperature        ! deg Celcius
+append_file        = out.dat            ! where to append result: average, RMS, minval, maxval
+!output_file        = out.dat            ! where to write result: average, RMS, minval, maxval
 #

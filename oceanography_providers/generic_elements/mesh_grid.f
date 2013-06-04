@@ -129,8 +129,8 @@ c     --- 2D grids ---
       
       real,allocatable,public     :: wdepth (:,:)      ! current depth at cell-center, including dslm [m]
       integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
-      real,allocatable,public     :: u_wind_stress(:,:) ! u of wind stress[???] (positive east)
-      real,allocatable,public     :: v_wind_stress(:,:) !  v of wind stress[???]] (positive north)   
+      real,allocatable,public     :: u_wind_stress(:,:) ! u of wind stress[N/m2] (positive east)
+      real,allocatable,public     :: v_wind_stress(:,:) !  v of wind stress[N/m2] (positive north)   
       public                      :: wetmask           ! hosted by horizontal_representation
 
       real   :: padval_wdepth   = default_padding 
@@ -969,10 +969,10 @@ c     ------------------------------------------
       integer          :: status
 c     ------------------------------------------ 
       call interpolate_wdepth(geo, wd, status) 
-      if (status==1) then
+      if (status==1) then     ! status = 1: horizontal range violation, set result = padval
          is_wet = .true.
          return
-      elseif (status==0) then
+      elseif (status==0) then ! status = 0: interior interpolation performed
          if ((geo(3)>-htol).and.(geo(3)<wd+htol)) then
             is_wet = .true.
          else

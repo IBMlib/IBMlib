@@ -751,7 +751,7 @@ c     -------------------------------------------------------
       call get_X_2D(x, iset, z_i4, zscale)
       end subroutine get_z
 
-      subroutine get_wu(x, iset)    ! zonal wind stress [ ?? ] - positive toward East
+      subroutine get_wu(x, iset)    ! zonal wind stress [ N/m2 ] - positive toward East
 c     -------------------------------------------------------
       real, intent(out)   :: x(:,:)
       integer, intent(in) :: iset   
@@ -760,7 +760,7 @@ c     -------------------------------------------------------
       end subroutine get_wu
 
 
-      subroutine get_wv(x, iset)    ! meridonal wind stress [ ?? ] - positive toward North
+      subroutine get_wv(x, iset)    ! meridonal wind stress [ N/m2 ] - positive toward North
 c     -------------------------------------------------------
       real, intent(out)   :: x(:,:)
       integer, intent(in) :: iset   

@@ -1,0 +1,26 @@
+
+!hydroDBpath       = /home/data/OPEC_test   ! refers to a specific PBI (OPEC)
+!hydroDBpath       = /data/AquaNAS02       ! refers to a specific PBI (OPEC)
+!hydroDBpath       = /home/asbjorn/DTU/OPEC/IBMlib/AquaNAS02_mount_point
+hydroDBpath        = /home/asbjorn/DTU/OPEC/IBMlib/AquaNAS02_mount_point
+cmod_data_set      = coarse                 ! refers to a specific PBI (OPEC)
+start_time         = 1990 5 1 0  
+end_time           = 1990 6 1 0  
+time_step          = 864000              !
+longitude_step     = 0.1667        ! longitude spacing between sampling points in degrees 
+latitude_step      = 0.1           ! latitude spacing between sampling points in degrees 
+vertical_range     = 0  1000  0.5 
+output_file        = temp_1990_5_1000.dat            
+
+!            guiding points:    Poland(w)    Bornholm(s)      Hammerodde      Sandhammaren     Sweden(n)      GB sw     Poland(mid)
+polygon            = BB_sub25    15 54           15 55        14.78 55.30     14.20 55.40     14.20 56.50    18 56.50      18 54 
+
+!            guiding points:     GB sw         Latvia(w)       Poland(ne)      Poland(mid)
+polygon            = GD_sub26   18 56.50       22 56.50          22 54          18 54 
+
+!            guiding points:    Sandoen       Estonia(w)       Latvia(m)        GB sw    Gotland sund   Gotland(s)   Gotland(n)
+polygon            = GB_sub28   19 58.50       25 58.50         25 56.50      18 56.50     18 57.0      18.3 57.0     19 57.93
+
+!            guiding points:    Poland(w)    Bornholm(s)      Hammerodde      Sandhammaren     Sweden(n)      GB sw    Gotland sund   Gotland(s)   Gotland(n)  Sandoen       Estonia(w)    Belarus
+polygon            = sub25+26+28  15 54         15 55        14.78 55.30     14.20 55.40     14.20 56.50    18 56.50     18 57.0      18.3 57.0     19 57.93   19 58.50       25 58.50     25 54
+

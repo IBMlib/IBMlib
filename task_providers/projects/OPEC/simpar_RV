@@ -1,0 +1,40 @@
+!#########################################################
+!   input file example for task = linear_extraction
+!#########################################################
+!
+###### the parameters initializes the PBI - they are specific to the PBI ###### 
+
+hydroDBpath   = /home/data/OPEC_test   ! refers to a specific PBI (OPEC)
+!hydroDBpath   = /data/AquaNAS02       ! refers to a specific PBI (OPEC)
+cmod_data_set = coarse                 ! refers to a specific PBI (OPEC)
+
+###### the parameters below here control the data extraction ######
+
+#  ==== set time period for average ====
+start_time         = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time           = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+time_step          = 2000              ! period between time samplings in seconds
+#  ==== spatial setup:  ====  
+#
+#  subdivisions of Area27: see http://www.fao.org/fishery/area/Area27/en
+#
+!            guiding points:    Poland(w)    Bornholm(s)      Hammerodde      Sandhammaren     Sweden(n)      GB sw     Poland(mid)
+polygon            = BB_sub25    15 54           15 55        14.78 55.30     14.20 55.40     14.20 56.50    18 56.50      18 54 
+
+!            guiding points:     GB sw         Latvia(w)       Poland(ne)      Poland(mid)
+polygon            = GD_sub26   18 56.50       22 56.50          22 54          18 54 
+
+!            guiding points:    Sandoen       Estonia(w)       Latvia(m)        GB sw    Gotland sund   Gotland(s)   Gotland(n)
+polygon            = GB_sub28   19 58.50       25 58.50         25 56.50      18 56.50     18 57.0      18.3 57.0     19 57.93
+!      
+!
+longitude_step     = 0.1667        ! longitude spacing between sampling points in degrees 
+latitude_step      = 0.1           ! latitude spacing between sampling points in degrees 
+vertical_step      = 0.5           ! vertical step length in meters, positive downward
+#
+RV_salt_limit      = 11.0          ! PSU
+rho_egg            = 1010          ! kg/m3  
+# ==== reporting ====
+output_file        = out.dat            ! where to write result: average, RMS, minval, maxval
+#
+

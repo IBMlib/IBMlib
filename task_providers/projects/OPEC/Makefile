@@ -5,7 +5,8 @@
 #      task_provider test (in file $(MAIN).f)          #
 ########################################################
 
-MAIN = opec1
+#MAIN = opec_RV
+MAIN = opec_temperature
 
 task.a: $(MAIN).o
 	ar rcs task.a $(MAIN).o
@@ -24,6 +25,6 @@ FORCE:
 #
 #     EXTRES = -x time_tools  -x run_context  -x physical_fields  -x particles
 
-input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod: 
+input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  water_density.mod: 
 	echo "update of" $@ "suppressed"
 

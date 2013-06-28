@@ -1,0 +1,8 @@
+#  
+hydroDBpath   = /home/asbjorn/DTU/OPEC/IBMlib/AquaNAS02_mount_point   ! refers to a specific example PBI (OPEC)
+cmod_data_set = coarse                                                ! refers to a specific example PBI (OPEC)
+#
+stations      = ../KASU_1_stationsliste_ylt2000.dat
+output        = KASU_1_ylt2000_TSdata.dat                   
+vertical_step = 0.5                    ! step for vertical averaging in meters
+#

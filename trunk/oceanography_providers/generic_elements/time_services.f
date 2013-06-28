@@ -17,6 +17,10 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: get_master_clock
       public :: set_master_clock
       
+      interface set_master_clock
+        module procedure set_master_clock_i4
+        module procedure set_master_clock_from_clock
+      end interface
 c     -------------------- module data --------------------  
       
       type(clock), target, private :: master_clock
@@ -34,7 +38,17 @@ c     ------------------------------------------
 c     ------------------------------------------ 
       end function 
 
-      subroutine set_master_clock(time)
+
+      subroutine set_master_clock_i4(idum4)
+c     ------------------------------------------
+      integer, intent(in) :: idum4(4)
+c     ------------------------------------------ 
+      call set_clock(master_clock, 
+     +               idum4(1), idum4(2), idum4(3), idum4(4))
+c     ------------------------------------------ 
+      end subroutine 
+
+      subroutine set_master_clock_from_clock(time)
 c     ------------------------------------------ 
       type(clock), intent(in) :: time
 c     ------------------------------------------ 

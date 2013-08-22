@@ -57,7 +57,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       character*(*), parameter  :: separator_token = "="
       character*(*), parameter  :: comment_token   = "!"
-      integer, parameter        :: linelen         = 256
+      integer, parameter,private :: linelen         = 256
 
       type control_file
          character(len=linelen)          :: filename
@@ -93,7 +93,7 @@ c========================================================
       type(control_file)    :: filehandler 
 
       integer               :: iunit, nlines, OK
-      character*linelen         :: linebuf
+      character(len=linelen) :: linebuf 
 c-------------------------------------------
       filehandler%filename = filename
       call find_free_IO_unit(iunit)
@@ -154,7 +154,7 @@ c========================================================
       type(control_file)    :: filehandler         
       character*(*)         :: name                                    
       integer               :: iline, isep, icomm
-      character*linelen     :: thisline, thisname
+      character(len=linelen)  :: thisline, thisname
 c-------------------------------------------
       count_tags = 0
       do iline = 1, size(filehandler%rawdata)
@@ -209,7 +209,7 @@ c========================================================
       integer, optional     :: next
       character(len=*)    :: value    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)   :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -278,7 +278,7 @@ c========================================================
       integer, optional     :: next
       integer             :: value    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)   :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -347,7 +347,7 @@ c========================================================
       integer, optional     :: next
       real                :: value    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)   :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -416,7 +416,7 @@ c========================================================
       integer, optional     :: next
       real(kind=8)        :: value    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)  :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -485,7 +485,7 @@ c========================================================
       integer, optional     :: next
       logical             :: value    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)   :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -554,7 +554,7 @@ c========================================================
       integer, optional     :: next
       integer             :: value(:)    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)     :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -623,7 +623,7 @@ c========================================================
       integer, optional     :: next
       real                :: value(:)    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)     :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from
@@ -692,7 +692,7 @@ c========================================================
       integer, optional     :: next
       real(kind=8)        :: value(:)    ! here goes decl
       integer               :: iline, isep, icomm, istart
-      character*linelen     :: thisline, thisname
+      character(len=linelen)     :: thisline, thisname
 c-------------------------------------------
 
 c.....resolve which line to start from

@@ -222,7 +222,7 @@ c --- Read vertical behaviour scheme
            vert_params(2)=vert_params(1)
          case default
            call abort_run("init_particle_start","Vertical behaviour "
-     +        " model '" //trim(vert_mdl_name) //"' is unknown.")
+     +        // " model '" //trim(vert_mdl_name) //"' is unknown.")
            stop 
          end select
       endif
@@ -251,7 +251,7 @@ c --- Read swim model - but only if there is some vertical behaviour involved
               write(*,*) "Swiming speed = ",swim_params(1)
             case default
               call abort_run("init_particle_start","Swimming model "
-     +           " '" //trim(swim_mdl_name) //"' is unknown.")
+     +          // " '" //trim(swim_mdl_name) //"' is unknown.")
               stop 
             end select
          endif

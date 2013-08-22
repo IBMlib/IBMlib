@@ -213,7 +213,7 @@ c     bog standard real(4) variables
 c-------------------------------------------------------
       real, intent(in)     :: geo1(:),geo2(:)
       real, intent(out)    :: d
-      real(16)             :: cosdR1,cosdR2,lat1,lat2,lon1,lon2
+      real(8)             :: cosdR1,cosdR2,lat1,lat2,lon1,lon2
 c     --------------------------------------------------
 c     Extract values and convert to radians
       lon1=geo1(1)*deg2Rad

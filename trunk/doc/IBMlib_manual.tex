@@ -809,6 +809,37 @@ we will add a convenience subroutine: get\_jacobian ...
 \end{itemize}
 
 %%====================================================================
+\chapter{Installation notes}
+
+Even though IBMlib code and build tools should stricktly adhere to standards, there may be
+minor issues when setting IBMlib up in a new computing environments. Below we have logged the work arounds
+for these cases, organized by computing environment.
+
+\section{DTU HPC (gbar)}
+
+\subsection{Installation}
+Mark Payne, Thursday, August 22, 2013 6:14 PM (committed to version 445):
+\begin{verbatim}
+#login to HPC front end
+ssh <username>@hpc-fe.gbar.dtu.dk
+#load  an interactive node
+qrsh
+#Check out IBMlib
+#Load modules required. PGI 2011 gives the newinclude problem, but not 2012.
+module load pgi/2012
+#Also need to load netcdf built with pgi
+module load netcdf/pgi-4.2
+#Configure IBMlib as usual but use the compiler defaults I have already setup for portland group compiler on HPC
+ ln -sf setups/compilers/pg/pgi_2012_compiler_DTU_HPC.mk compiler_defaults.mk
+#Use the PGI makefile that I have already modified
+rm Makefile
+ln -sf Makefile_PGI Makefile
+#And build.
+make all
+\end{verbatim}
+
+
+%%====================================================================
 \chapter{FAQ (programmers)}
 
 \section{Compilation}

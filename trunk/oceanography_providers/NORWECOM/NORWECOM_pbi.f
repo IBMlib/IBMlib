@@ -19,7 +19,8 @@ c       * Test velocity vectors by comparison with ARIANE
 c       * Improve interpolations around coastline
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
-      use mesh_grid,
+      use mesh_grid,   !Use the entire module, apart from these three,
+                       !which need special treatment in NORWECOM
      +   ncc_interpolate_currents  => interpolate_currents,
      +   ncc_interpolate_turbulence=> interpolate_turbulence,
      +   ncc_interp_turb_deriv     => interpolate_turbulence_deriv

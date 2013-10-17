@@ -30,3 +30,8 @@ LINKLIBS  += -L$(NETCDF_DIR)/lib -lcurl
 
 export LITTLE_ENDIAN = -convert little_endian
 export BIG_ENDIAN    = -convert big_endian
+
+#Test for presence of loaded module
+ifeq ($(FC),ifort)
+	stop
+endif

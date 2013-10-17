@@ -164,7 +164,12 @@ all: $(EXECUTABLE)
 $(EXECUTABLE): $(IBMLIB_OBJS)
 	@echo ""
 	#$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
-	$(FC)  $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
+#	$(FC)  $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
+	pgf90  grid_interpolations.o  runtime_tools.o  string_tools.o  constants.o input_parser.o \
+	random_numbers.o time_tools.o run_context.o output.o geometry.o array_tools.o spline.o  \
+	particle_tracking.o particles.o \
+	task.a particle_state.a physical_fields.a libtime/libtime77.a ascii_writer.a netcdf_writer.a \
+	 -i4 -I/usr/local/include      -L/appl/netcdf/pgi/4.2/lib -lcurl  -L/usr/lib  -L/usr/local/lib -lnetcdff -lnetcdf  -lhdf5_hl -lhdf5 -lz        -o ibmrun   
 
 
 # 

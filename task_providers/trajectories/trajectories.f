@@ -76,9 +76,13 @@ c     ------------   init system  ------------
 
 c     ------------ seed random number generator  ------------
       call random_seed(size=seed_size)    !get seed size
+      write(*,*) "Compiler-determined seed size = ", seed_size
       allocate(seed(seed_size))
       if(count_tags(simulation_file,"random_seed")>0) then 
-           call read_control_data(simulation_file, "random_seed", seed)
+           call read_control_data(simulation_file, 
+     +             "random_seed",seed(1))
+           seed=seed(1)    !We specify the seed as one integer repeated
+                           !throughout the entire vector
            call random_seed(put=seed)
       else
            call random_seed()

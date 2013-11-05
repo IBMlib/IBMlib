@@ -1,0 +1,20 @@
+!#########################################################
+!   input file example for task = zsalt
+!#########################################################
+!
+###### the parameters initializes the PBI - they are specific to the PBI ###### 
+
+!hydroDBpath   = /home/data/OPEC_test   ! refers to a specific PBI (OPEC)
+!hydroDBpath   = /data/AquaNAS02       ! refers to a specific PBI (OPEC)
+hydroDBpath   = /mnt             
+cmod_data_set = coarse                 ! refers to a specific PBI (OPEC)
+
+###### the parameters below here control the data extraction ######
+
+start_year      =  1991
+end_year        =  2009    
+time_step       =  604800    ! in seconds; weekly = 604800; monthly = 2628000
+position        =  15.4 55.5 ! degE degN
+salinity_target =  9         ! PSU 
+output_file     =  out.dat   ! time series of (time, depth)
+

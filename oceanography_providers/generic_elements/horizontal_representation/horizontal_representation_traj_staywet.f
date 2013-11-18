@@ -127,6 +127,8 @@ c     * georef is the modified final position, if step from geo1 to geo2 is refl
 c       in the coast line. georef may be both wet/dry
 c     * geohit is the first position where the line from geo1 to geo2 
 c       crosses a coast line. geohit is guarentied a wet point
+c     Both georef and geohit will be assumed to have length as geo1/geo2 if assigned
+c     If present, vertical component (and higher) will be interpolated linearly along (geo1, geo2)
 c
 c     If anycross is .false. neither georef and geohit are assigned.
 c
@@ -330,6 +332,8 @@ c
 c     |direct| == |reflect|        
       xyhit = xy1   +     s*direct  ! position where coast line is hit
       xyref = xyhit + (1-s)*reflect ! position for reflection in coast line
+      georef = xyref                ! copy vertical coordinate (and higher) before transformation, if present
+      geohit = xyhit                ! copy vertical coordinate (and higher) before transformation, if present
       call get_horiz_geo_coordinates(xyref,georef) ! return to geo coordinates
       call get_horiz_geo_coordinates(xyhit,geohit) ! return to geo coordinates
 c

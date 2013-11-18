@@ -477,6 +477,8 @@ c     to within a numerical tolerance, by a small displacement
 
       ldum = repel_from_coast_line(xyhit)   ! do not parse result
       ldum = repel_from_coast_line(xyref)   ! do not parse result
+      georef = xyref            ! copy vertical coordinate (and higher) before transformation, if present
+      geohit = xyhit            ! copy vertical coordinate (and higher) before transformation, if present
       call get_horiz_geo_coordinates(xyref,georef) ! return in geo coordinates
       call get_horiz_geo_coordinates(xyhit,geohit) ! return in geo coordinates
 

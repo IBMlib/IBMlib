@@ -129,6 +129,7 @@ c       in the coast line. georef may be both wet/dry
 c     * geohit is the first position where the line from geo1 to geo2 
 c       crosses a coast line. geohit is guarentied a wet point
 c     Both georef and geohit will be assumed to have length as geo1/geo2 if assigned
+c     If present, vertical component (and higher) will be interpolated linearly along (geo1, geo2)
 c
 c     If anycross is .false. neither georef nor geohit are assigned.
 c
@@ -346,8 +347,10 @@ c
 c     |direct| == |reflect|        
       xyhit = xy1   +     s*direct  ! position where coast line is hit
       xyref = xyhit + (1-s)*reflect ! position for reflection in coast line
-      call get_horiz_geo_coordinates(xyref,georef) ! return to geo coordinates
-      call get_horiz_geo_coordinates(xyhit,geohit) ! return to geo coordinates
+      georef = xyref                ! copy vertical coordinate (and higher) before transformation, if present
+      geohit = xyhit                ! copy vertical coordinate (and higher) before transformation, if present
+      call get_horiz_geo_coordinates(xyref,georef) ! return to geo coordinates (only modifies position 1:2) 
+      call get_horiz_geo_coordinates(xyhit,geohit) ! return to geo coordinates (only modifies position 1:2) 
 c
 c     Finally, when coast line was crossed, make sure geohit tests wet
 c     do not test/modify georef
@@ -651,7 +654,7 @@ c     nudging loop: set assured_wetpt by scaling down difference vector iterativ
 c   
       dg            = maybewet(1:2) - wetpt(1:2) ! horizontal vector only
       istep         = 1
-      assured_wetpt = maybewet ! transfer vertical component, if present
+      assured_wetpt = maybewet ! transfer vertical component (and higher), if present
       keep_going    = .true.   ! we know we need at least one step
       do while (keep_going)
          scale_factor = max(0.0, 1.0 - istep*resol + alpha*(istep**2))

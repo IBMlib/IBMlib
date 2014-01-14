@@ -180,8 +180,8 @@ c     ----------------------------------------------------
      +                              xy, poly%extpt, s, cross)
          if (cross) ncross = ncross + 1
       enddo   
-c     finally include  mplicit closure between final and first point
-      call cross_2Dline_segments(poly%nodes(:,inode),
+c     finally include implicit closure between final and first point
+      call cross_2Dline_segments(poly%nodes(:,nnodes),
      +                           poly%nodes(:,1),
      +                           xy, poly%extpt, s, cross)
       if (cross) ncross = ncross + 1

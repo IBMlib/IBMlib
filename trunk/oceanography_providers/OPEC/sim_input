@@ -13,3 +13,4 @@
 ! --------------------------------------------------------------------
 hydroDBpath   = PATH
 cmod_data_set = coarse     ! value of X above
+include_biogeochem = T     ! T/F, optional, default T

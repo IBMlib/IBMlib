@@ -73,10 +73,10 @@ c     -------------------- module data --------------------
 c      real           :: unsetlim : loaded from read_cmod_ergom
 c
 c     ------ data frame handler ------
-      
-      character*999           :: hydroDBpath      ! path for hydrographic data sets     
-      integer                 :: data_set_handler ! which cmod data map will be used
-
+   
+      character*999      :: hydroDBpath      ! path for hydrographic data sets     
+      integer            :: data_set_handler ! which cmod data map will be used
+      logical            :: include_bio      = .true. ! handle to control whether biodata is read (physics is always read)
 c     --- 3D grids ---
                 
       real,allocatable,target :: ccdepth0(:,:,:)   ! reference cell center depth water below surface [m] (dslm=0)
@@ -173,7 +173,17 @@ c     ---------------------------------------------------
       
       real                 :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
 c     ---------------------------------------------------
-      call init_read_cmod_ergom(hydroDBpath) ! defined in module read_cmod
+c
+c     --- first resolve whether to read biogeochemistry: optional tag include_biogeochem
+c   
+      if (count_tags(simulation_file, "include_biogeochem") /= 0) then
+         call read_control_data(simulation_file,"include_biogeochem",
+     +                       include_bio)
+      else 
+         include_bio = .true. ! set default
+      endif
+
+      call init_read_cmod_ergom(hydroDBpath, include_bio) ! defined in module read_cmod
 
       call read_control_data(simulation_file,"cmod_data_set",
      +                       data_set_id)
@@ -201,7 +211,7 @@ c     get_grid_descriptors is defined in module read_cmod
 
 
       write(*,*) "read_grid_desc: allocate grid arrays: begin"
-      call init_mesh_grid(init_biogeochem = .true.)  ! incl allocation of phys + bio 3D arrays
+      call init_mesh_grid(init_biogeochem = include_bio)  ! incl allocation of phys + bio 3D arrays
       
 c     --- allocate specific auxillary arrays ---      
 
@@ -334,20 +344,23 @@ c
       call get_t(temp, data_set_handler)
       call get_wu(u_wind_stress, data_set_handler)
       call get_wv(v_wind_stress, data_set_handler)
-      call get_eco_3D(oxygen, data_set_handler,                "oxy")
-      call get_eco_3D(zoo, data_set_handler,                   "zoo")   ! sum of zooplankton classes
-      call get_eco_3D(nh4, data_set_handler,                   "nh4") 
-      call get_eco_3D(no3, data_set_handler,                   "no3")                      
-      call get_eco_3D(po4, data_set_handler,                   "po4")                      
-      call get_eco_3D(diatoms, data_set_handler,               "dia")            
-      call get_eco_3D(flagellates, data_set_handler,           "fla") 
-      call get_eco_3D(cyanobacteria, data_set_handler,         "cya")         
-      call get_eco_3D(organic_detritus, data_set_handler,      "odt")                
-      call get_eco_3D(part_org_matter, data_set_handler,       "pom") 
-      call get_eco_3D(dissolv_inorg_carbon, data_set_handler,  "dic")    
-      call get_eco_3D(alkalinity, data_set_handler,            "alk")
-      call get_eco_3D(dissolv_inorg_nitrogen, data_set_handler,"din") 
-      call get_eco_3D(chlorophyl, data_set_handler,            "chl") 
+
+      if (include_bio) then
+         call get_eco_3D(oxygen, data_set_handler,                "oxy")
+         call get_eco_3D(zoo, data_set_handler,                   "zoo") ! sum of zooplankton classes
+         call get_eco_3D(nh4, data_set_handler,                   "nh4") 
+         call get_eco_3D(no3, data_set_handler,                   "no3")                      
+         call get_eco_3D(po4, data_set_handler,                   "po4")                      
+         call get_eco_3D(diatoms, data_set_handler,               "dia")            
+         call get_eco_3D(flagellates, data_set_handler,           "fla") 
+         call get_eco_3D(cyanobacteria, data_set_handler,         "cya")         
+         call get_eco_3D(organic_detritus, data_set_handler,      "odt")                
+         call get_eco_3D(part_org_matter, data_set_handler,       "pom") 
+         call get_eco_3D(dissolv_inorg_carbon, data_set_handler,  "dic")    
+         call get_eco_3D(alkalinity, data_set_handler,            "alk")
+         call get_eco_3D(dissolv_inorg_nitrogen, data_set_handler,"din") 
+         call get_eco_3D(chlorophyl, data_set_handler,            "chl") 
+      endif 
 c
 c     avoid tricky current interpolations where the number of wet layers change
 c
@@ -379,9 +392,11 @@ c
 c
 c     ------ convert zooplankton concentration from unit mmol N/m3 -> kg DW/m3
 c
-      where (zoo < unsetlim) 
-         zoo = zoo*mmolN2kgDW
-      end where     
+      if (include_bio) then ! zoo only allocated if true
+         where (zoo < unsetlim) 
+            zoo = zoo*mmolN2kgDW
+         end where 
+      endif
 c
 c     ------ add DSLM to auxillary grid descriptors for wet points (notice: recent cmod dumps
 c            applies DSLM with positive direction up, compared to earlier) 

@@ -90,6 +90,8 @@ c             v on south side of cell
 c        sign of z validated from tide table Tide07_DK.pdf close to Esbjerg
 c
 c     TODO: set undefs at dry points, define undef test condition
+c 
+c     LOG: Feb 2014: enabled physics-only mode (ecosystem variables not loaded/allocated)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use time_tools
 c     directives ----------------------------------------------------------------
@@ -125,8 +127,6 @@ c
      +     (/"nh4", "no3", "po4", "dia", "fla",            ! further labels are resolved by get_eco_3D
      +       "cya", "zo1", "zo2", "odt", "oxy",            ! for derived variables
      +       "pom", "dic", "alk"/)
- 
-
 
 c
 c     allocatable arrays --------------------------------------------------------
@@ -160,6 +160,7 @@ c
       integer            :: iunit_phy        = -1   ! assign at first read ()
       integer            :: iunit_bio        = -1   ! assign at first read ()
       character(len=999) :: hydroDBpath      = " "  ! including trailing /
+      logical            :: include_bio      = .true. ! handle to control whether biodata is read (physics is always read)
 
       character(len=7), parameter :: physprefix = "physics"  ! new prefix May 2013
       character(len=6), parameter :: bioprefix  = "biodat"     
@@ -185,11 +186,13 @@ c     ========================================================================
 c     ========================================================================
 
 
-      subroutine init_read_cmod_ergom(path)
+      subroutine init_read_cmod_ergom(path, readbio)
 c----------------------------------------------------------------------------+
 c     path is to grid descriptor files, without trailing slash
+c     readbio controls wheter ecosystem varaible are read
 c----------------------------------------------------------------------------+ 
       character*(*), intent(in) :: path ! applied as prefix to file names (without trailing slash)
+      logical, intent(in)       :: readbio
       integer(4)                :: ios
       integer(4)                :: lun,ia,ie
       character(LEN=999)        :: cfgfile
@@ -198,6 +201,13 @@ c----------------------------------------------------------------------------+
       hydroDBpath = trim(adjustl(path)) // "/" ! prepend linux delimiter
       write(*,*) "init_read_cmod_ergom: path = ", trim(hydroDBpath)
 
+      include_bio = readbio
+      if (include_bio) then
+         write(*,*) "init_read_cmod_ergom: ecosystem data will be read"
+      else
+         write(*,*) "init_read_cmod_ergom: ecosystem data excluded"
+      endif
+         
 c     allocate descriptor arrays:
       allocate( mmx(narea),nmx(narea),kmx(narea),iw2(narea),iw3(narea),          
      +     m1(narea),hz(narea),cellw(narea),
@@ -255,7 +265,7 @@ c     ---------- allocate hydrographic buffers ----------
      +     w_i4(narea), z_i4(narea), s_i4(narea), t_i4(narea), 
      +     wu_i4(narea), wv_i4(narea))
 
-      allocate(eco_i4(narea), benthos_i4(narea)) 
+      if (include_bio) allocate(eco_i4(narea), benthos_i4(narea)) 
 
       do ia=1,narea
          allocate( u_i4(ia)%p(0:iw3(ia)), 
@@ -263,12 +273,12 @@ c     ---------- allocate hydrographic buffers ----------
      +        z_i4(ia)%p(0:iw2(ia)),s_i4(ia)%p(0:iw3(ia)), 
      +        t_i4(ia)%p(0:iw3(ia)), wu_i4(ia)%p(0:iw2(ia)), 
      +        wv_i4(ia)%p(0:iw2(ia)) )
-         allocate( benthos_i4(ia)%p(0:iw2(ia))      )
-         allocate(     eco_i4(ia)%p(neco,0:iw3(ia)) )
+         
+         if (include_bio) allocate( benthos_i4(ia)%p(0:iw2(ia))      )
+         if (include_bio) allocate(     eco_i4(ia)%p(neco,0:iw3(ia)) )
       enddo
 
       
-
       end subroutine init_read_cmod_ergom
 
 
@@ -280,6 +290,7 @@ c     deallocate module data arrays/pointers
 c     -------------------------------------------------------------------  
       integer(4)           :: ia
 c     -------------------------------------------------------------------  
+c     ---- physics ----
       deallocate( mmx,nmx,kmx,iw2,iw3 )
       do ia=1,narea          
          if (associated( m1(ia)%p ))    deallocate( m1(ia)%p )
@@ -293,15 +304,23 @@ c     -------------------------------------------------------------------
          if (associated( t_i4(ia)%p ))  deallocate( t_i4(ia)%p )
          if (associated( wu_i4(ia)%p )) deallocate( wu_i4(ia)%p )
          if (associated( wv_i4(ia)%p )) deallocate( wv_i4(ia)%p )
-         if (associated(benthos_i4(ia)%p)) deallocate(benthos_i4(ia)%p)
-         if (associated( eco_i4(ia)%p )) deallocate( eco_i4(ia)%p )
       enddo
       deallocate( m1 )
       deallocate( hz,cellw )
       deallocate( u_i4,v_i4,w_i4,z_i4 )  
       deallocate( s_i4,t_i4 )            
       deallocate( wu_i4,wv_i4 )
-      deallocate( benthos_i4, eco_i4)
+
+c     ---- biology ----
+      if (include_bio) then
+         do ia=1,narea 
+            if (associated(benthos_i4(ia)%p)) 
+     +         deallocate(benthos_i4(ia)%p)
+            if (associated( eco_i4(ia)%p )) 
+     +         deallocate( eco_i4(ia)%p)
+         enddo   
+         deallocate( benthos_i4, eco_i4)
+      endif
 c
 c     --- reset data handlers ---
 c
@@ -352,6 +371,7 @@ c     ---- standard exit condition for exhausted do loop:
       end subroutine get_grid_descriptors
       
 
+
       logical function update_buffers(now) 
 c     ----------------------------------------------------------------------------+
 c     Update buffers corresponding to requested time (year,month,day,hour)
@@ -398,20 +418,22 @@ c        ---------- first physics ----------
          endif
          call reset_tempfile(iunit_phy) ! wind to first frame
 c        ---------- then biochemistry ----------
-         if (iunit_bio>0) close(iunit_bio)                               ! we opened it previously
-         if (iunit_bio<0) iunit_bio = io_new_unit()                      ! first time, pick a free unit 
-         fname = trim(hydroDBpath) // bioprefix // tag          ! bioprefix + tag are cropped
-         open(iunit_bio,file=fname, form='unformatted',status='old',
-     +               iostat=ios )                                ! keep same logical unit
-         if (ios /= 0) then
-            write(*,'(a,a)') "error opening data file ", 
-     +                       trim(adjustl(fname))
-            stop
-         else
-            write(*,'(a,a)') "update_buffers: opened new data file", 
-     +                       trim(adjustl(fname))
-         endif
-         call reset_tempfile(iunit_bio) ! wind to first frame
+         if (include_bio) then
+            if (iunit_bio>0) close(iunit_bio) ! we opened it previously
+            if (iunit_bio<0) iunit_bio = io_new_unit() ! first time, pick a free unit 
+            fname = trim(hydroDBpath) // bioprefix // tag ! bioprefix + tag are cropped
+            open(iunit_bio,file=fname, form='unformatted',status='old',
+     +           iostat=ios )                                ! keep same logical unit
+            if (ios /= 0) then
+               write(*,'(a,a)') "error opening data file ", 
+     +              trim(adjustl(fname))
+               stop
+            else
+               write(*,'(a,a)') "update_buffers: opened new data file", 
+     +              trim(adjustl(fname))
+            endif
+            call reset_tempfile(iunit_bio) ! wind to first frame
+         endif   ! include_bio
 c         
       endif
 c      
@@ -423,8 +445,8 @@ c     decide to read or not and set update flag
 c
       if (newtime.or.newfile) then  
          if (treq <= tcur) then
-              call reset_tempfile(iunit_phy) ! will rewind if same frame is requested  
-              call reset_tempfile(iunit_bio) ! will rewind if same frame is requested  
+              call reset_tempfile(iunit_phy)                  ! will rewind if same frame is requested  
+              if (include_bio) call reset_tempfile(iunit_bio) ! will rewind if same frame is requested  
          endif     
          call read_frame(request_time)       ! updates current_frame when loaded
          update_buffers = .true.
@@ -576,6 +598,11 @@ c     At successful read, we will exit in the do-while loop above
 c
 c     ======== load biogeochemistry: read time stamp from tempdat file: ========
 c
+      if (.not. include_bio) then
+         write(*,*) "read_frame: omitted ecosystem vars ", ctim
+         return    
+      endif
+
       read(iunit_bio, iostat=ios) ctim,tim
       it = ios
       do while (it == 0)
@@ -888,6 +915,7 @@ c     -------------------------------------------------------
 c     -------------------------------------------------------
 c     Generic transformation from integer dry rep eco_i4 variable
 c     corresponding to property in set iset to 3D full rep x 
+c     return with x == dryval if include_bio is false
 c     -------------------------------------------------------   
       real, intent(out)            :: x(:,:,:)
       integer, intent(in)          :: iset    ! which area (data set) to pick
@@ -899,7 +927,13 @@ c     -------------------------------------------------------
          write(*,*) "get_eco_3D: invalid set", iset
          stop
       endif
-      x = dryval
+      
+      if (.not. include_bio) then
+         if (ldebug) write(*,*) "get_eco_3D: include_bio == false"
+         x = dryval 
+         return  ! ecosystem arrays below are not allocated
+      endif
+
 c     --- first handle derived properties      
       if      (property == "din") then      ! dissolved inorganic nitrogen
          allocate( x1(size(x,1), size(x,2), size(x,3)) )

@@ -25,6 +25,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public ::  get_local_distance
       public ::  get_horizontal_distance
       public ::  add_finite_step   
+      public ::  get_xyz2cart_jacobian
 
       interface get_local_distance
          module procedure get_local_distance_scalar
@@ -80,7 +81,7 @@ c     ----------------------------------------------------------
       real, intent(in)     :: x0(*),x1(*),y0(*),y1(*)
       real, intent(out)    :: s,t
       logical, intent(out) :: cross
-      real                 :: vx(2),vy(2),sum_vx,sum_vy,det
+      real                 :: vx(2),vy(2),sum_vx,sum_vy,det  
       real,parameter       :: s_parallel = 1.e20
       real,parameter       :: s_undef    = 2.e20
 c     ----------------------------------------------------------
@@ -125,7 +126,7 @@ c     ----------------------------------------------------------
 
 
 
-      subroutine get_jacobian(xy,r3) ! consider as public
+      subroutine get_xyz2cart_jacobian(xy,r3) ! consider as public
 c     ------------------------------------------
 c     Transform from coordinates space to Cartesian
 c     dR = r3 * (dlon[deg], dlat[deg], dz[m]) [m**3]
@@ -151,7 +152,7 @@ c     ------------------------------------------
       real, intent(inout)  :: r2(:)  !dimension 2+
       real                 :: jac(3)
 c     ------------------------------------------  
-      call get_jacobian(xy, jac)
+      call get_xyz2cart_jacobian(xy, jac)
       r2(1:2) = r2(1:2)/jac(1:2) ! element-by-element
       end subroutine 
 
@@ -167,7 +168,7 @@ c     ------------------------------------------
       real, intent(inout)  :: r2(:)  !dimension 2+
       real                 :: jac(3)
 c     ------------------------------------------ 
-      call get_jacobian(xy, jac)
+      call get_xyz2cart_jacobian(xy, jac)
       r2(1:2) = r2(1:2)*jac(1:2) ! element-by-element
       end subroutine 
 
@@ -192,7 +193,7 @@ c     ------------------------------------------
       real, intent(out)    :: v(:)
       real                 :: xyzmid(3),jac(3)
       xyzmid = 0.5*(xyz1 + xyz2)
-      call get_jacobian(xyzmid, jac)
+      call get_xyz2cart_jacobian(xyzmid, jac)
       v = jac*(xyz2 - xyz1) ! element-by-element
       end subroutine 
 

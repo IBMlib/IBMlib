@@ -1,0 +1,12 @@
+ ! bla  bla  bla bla  rather messy
+y = 3445      ! a trailing comment
+  x =    45.
+empty line and line without eq sign
+
+ints = 1 2 3 5 6 9 88
+aname = whatever/dev/null
+      reals= 3.123456789012345  5.77e-5  0.0772 
+notused  =7837435877
+xx ? ppp
+ x =    7899
+= 866.777

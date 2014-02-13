@@ -1,12 +1,14 @@
-#
-bgmfile               = task_providers/Atlantis/test_only_spaces.bgm  ! preprocessed BGM file name defining Atlantis geometry
-layer_widths          = 5 10 20 50 100 200 500 1000                   ! [m] integer vector defining widths of vertical layers
-samplings_per_layer   = 6                                             ! how many times a layer i subdivided at vertical integral sampling
+!##########################################################################################################
+!   Current strata: 0-5m, 5-10, 10-30, 30-40, 40-50, 50-100, 100-200, >200 = 8 wet + 1 sediment layer
+!##########################################################################################################
+bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm.bgm    ! preprocessed BGM file name defining Atlantis geometry
+layer_widths          =  5  5  20  10  10  50  100 1000               ! [m] integer vector defining widths of vertical layers, 
+samplings_per_layer   = 10                                             ! how many times a layer i subdivided at vertical integral sampling
 horiz_sampling_lenght = 5000                                          ! [m] lenght scale for generating horizontal integration meshes
 start_time            = 2004 01 01 0                                  ! YYYY MM DD SSS  - start time of time frame genaration
 end_time              = 2004 02 01 0                                  ! YYYY MM DD SSS  - end time of time frame genaration
 dt_frames             = 43200                                         ! [sec] period between subsequent time frames
-dt_sampling           = 7200                                          ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
+dt_sampling           = 3600                                          ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
 hydro_fname           = task_providers/Atlantis/jjh.nc                ! name of hydrodynamic fluxes 
 temp_fname            = task_providers/Atlantis/jjt.nc                ! name of box temperatures
 salt_fname            = task_providers/Atlantis/jjs.nc                ! name of box salinities

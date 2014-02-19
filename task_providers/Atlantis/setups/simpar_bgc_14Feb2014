@@ -1,0 +1,19 @@
+!##########################################################################################################
+!   Current strata: 0-5m, 5-10, 10-30, 30-40, 40-50, 50-100, 100-200, >200 = 8 wet + 1 sediment layer
+!
+!   sudo mount -t nfs 172.18.127.12:/volume1/OPEC_20yr_hindcast  /mnt  
+!   sudo umount /mnt 
+!   ibmrun_phys_OPEC_noBGC task_providers/Atlantis/simpar_phys_14Feb2014 > phys_14Feb2014.log  2>&1 &
+!##########################################################################################################
+hydroDBpath   = /mnt
+cmod_data_set = coarse     ! value of X above
+include_biogeochem = T     ! T/F, default  = T
+!--------------------------------------------------------------------------------
+bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm.bgm    ! preprocessed BGM file name defining Atlantis geometry
+layer_widths          =  5  5  20  10  10  50  100 1000               ! [m] integer vector defining widths of vertical layers, 
+samplings_per_layer   = 10                                             ! how many times a layer i subdivided at vertical integral sampling
+horiz_sampling_lenght = 5000                                          ! [m] lenght scale for generating horizontal integration meshes
+start_time            = 2005 01 01 0                                  ! YYYY MM DD SSS  - start time of time frame genaration
+end_time              = 2005 03 31 86399                              ! YYYY MM DD SSS  - end time of time frame genaration
+dt_sampling           = 86400                                         ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
+fname_template        = task_providers/Atlantis/TAG_14Feb2014.dat     ! filename template - should contain TAG (only once)

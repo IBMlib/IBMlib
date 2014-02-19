@@ -15,6 +15,10 @@ c     we flip indexing, so it is 1,2,... starting from the surface and then at o
 c     flip to Atlantis indexing.
 c     Positive flux direction is up (?).
 c     The module can represent only one Atlantis grid (a singleton)
+c     The preprocessor flag WITH_BGC (test: #ifdef WITH_BGC) controls whether 
+c     the biogeochemical interface is activated in addition to the physics-only interface
+c     Currently WITH_BGC must be set locally
+c
 c     NOTE: the BGM file must be preprocessed to places all whitespaces (except "\n") with " "
 c           using e.g. the script regularize_blanks.py
 c     
@@ -28,6 +32,7 @@ c                       box avg temperatures/salinities:  OK, 11 Feb 2014
 c
 c     TODO: latitude dependent normal vectors along faces in type AtlantisFace
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+#define WITH_BGC           ! comment out if physics only
       use input_parser
       use geometry              ! get_horizontal_distance
       use constants             ! deg2rad
@@ -158,8 +163,8 @@ c     ---------------- define the public scope --------------------
 
       public :: initialize_atlantis_grid
       public :: close_atlantis_grid  
-      public :: make_input_files
-
+      public :: make_physics_input_files
+      public :: make_txt_input
 c     =========================================================================================
                                         contains
 c     =========================================================================================
@@ -508,11 +513,10 @@ c
 
 c     ==========================  Box  analyzers  ========================================
               
-      subroutine get_box_phys_averages(temp, salt)
+      subroutine get_box_averages(buff, prop, fill)
 c     -------------------------------------------------------
-c     Evaluate temperature/salinity averages in Atlantis boxes 
-c     at the current time into buffers temp, salt.
-c     Use same layout for output buffers (temp, salt) as Atlantis requires for input
+c     Evaluate property prop averages in Atlantis boxes returned into buff
+c     Use same layout for output buffer as Atlantis requires for input
 c     Layerwise, box quantities are stored a little peculiar:
 c     If nwet = 4, nlayers = 7 then
 c       Atlantis layer indexing: 0, 1, 2, 3, _, _,  _, _, d
@@ -522,75 +526,68 @@ c     probe to quantity at the bottom and associate this with
 c     layer d. "_" is the fill value. Notice that layers written is
 c     nlayers + 1, the last being sediment
 c     -------------------------------------------------------
-      real, intent(out)     :: temp(0:,0:) ! [deg C] shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
-      real, intent(out)     :: salt(0:,0:) ! [PSU]   shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
-      integer               :: ibox, ilay, atlay, istatt, istats
-      integer               :: nboxes, nlayers, iz, ixy, istat
-      real                  :: t_acc, s_acc, vol_acc, area_acc
+      real, intent(out)         :: buff(0:,0:) ! shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
+      character*(*), intent(in) :: prop        ! property tag
+      real(kind=8), intent(in)  :: fill        ! fill value for buff
+      integer               :: ibox, ilay, atlay, istatt, istat
+      integer               :: nboxes, nlayers, iz, ixy
+      real                  :: val_acc, vol_acc, area_acc, value
       real                  :: geo(3), t,s,v,a,cwd
       type(AtlantisBox), pointer  :: box
 c     -------------------------------------------------------
       nboxes  = size(Boxes)
       nlayers = size(zgrid_CC) 
-      temp    = temp_fill   ! pad value
-      salt    = salt_fill   ! pad value
+      buff    = fill   ! pad value, inplicit cast
+      
       do ibox = 0, nboxes-1
          box => Boxes(ibox)
 c           ---- average over each layer for this box ---- 
          do ilay = 1, box%nwet       ! ilay refers to internal layer indexing in this module          
             atlay = box%nwet - ilay ! corresponding Atlantis layer index
-            t_acc   = 0.0
-            s_acc   = 0.0
+            val_acc = 0.0
             vol_acc = 0.0  ! accepted volume
             do iz = 1, nzpts(ilay) ! intra layer loop
                geo(3) = zoffset(ilay) + (iz-1)*dz(ilay)    
                do ixy = 1, size(box%xy, 2)  ! horizontal mesh loop
                   geo(1:2) = box%xy(:,ixy)
-                  call interpolate_temp(geo, t, istatt)
-                  call interpolate_salty(geo, s, istats)
-                  if ((istatt == 0).and.(istats == 0)) then !   assume same, no padding if /= 0 
+                  call interpolate_property(geo, prop, value, istat)
+                  if (istat == 0) then !   assume same, no padding if /= 0 
                      v       = box%da(ixy)*dz(ilay)   ! volume associated with this sampling
-                     t_acc   = t_acc + v*t
-                     s_acc   = s_acc + v*s
+                     val_acc = val_acc + v*value
                      vol_acc = vol_acc + v
                   endif
                enddo  ! ixy
             enddo     ! iz
 c
-            if (vol_acc > 1e-6) then
-               temp(atlay,ibox) = t_acc/vol_acc
-               salt(atlay,ibox) = s_acc/vol_acc
+            if (vol_acc > 1e-6) then ! else pad applies
+               buff(atlay,ibox) = val_acc/vol_acc
             endif
 c
          enddo  !  ilay
 c
 c        ---- evaluate sediment layer; ignore slope contribution to jacobian of seabed 
 c
-         t_acc    = 0.0
-         s_acc    = 0.0
+         val_acc  = 0.0
          area_acc = 0.0  ! accepted area
          do ixy = 1, size(box%xy, 2)  ! horizontal mesh loop
             geo(1:2) = box%xy(:,ixy)
             call interpolate_wdepth(geo, cwd, istat) 
             if (istat /= 0) cycle       ! dry point or other exception, continue with next ixy
             geo(3) = min(cwd, cwd-1e-3) ! hover just over bottum
-            call interpolate_temp(geo, t, istatt)
-            call interpolate_salty(geo, s, istats)
-            if ((istatt == 0).and.(istats == 0)) then !   assume same, no padding if /= 0 
+            call interpolate_property(geo, prop, value, istat)
+            if (istat == 0) then !   assume same, no padding if /= 0 
                a        = box%da(ixy) ! area associated with this sampling, ignore slope
-               t_acc    = t_acc + a*t
-               s_acc    = s_acc + a*s
+               val_acc  = val_acc + a*value
                area_acc = area_acc + a
             endif
          enddo                  ! ixy
 c
-         if (area_acc > 1e-6) then
-            temp(nlayers,ibox)  = t_acc/area_acc    ! sediment goes into last layer position
-            salt(nlayers,ibox)  = s_acc/area_acc    ! sediment goes into last layer position
+         if (area_acc > 1e-6) then    ! else pad applies
+            buff(nlayers,ibox)  = val_acc/area_acc    ! sediment goes into last layer position
          endif
       enddo ! ibox
 
-      end subroutine get_box_phys_averages
+      end subroutine get_box_averages
       
       
 
@@ -686,6 +683,60 @@ c        ---- resolve number of layers to scan
  
       end subroutine get_vertical_water_fluxes
       
+
+      
+      subroutine interpolate_property(geo, prop, value, istat)
+c     ----------------------------------------------------
+c     map scalar interpolations
+c     ----------------------------------------------------
+      real, intent(in)          :: geo(:)
+      character*(*), intent(in) :: prop
+      real, intent(out)         :: value
+      integer, intent(out)      :: istat
+      real                      :: rvec2(2)
+c     ----------------------------------------------------
+      select case (prop) 
+      case ("tem") 
+         call interpolate_temp(geo, value, istat)
+      case ("sal") 
+         call interpolate_salty(geo, value, istat)
+#ifdef WITH_BGC
+      case ("zoo") 
+         call interpolate_zooplankton(geo, rvec2, istat)  
+         value = rvec2(1)
+      case ("oxy") 
+         call interpolate_oxygen(geo, value, istat)
+      case ("nh4") 
+         call interpolate_nh4(geo, value, istat)  
+      case ("no3") 
+         call interpolate_no3(geo, value, istat)  
+      case ("po4") 
+         call interpolate_po4(geo, value, istat)  
+      case ("dia")   
+         call interpolate_diatoms(geo, value, istat)   
+      case ("fla")                
+         call interpolate_flagellates(geo, value, istat)       
+      case ("cya")       
+         call interpolate_cyanobacteria(geo, value, istat)  
+      case ("odt")         
+         call interpolate_organic_detritus(geo, value, istat)  
+      case ("pom")               
+         call interpolate_part_org_matter(geo, value, istat)   
+      case ("dic") 
+         call interpolate_DIC(geo, value, istat)  
+      case ("alk")   
+         call interpolate_alkalinity(geo, value, istat)   
+      case ("din") 
+         call interpolate_DIN(geo, value, istat)     
+      case ("chl")  
+         call interpolate_chlorophyl(geo, value, istat)  
+#endif
+      case default
+         write(*,*) "interpolate_property: invalid tag: ", prop
+         stop 977
+      end select
+c     ----------------------------------------------------
+      end subroutine interpolate_property
 
 c     ==========================  basic I/O  ============================================== 
 
@@ -1169,7 +1220,7 @@ c
 
       istat = nf90_put_var(ncid_temp, temperature_id_temp, 
      +                  temp_avg,                                   
-     +                  start = (/1,     1,       1,      nt+1/))       
+     +                  start = (/1,     1,       nt+1/))       
       call nf90_check_event(istat, "t:put_var temperature")
 c
 c     3) salinity data set    
@@ -1183,7 +1234,7 @@ c
 
       istat = nf90_put_var(ncid_salt, salinity_id_salt, 
      +                  salt_avg,                                   
-     +                  start = (/1,     1,       1,      nt+1/))       
+     +                  start = (/1,     1,       nt+1/))       
       call nf90_check_event(istat, "s:put_var salinity")
 c
 c     --- clean-up buffers ---
@@ -1196,9 +1247,9 @@ c
 
 
 
-      subroutine make_input_files(tstart, tend, dt_frames, dt_sampling,
-     +                            toffset, hydrofname, tempfname, 
-     +                            saltfname)
+      subroutine make_physics_input_files(tstart, tend, dt_frames, 
+     +                            dt_sampling, toffset, 
+     +                            hydrofname, tempfname, saltfname)
 c     -------------------------------------------------------
 c     Generate physics input files (water flow, salinity and temperature) for Atlantis
 c     in netCDF format in the period [tstart, tend] with time frame interval dt_frame
@@ -1252,7 +1303,8 @@ c     -------------------------------------------------------
 
       ntinner = dt_frames/dt_sampling  ! inner time loop, truncate remainder, if any
       if (mod(dt_frames, dt_sampling) /= 0) then 
-         write(*,*) "make_input_files: mod(dt_frames/dt_sampling) != 0" 
+         write(*,*) "make_physics_input_files: "//
+     +              "mod(dt_frames/dt_sampling) != 0" 
          write(*,*) "dt_frames   = ", dt_frames
          write(*,*) "dt_sampling = ", dt_sampling
          stop 491
@@ -1283,7 +1335,8 @@ c     -------------------------------------------------------
             call get_vertical_water_fluxes(vflux)
             htransp = htransp + hflux*dt_sampling ! simple Eulerian flux integration
             vtransp = vtransp + vflux*dt_sampling ! simple Eulerian flux integration
-            call get_box_phys_averages(temp_now, salt_now) 
+            call get_box_averages(temp_now, "temp", temp_fill) 
+            call get_box_averages(salt_now, "salt", salt_fill)
             temp_avg = temp_avg + temp_now  
             salt_avg = salt_avg + salt_now
             call add_seconds_to_clock(tnow, dt_sampling) 
@@ -1307,12 +1360,142 @@ c
       deallocate( temp_avg )
       deallocate( salt_avg )
 c     
- 831  format("make_input_files: writing frame",i6,"/",i6)
- 832  format("make_input_files:",1x,a,1x,"time =",1x,a) 
- 833  format("make_input_files:",1x,a,1x,i8,1x,"sec")    
- 834  format("make_input_files: inner time steps =",i6)      
+ 831  format("make_physics_input_files: writing frame",i6,"/",i6)
+ 832  format("make_physics_input_files:",1x,a,1x,"time =",1x,a) 
+ 833  format("make_physics_input_files:",1x,a,1x,i8,1x,"sec")    
+ 834  format("make_physics_input_files: inner time steps =",i6)      
 c      
-      end subroutine make_input_files
+      end subroutine make_physics_input_files
+
+
+
+      subroutine make_txt_input(proplist, tstart, tend, dt_sampling,  
+     +                          fnametemp, multifac, seperator)
+c     -------------------------------------------------------------------------------------
+c     Generate simple column formatted text input of averages over a period
+c     [tstart, tend] of arbitrary properties prop(:) offered by the PBI to file(s) fnametemp /. TAG <- <propertyname>
+c     using optional separator (default blank) between columns and using
+c     dt_sampling as sampling interval when averaging.
+c
+c     Properties are bundled into list proplist to avoid I/O overhead at multiple property extraction
+c     If (tend-tstart) is not an integral number of dt_sampling, end point is truncated
+c     -------------------------------------------------------------------------------------
+      character(len=3), intent(in) :: proplist(:) ! list of properties to extract
+      type(clock), intent(in)   :: tstart        ! start time of time frame generation
+      type(clock), intent(in)   :: tend          ! end time of time frame generation 
+      integer, intent(in)       :: dt_sampling   ! [sec] sampling time interval for generating frames
+      character*(*), intent(in) :: fnametemp      ! template to create file name; 'TAG' is replaced with <propertyname>
+      real, intent(in)          :: multifac(:)    ! mulitplication factor for properties, same order as list
+      character, intent(in), optional :: seperator ! separator between cols in output
+c    
+      real, allocatable          :: prop_now(:,:,:)   ! current temperature [deg C] 
+      real, allocatable          :: prop_avg(:,:,:)   ! accumulated temperature average [deg C]  
+      integer, allocatable       :: iunits(:)
+      integer                    :: ipro, nprops, ibox, ilay, i, icopy
+      integer                    :: nfaces, nboxes, nlayers, nframes
+      integer                    :: ntinner, it, tdiff, istat
+      character(len=256)         :: fname ! assume long enough
+      character(len=3)           :: sep
+      type(clock), pointer       :: tnow
+c     -------------------------------------------------------
+      nlayers = size(zgrid_CC)
+      nfaces  = size(Faces)   ! range = 0:nfaces-1
+      nboxes  = size(Boxes)   ! range = 0:nboxes-1
+      nprops  = size(proplist)
+
+      if (size(proplist) /= size(multifac)) then
+         write(*,*) "make_txt_input: proplist does not match multifac"
+         write(*,*) "size(proplist) = ", size(proplist)
+         write(*,*) "size(multifac) = ", size(multifac)
+         stop 704
+      endif
+
+      if (present(seperator)) then
+         sep = seperator//"  " 
+      else
+         sep = "   "   ! 3 spaces
+      endif
+c      
+c     -------- initialize output files --------
+c
+      allocate( iunits(nprops) )
+      icopy = min(len(fname), len(fnametemp))
+      do ipro = 1, nprops
+         call find_free_IO_unit(iunits(ipro)) 
+         fname = fnametemp(1:icopy)
+         i = index(fname, 'TAG')
+         if (i<1) then
+            write(*,*) "make_txt_input: invalid fnametemp"
+            write(*,*) "make_txt_input: fnametemp=",fnametemp
+            stop 7299
+         else
+            write(fname(i:i+2), '(a3)') proplist(ipro) ! replace TAG with property keyword
+         endif
+         open(iunits(ipro), file=fname)
+      enddo
+
+      allocate( prop_now(0:nlayers, 0:nboxes-1, nprops) )
+      allocate( prop_avg(0:nlayers, 0:nboxes-1, nprops) ) 
+     
+      call get_period_length_sec(tstart, tend, tdiff)  !
+      ntinner = tdiff/dt_sampling  ! inner time loop, truncate remainder, if any
+      tnow    => get_master_clock()
+      call set_clock(tnow, tstart)
+      if (verbose > 0) then
+         write(*, 842) "start", get_datetime(tstart)
+         write(*, 842) "end  ", get_datetime(tend)
+         write(*, 843) "requested frame sampling",  dt_sampling
+         write(*, 844) ntinner
+      endif
+
+
+      prop_avg = 0.0            ! reset accumulants
+      do it = 1, ntinner        ! inner loop begin
+         if (verbose > 0) write(*,841) it, ntinner
+         call update_physical_fields()  
+         do ipro = 1, nprops
+            call get_box_averages(prop_now(:,:,ipro), 
+     +                            trim(adjustl(proplist(ipro))), 0.d0)   ! fill declared as real8
+         enddo
+         prop_avg = prop_avg + prop_now  ! all props at once
+         call add_seconds_to_clock(tnow, dt_sampling) 
+      enddo                     ! it (inner time loop)
+      prop_avg = prop_avg/ntinner ! plain average over inner time steps
+      
+c
+c     -------- write files ( + convert units) --------
+c
+      do ipro = 1, nprops
+         write(iunits(ipro), 846) "box", sep, "layer", sep,
+     +                            trim(adjustl(proplist(ipro)))
+         do ibox = 0, nboxes-1
+            do ilay = 0, nlayers  ! wet+sediment
+               write(iunits(ipro), 847) ibox, sep, ilay, sep,
+     +               prop_avg(ilay, ibox, ipro)*multifac(ipro)  ! convert units before writing
+            enddo  ! ilay
+         enddo     ! ibox
+      enddo        ! ipro
+c
+ 846  format(1x, a6, a, a6, a, a15)
+ 847  format(1x, i6, a, i6, a, e15.7)    
+c
+c     -------- wind up     --------
+c
+      do ipro = 1, nprops
+         close(iunits(ipro))
+      enddo
+      deallocate( prop_now )  
+      deallocate( prop_avg )
+      deallocate( iunits   )
+ 
+
+ 841  format("make_txt_input: sampling frame",i6,"/",i6)
+ 842  format("make_txt_input:",1x,a,1x,"time =",1x,a) 
+ 843  format("make_txt_input:",1x,a,1x,i8,1x,"sec")    
+ 844  format("make_txt_input: inner time steps =",i6)      
+c     
+c     -------------------------------------------------------------------------------------
+      end subroutine make_txt_input
 
 
 

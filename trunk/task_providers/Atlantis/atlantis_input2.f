@@ -1,6 +1,6 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Generate hydrodynamic input for Atlantis
+c     Generate misc box average inputs for Atlantis
 c     ---------------------------------------------------
 
 c     $Rev: $
@@ -14,14 +14,12 @@ c          samplings_per_layer   : how many times a layer i subdivided at vertic
 c          horiz_sampling_lenght : [m] lenght scale for generating horizontal integration meshes
 c          start_time            : YYYY MM DD SSS  - start time of time frame genaration
 c          end_time              : YYYY MM DD SSS  - end time of time frame genaration
-c          dt_frames             : [sec] period between subsequent time frames
 c          dt_sampling           : [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
-c          hydro_fname           : name of hydrodynamic fluxes 
-c          temp_fname            : name of hydrodynamic fluxes 
-c          salt_fname            : name of hydrodynamic fluxes 
+c          fnametemp             : template to create file name; 'TAG' is replaced with <propertyname>
 c
 c     make ibmrun
 c     ibmrun task_providers/Atlantis/simpar
+c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       program ibmrun
       use input_parser
@@ -36,8 +34,39 @@ c     ------------ declarations ------------
       integer, parameter :: lwmax = 99  ! number of layers
       real               :: lwbuf(lwmax), drhoz
       integer            :: nsamppts, nlayers, idum4(4)
-      integer            :: dt_frames, dt_sampling
-      character(len=999) :: hydro_fname, temp_fname, salt_fname
+      integer            :: dt_sampling
+      character(len=999) :: fnametemp
+
+      character(len=3), parameter :: proplist(10) = (/"zoo",
+     +                                                "oxy",
+     +                                                "nh4",
+     +                                                "no3",
+     +                                                "po4",
+     +                                                "dia",
+     +                                                "fla",
+     +                                                "cya",
+     +                                                "odt",
+     +                                                "din"/) 
+c     ----------------------------------------------------------------------------------------------------
+c     Atlantis units 
+c       Dissolved oxygen concentration  -> [mg-O2 per m3]
+c       Nitrate, ammonia, organic nitrogen, phytoplankton, zooplankton and detritus concentrations -> [mg-N per m3]
+c       Silicate concentrations:   -> [mg-Si per m3]
+c       Phosphorus concentrations: -> [mg-P per m3]
+c     ----------------------------------------------------------------------------------------------------
+      real,parameter     :: mmolN2kgDW = 14./1000/0.074/1000 ! conversion factor mmol N/m3 -> kg DW/m3 
+      real,parameter    :: multifac(10) = (/14.0/mmolN2kgDW,
+     +                                      32.0,
+     +                                      14.0,
+     +                                      14.0,
+     +                                      31.0,
+     +                                      14.0,
+     +                                      14.0,
+     +                                      14.0,
+     +                                      14.0,
+     +                                      14.0/) 
+c     ----------------------------------------------------------------------------------------------------
+
 c     ------------   show time starts  ------------
       call init_run_context()
 c.....    
@@ -63,24 +92,18 @@ c.....set clocks
       call set_clock(start_time, idum4(1), idum4(2), idum4(3), idum4(4))
       call read_control_data(simulation_file,"end_time", idum4)
       call set_clock(end_time, idum4(1), idum4(2), idum4(3), idum4(4))
-      call read_control_data(simulation_file,"dt_frames", dt_frames) 
       call read_control_data(simulation_file,"dt_sampling",dt_sampling)
-      call read_control_data(simulation_file,"hydro_fname", hydro_fname)
-      call read_control_data(simulation_file,"temp_fname", temp_fname)
-      call read_control_data(simulation_file,"salt_fname", salt_fname)
+      call read_control_data(simulation_file,"fname_template",fnametemp)
+c
       call init_physical_fields(start_time)
       call update_physical_fields()
       call initialize_atlantis_grid(bgmfile, lwbuf(1:nlayers), nsamppts, 
      +                              drhoz)
 
 c.....currently set time offset to start time
-      call make_physics_input_files(start_time, end_time, 
-     +                      dt_frames, dt_sampling,
-     +                      start_time, hydro_fname,
-     +                      temp_fname, salt_fname)
-
-      call close_atlantis_grid()
-
+      call make_txt_input(proplist, start_time, end_time, 
+     +                    dt_sampling, fnametemp, multifac)
+     
       write(*,*) "normal end of simulation"
       
       end program

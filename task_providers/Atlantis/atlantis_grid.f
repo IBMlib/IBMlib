@@ -42,7 +42,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use netcdf
 
       implicit none
-      private
+      private                  ! module scope (default public)
 
       type AtlantisBox
 c     -------------------------------------------------------------------
@@ -57,9 +57,11 @@ c     -------------------------------------------------------------------
       type(lonlat_polygon) :: shape             ! geometric information
       integer, pointer     :: faces(:)          ! surrounding (dynamic) face numbers, referring to list Faces
       integer, pointer     :: neighbors(:)      ! neighboring (dynamic) box numbers , referring to list Boxes
-      integer              :: nwet              ! number of wet polygons in this column. Layers numbered 1 ... from surface and down
+      integer              :: nwet              ! number of wet polygons in this column. Layers numbered 1 ... from surface and down. nwet==0 for dry boxes, e.g. island boxes
       real, pointer        :: xy(:,:)           ! input (2, 1:nintgpts) wet horizontal integral mesh inside polygon
       real, pointer        :: da(:)             ! (1:nintgpts) area associated each point in xy
+      real                 :: max_depth         ! [meters] max depth encountered in this box
+      real                 :: avg_depth         ! [meters] average depth encountered in this box
       end type
       
 
@@ -171,18 +173,23 @@ c     ==========================================================================
       
 
 
-      subroutine initialize_atlantis_grid(bgmfname, lw, numpts, drhoz)
+      subroutine initialize_atlantis_grid(bgmfname, lw, numpts, drhoz,
+     +                                    use_water_depth)
 c     --------------------------------------------------------------------
 c     Initialize Atlantis grid representaion in this module from a
 c     BGM formatted file bgmfname
 c     Integer vector lw is a vector of layer widths in meters, counted from the surface and down
 c     numpts is the number of samplings per layer for vertical sampling grid
 c     drhoz is the length scale for horizontal sampling grids
+c     use_water_depth == .true. implies actual average water depth is used to
+c     determine wet layers in box, otherwise the value boxNN.botz != 0 is used
+c     boxNN.botz == 0 overrides use_water_depth, and sets the box as dry
 c     --------------------------------------------------------------------
       character*(*), intent(in) :: bgmfname
       real, intent(in)          :: lw(:) ! meters
       integer, intent(in)       :: numpts
       real, intent(in)          :: drhoz ! meters
+      logical, intent(in)       :: use_water_depth
       integer                   :: nbox, nface, ibox, iface
       type(control_file)        :: ctrlfile
 c     --------------------------------------------------------------------
@@ -203,7 +210,8 @@ c
 c     -------- initialize grid boxes from BGM file --------   
       allocate( Boxes(0 : nbox-1) )  ! apply offset 0 to conform with Atlantis convention
       do ibox = 0, nbox-1
-         call load_box_from_bgm_file(ctrlfile, ibox, drhoz)
+         call load_box_from_bgm_file(ctrlfile, ibox, drhoz,
+     +                               use_water_depth)
       enddo
       if (verbose > 0) then
          write(*,467) "initialize_atlantis_grid:", nbox, "boxes"
@@ -302,14 +310,16 @@ c
       
 
 
-
-
-      subroutine load_box_from_bgm_file(ctrlfile, ibox, drhoz)
+      subroutine load_box_from_bgm_file(ctrlfile, ibox, drhoz, 
+     +                                  use_water_depth)
 c     --------------------------------------------------------------------
 c     Initialize box ibox from parameters in ctrlfile
 c
 c     drhoz[meters] is the isotropic horizontal scale used to initialize integral sampling grid
 c     Assume Boxes has been allocated. 
+c     If use_water_depth is true, then number of wet layers is set from 
+c     actual water depth rather than boxNN.botz in the BGM file (this requires
+c     physical_fields is initialized and updated)
 c     Only retain a necessary sub set of the informatoin provided in BGM file 
 c     Use parameter boxN.botz to statically select number of wet layers in each box
 c     Parameter format in BGM file (example for box 2)
@@ -328,54 +338,41 @@ c         box2.vert 12.127242435108569 55.66716261584352
 c         box2.vert 10.428889554898678 57.586861347572196
 c         box2.vert 10.219156023058297 56.75538033731939
 c         box2.vert 11.24336228544731 55.80020684195673
+c
+c     botz = 0.0 signals box is dry - this overwrites actual topography
+c     Assume physics has been initialized and updated so water depth is accessible
 c     --------------------------------------------------------------------
       type(control_file), intent(in)  :: ctrlfile
       integer, intent(in)             :: ibox
       real, intent(in)                :: drhoz  ! unit = meters
+      logical, intent(in)             :: use_water_depth
 
       character(len=taglength)        :: proptag
       character(len=12)               :: boxname
       real                            :: botz, geo(2), bbox(4)
       real                            :: nw(2), se(2), sw(2), jacob(3)
-      real                            :: drlon, drlat, dlon, dlat
-      integer                         :: nnodes, inode, inext 
+      real                            :: drlon, drlat, dlon, dlat,cwd
+      real                            :: maxwd, area
+      integer                         :: nnodes, inode, inext, istat
       integer                         :: nxsub, nysub, naccept, ix, iy
       integer                         :: nconn, ilay, maxlayers, i
       real, allocatable               :: nodebuf(:,:), xybuf(:,:)
+      type(AtlantisBox), pointer      :: box
 c     --------------------------------------------------------------------
+      box => Boxes(ibox)
+c
       call make_prop_tag(proptag, "box", ibox, "nconn")
       call read_control_data(ctrlfile, proptag, nconn)
 c
-      allocate(Boxes(ibox)%neighbors(nconn))
+      allocate(box%neighbors(nconn))
       call make_prop_tag(proptag, "box", ibox, "ibox")
-      call read_control_data(ctrlfile, proptag, Boxes(ibox)%neighbors)
+      call read_control_data(ctrlfile, proptag, box%neighbors)
 c
-      allocate(Boxes(ibox)%faces(nconn))
+      allocate(box%faces(nconn))
       call make_prop_tag(proptag, "box", ibox, "iface")
-      call read_control_data(ctrlfile, proptag, Boxes(ibox)%faces)
-c
-c     Use parameter boxN.botz to statically select number of wet layers in each box
-c     layer m: zgrid_bounds(m, m+1)
-c
-      call make_prop_tag(proptag, "box", ibox, "botz")
-      call read_control_data(ctrlfile, proptag, botz)
-      botz      = -botz    ! now botz > 0
-      maxlayers = size(zgrid_CC)
-      do ilay = 1, maxlayers
-         if (zgrid_bounds(ilay+1) > botz) exit
-      enddo
-      if (ilay > maxlayers) then ! standard exit condition at loop bound
-         write(*,*) "load_box_from_bgm_file: botz > zgrid_bounds"
-         write(*,*) "box number = ", ibox
-         write(*,*) "botz       = ", botz
-         write(*,*) zgrid_bounds(1), " < zgrid < ", 
-     +              zgrid_bounds(maxlayers+1)
-         stop 
-      else ! loop terminated by break
-         Boxes(ibox)%nwet = ilay
-      endif
+      call read_control_data(ctrlfile, proptag, box%faces)
 c  
-c     load box perimeter
+c     load box perimeter (but do not store it)
 c
       call make_prop_tag(proptag, "box", ibox, "vert")
       nnodes = count_tags(ctrlfile, proptag) - 1    ! first point repeated at last
@@ -393,13 +390,13 @@ c
          enddo
          write(boxname,*) ibox 
          boxname =  "box" // trim(adjustl(boxname))
-         call init_lonlat_polygon(Boxes(ibox)%shape, nodebuf, boxname) ! copies nodebuf
+         call init_lonlat_polygon(box%shape, nodebuf, boxname) ! copies nodebuf
          deallocate ( nodebuf )
       endif
 c     
 c     Use bounding box to define integral sampling mesh (lon-lat sub grid)
 c
-      call get_bounding_box(Boxes(ibox)%shape, bbox)   ! bbox  = (SWlon,SWlat,NElon,NElat)
+      call get_bounding_box(box%shape, bbox)   ! bbox  = (SWlon,SWlat,NElon,NElat)
       sw    = bbox(1:2)
       nw(1) = bbox(1)
       nw(2) = bbox(4)
@@ -412,27 +409,41 @@ c
       dlon = (bbox(3)-bbox(1))/nxsub ! longitute sampling step
       dlat = (bbox(4)-bbox(2))/nysub ! latitude sampling step      
       allocate( xybuf(2,nxsub*nysub) )
-      naccept = 0
+      naccept       = 0
       do ix = 1, nxsub
          geo(1) = bbox(1) + (ix-0.5)*dlon
          do iy = 1, nysub
             geo(2) = bbox(2) + (iy-0.5)*dlat
-            if (is_inside_polygon(Boxes(ibox)%shape, geo)) then
+            if (is_inside_polygon(box%shape, geo)) then
                naccept = naccept + 1
-               xybuf(:,naccept) = geo           
+               xybuf(:,naccept) = geo    
             endif        
          enddo
       enddo
-      
+c      
 c     -------- transfer sampling points from buffer and set area element -------- 
+c     Also use the horizontal loop to access the maximum/avarage depth in the box
+c
+      box%max_depth = 0.0
+      box%avg_depth = 0.0
+      area          = 0.0
       if (naccept > 0) then
-         allocate( Boxes(ibox)%xy(2,naccept) )
-         allocate( Boxes(ibox)%da(naccept)   )
-         Boxes(ibox)%xy = xybuf(:,1:naccept) ! copy buffer
+         allocate( box%xy(2,naccept) )
+         allocate( box%da(naccept)   )
+         box%xy = xybuf(:,1:naccept) ! copy buffer
          do i = 1, naccept
             call get_xyz2cart_jacobian(xybuf(:,i),jacob)
-            Boxes(ibox)%da(i) = jacob(1)*dlon*jacob(2)*dlat ! apply tangent space area
-         enddo      
+            box%da(i) = jacob(1)*dlon*jacob(2)*dlat ! apply tangent space area
+            if (use_water_depth) then
+               call interpolate_wdepth(xybuf(:,i), cwd, istat)
+               if (istat==0) then ! this is a valid point
+                  box%max_depth = max(box%max_depth, cwd)
+                  box%avg_depth = box%avg_depth + cwd*box%da(i)
+                  area          = area + box%da(i)
+               endif
+            endif ! if use_water_dept
+         enddo    ! i 
+         box%avg_depth = box%avg_depth/area
       else
          write(*,*) "load_box_from_bgm_file: no sub grid"
          write(*,*) "box number = ", ibox
@@ -440,6 +451,48 @@ c     -------- transfer sampling points from buffer and set area element -------
       endif
       deallocate( xybuf )
       
+c
+c     Resolve how many boxes are wet (box%nwet). Either use parameter boxN.botz 
+c     select number of wet layers in box or use actual detected avg water depth
+c     layer m: zgrid_bounds(m, m+1)
+c     botz = 0 signals a dry box - overrules everything and sets box%nwet = 0
+c
+      call make_prop_tag(proptag, "box", ibox, "botz")
+      call read_control_data(ctrlfile, proptag, botz)
+      botz      = -botz    ! flip sign so positive is down
+      if (botz < 1e-3) then ! box is considered dry
+         box%nwet      = 0   ! 
+         box%max_depth = 0.0 ! for consistency
+         box%avg_depth = 0.0 ! for consistency
+      else                  ! box is considered wet, use botz/avg_depth to set box%nwet
+c
+c        ---- resolve which depth (maxwd) to use to assign box%nwet 
+c        
+         if (use_water_depth) then 
+            maxwd = box%avg_depth
+         else
+            maxwd         = botz
+            box%max_depth = botz ! botz not accessible in horizontal loop
+            box%avg_depth = botz
+         endif  
+c        ---- use maxwd to determine  box%nwet            
+         maxlayers = size(zgrid_CC)
+         do ilay = 1, maxlayers
+            if (zgrid_bounds(ilay+1) > maxwd) exit
+         enddo
+         if (ilay > maxlayers) then ! standard exit condition at loop bound
+            write(*,*) "load_box_from_bgm_file: maxwd > zgrid_bounds"
+            write(*,*) "box number = ", ibox
+            write(*,*) "maxwd      = ", maxwd
+            write(*,*) zgrid_bounds(1), " < zgrid < ", 
+     +           zgrid_bounds(maxlayers+1)
+            stop 
+         else                   ! loop terminated by break
+            box%nwet = ilay
+         endif ! ilay
+      endif    ! botz
+
+
       end subroutine load_box_from_bgm_file
 
 
@@ -600,8 +653,9 @@ c     current time. hflux is an allocated output buffer for results with
 c     unit m3/s. Positive direction for fluxes across faces follows from the
 c     face normal vector. Apply pad value 0.0 to faces to dry cells
 c     Faulty interpolations (whatever reason) are padded with 0
+c     Dry boxes have nwet == 0 and flux to/from these will be set to hydro_fill
 c     -------------------------------------------------------
-      real, intent(out)           :: hflux(:,0:) ! [m3/s] shape = (1:nlaýers, 0:nfaces-1)
+      real, intent(out)           :: hflux(:,0:) ! [m3/s] shape = (1:nlayers, 0:nfaces-1)
       integer                     :: iface, ilay, nfaces, nlayers
       integer                     :: iz, ixy, nintgpts, istat
       type(AtlantisFace), pointer :: face
@@ -615,9 +669,9 @@ c     -------------------------------------------------------
          left  => Boxes(face%left_right(1))
          right => Boxes(face%left_right(2))
 c        --- assess how many layers are wet-wet for face
-         nlayers   = min(left%nwet, right%nwet)
+         nlayers   = min(left%nwet, right%nwet) ! OK if left/right is dry (flux = hydro_fill)
          nintgpts  = size(face%xy, 2) ! number of horizontal integration points
-         do ilay = 1, nlayers   ! layer loop, internal numbering
+         do ilay = 1, nlayers   ! layer loop, internal numbering - void if left/right box is dry
 c           ---- perform surface integral for this layer at this face
             intg = 0.0
             do iz = 1, nzpts(ilay) ! intra layer loop
@@ -649,7 +703,7 @@ c     Fluxes through bottom of a column: if box%nwet < nlaýers = size(zgrid_CC)
 c     then vflux(box, box%nwet:) = 0 else (if box%nwet = nlaýers) 
 c     vflux(box, nlaýers) is calculated
 c     -------------------------------------------------------
-      real, intent(out)           :: vflux(:,0:) ! [m3/s] shape = (1:nlaýers, 0:nboxes-1)
+      real, intent(out)           :: vflux(:,0:) ! [m3/s] shape = (1:nlayers, 0:nboxes-1)
       integer                     :: ibox, ilay
       integer                     :: ixy, nscan, istat
       integer                     :: nboxes, maxlayers, nintgpts
@@ -755,6 +809,8 @@ c     --------------------------------------------
       write(iunit,*) "faces      = ", abox%faces
       write(iunit,*) "neighbors  = ", abox%neighbors
       write(iunit,*) "wet layers = ", abox%nwet
+      write(iunit,*) "max depth  = ", abox%max_depth
+      write(iunit,*) "avg depth  = ", abox%avg_depth
       write(iunit,*) "sampling points  xy  area[m2]"
       do i=1, size(abox%xy, 2)
          write(iunit,*) i, abox%xy(:,i), abox%da(i)
@@ -1148,10 +1204,10 @@ c     -------------------------------------------------------
 c     Write a frame to input files
 c     -------------------------------------------------------
       integer, intent(in) :: time          ! [sec]
-      real, intent(in)    :: htransp(:,0:)   ! accumulated hor transport [m3]          shape = (1:nlaýers, 0:nfaces-1)
-      real, intent(in)    :: vtransp(:,0:)   ! accumulated ver transport [m3]          shape = (1:nlaýers, 0:nboxes-1)
-      real, intent(in)    :: temp_avg(0:,0:) ! accumulated temperature average [deg C] shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
-      real, intent(in)    :: salt_avg(0:,0:) ! accumulated salinity average [PSU]      shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
+      real, intent(in)    :: htransp(:,0:)   ! accumulated hor transport [m3]          shape = (1:nlayers, 0:nfaces-1)
+      real, intent(in)    :: vtransp(:,0:)   ! accumulated ver transport [m3]          shape = (1:nlayers, 0:nboxes-1)
+      real, intent(in)    :: temp_avg(0:,0:) ! accumulated temperature average [deg C] shape = (0:nlayers, 0:nboxes-1) = Atlantis layout
+      real, intent(in)    :: salt_avg(0:,0:) ! accumulated salinity average [PSU]      shape = (0:nlayers, 0:nboxes-1) = Atlantis layout
       integer             :: nboxes, nlayers, nfaces
       integer             :: ibox, ifc, ilay, id,il,ib, nt, istat
       real, allocatable   :: exchange(:,:,:)
@@ -1275,10 +1331,10 @@ c     -------------------------------------------------------
       character*(*), intent(in) :: tempfname     ! file name for temperature data
       character*(*), intent(in) :: saltfname     ! file name for salinity data
 c
-      real, allocatable          :: hflux(:,:)    ! horizontal water flux     [m3/sec] shape = (1:nlaýers, 0:nfaces-1) 
-      real, allocatable          :: vflux(:,:)    ! vertical water flux       [m3/sec] shape = (1:nlaýers, 0:nboxes-1) 
-      real, allocatable          :: htransp(:,:)  ! accumulated hor transport [m3]     shape = (1:nlaýers, 0:nfaces-1)
-      real, allocatable          :: vtransp(:,:)  ! accumulated ver transport [m3]     shape = (1:nlaýers, 0:nboxes-1) 
+      real, allocatable          :: hflux(:,:)    ! horizontal water flux     [m3/sec] shape = (1:nlayers, 0:nfaces-1) 
+      real, allocatable          :: vflux(:,:)    ! vertical water flux       [m3/sec] shape = (1:nlayers, 0:nboxes-1) 
+      real, allocatable          :: htransp(:,:)  ! accumulated hor transport [m3]     shape = (1:nlayers, 0:nfaces-1)
+      real, allocatable          :: vtransp(:,:)  ! accumulated ver transport [m3]     shape = (1:nlayers, 0:nboxes-1) 
       real, allocatable          :: temp_now(:,:)   ! current temperature [deg C] 
       real, allocatable          :: salt_now(:,:)   ! current salinity [deg C] 
       real, allocatable          :: temp_avg(:,:)   ! accumulated temperature average [deg C]
@@ -1391,7 +1447,7 @@ c
       real, allocatable          :: prop_now(:,:,:)   ! current temperature [deg C] 
       real, allocatable          :: prop_avg(:,:,:)   ! accumulated temperature average [deg C]  
       integer, allocatable       :: iunits(:)
-      integer                    :: ipro, nprops, ibox, ilay, i, icopy
+      integer                    :: ipro, nprops, ibox, atlay, i, icopy
       integer                    :: nfaces, nboxes, nlayers, nframes
       integer                    :: ntinner, it, tdiff, istat
       character(len=256)         :: fname ! assume long enough
@@ -1454,7 +1510,7 @@ c
          if (verbose > 0) write(*,841) it, ntinner
          call update_physical_fields()  
          do ipro = 1, nprops
-            call get_box_averages(prop_now(:,:,ipro), 
+            call get_box_averages(prop_now(0:nlayers, 0:nboxes-1, ipro), 
      +                            trim(adjustl(proplist(ipro))), 0.d0)   ! fill declared as real8
          enddo
          prop_avg = prop_avg + prop_now  ! all props at once
@@ -1469,10 +1525,10 @@ c
          write(iunits(ipro), 846) "box", sep, "layer", sep,
      +                            trim(adjustl(proplist(ipro)))
          do ibox = 0, nboxes-1
-            do ilay = 0, nlayers  ! wet+sediment
-               write(iunits(ipro), 847) ibox, sep, ilay, sep,
-     +               prop_avg(ilay, ibox, ipro)*multifac(ipro)  ! convert units before writing
-            enddo  ! ilay
+            do atlay = 0, nlayers  ! wet+sediment, Atlantis indexing
+               write(iunits(ipro), 847) ibox, sep, atlay, sep,
+     +               prop_avg(atlay, ibox, ipro)*multifac(ipro)  ! convert units before writing
+            enddo  ! atlay
          enddo     ! ibox
       enddo        ! ipro
 c

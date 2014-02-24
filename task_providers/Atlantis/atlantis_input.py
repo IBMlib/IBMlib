@@ -11,6 +11,33 @@ import os
 
 from Scientific.IO.NetCDF import *
 from numpy import *
+import re
+
+def extract_boxes(bgmfile, fstem):
+    # ------------------------------------------------------
+    #  Extract vertices from BGM file to fstem<BOXNUM>.xy
+    #
+    #  example:
+    #      extract_boxes("Baltic_geometry_latlong_only_spaces.bgm", "tmp/box")
+    #  xmgrace tmp/box?.xy tmp/box??.xy 
+    # ------------------------------------------------------
+    boxver = re.compile("box(?P<bnum>\d+)\.vert\s+(?P<x>\d+\.\d+)\s+(?P<y>\d+\.\d+)") # vertex definition in a box
+    bnum_last = None
+    f         = None
+    data = open(bgmfile).readlines()
+    for line in data:
+        m = boxver.match(line)
+        if m:
+            bnum,x,y = m.groups() # keep as strings
+            if bnum != bnum_last:
+                if f is not None:
+                    f.close()
+                f = open(fstem + bnum + ".xy", "w")
+                bnum_last = bnum
+            f.write("%s %s\n" % (x,y))
+    if f is not None:
+        f.close()
+    #    
 
 
 class HydroInput:

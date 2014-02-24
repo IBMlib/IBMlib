@@ -71,7 +71,7 @@ c.....set clocks
       call init_physical_fields(start_time)
       call update_physical_fields()
       call initialize_atlantis_grid(bgmfile, lwbuf(1:nlayers), nsamppts, 
-     +                              drhoz)
+     +                              drhoz, .true.)
 
 c.....currently set time offset to start time
       call make_physics_input_files(start_time, end_time, 

@@ -1,7 +1,7 @@
 !##########################################################################################################
 !   Current strata: 0-5m, 5-10, 10-30, 30-40, 40-50, 50-100, 100-200, >200 = 8 wet + 1 sediment layer
 !##########################################################################################################
-bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm.bgm    ! preprocessed BGM file name defining Atlantis geometry
+bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm   ! preprocessed BGM file name defining Atlantis geometry
 layer_widths          =  5  5  20  10  10  50  100 1000               ! [m] integer vector defining widths of vertical layers, 
 samplings_per_layer   = 10                                             ! how many times a layer i subdivided at vertical integral sampling
 horiz_sampling_lenght = 5000                                          ! [m] lenght scale for generating horizontal integration meshes

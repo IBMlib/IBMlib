@@ -566,6 +566,8 @@ c     --------------------------------------------------------------------------
       integer                  :: treq, tcur
       integer                  :: time_stamp(4)
       character(len=256)       :: fname
+      character*(*),parameter  :: fname_path = 
+     +                      "/home/data/OPEC_test/silicate_Q12005/"         ! HACK
 c     ----------------------------------------------------------------------------+      
 c
 c     ======== load physics: read time stamp from tempdat file: ========
@@ -616,16 +618,21 @@ c
       fname = "biodat.H4_si_2005020100.daily_mean.0.nc"      ! HACK
       write(fname(14:17),'(i4)')   request_time(1) ! year    ! HACK
       write(fname(18:19),'(i2.2)') request_time(2) ! month   ! HACK
+      fname = trim(adjustl(fname_path))//trim(adjustl(fname))! HACK
+      write(*,*) "silicate hack: opening ", trim(adjustl(fname))  ! HACK
       istat = nf90_open(fname, NF90_NOWRITE, ncid)           ! HACK
       if (istat /= NF90_NOERR) stop "nf90_open: error"       ! HACK
       istat = nf90_inq_varid(ncid, 'si', varid)              ! HACK
       if (istat /= NF90_NOERR) stop "nf90_inq_varid: error"  ! HACK
       istat = nf90_get_var(ncid, varid, databuf,             ! HACK
      +                     start=(/1,1,1,request_time(3)/))  ! HACK
-      if (istat /= NF90_NOERR) stop "nf90_get_var: error"    ! HACK
+      if (istat /= NF90_NOERR) then                          ! HACK
+           stop "nf90_get_var: error"                        ! HACK
+      else                                                   ! HACK  
+         write(*,*) "silicate hack: loaded frame ", request_time(3)  ! HACK
+      endif                                                  ! HACK
       istat = nf90_close(ncid)                               ! HACK
       if (istat /= NF90_NOERR) stop "nf90_close: error"      ! HACK
-
 c
 c     ======== load biogeochemistry: read time stamp from tempdat file: ========
 c

@@ -961,7 +961,7 @@ c     --- first handle derived properties
          allocate( x2(size(x,1), size(x,2), size(x,3)) )  
          call get_eco_3D(x1, iset, "zo1")
          call get_eco_3D(x2, iset, "zo2")
-         x = x1 + x2
+         x = x1 + x2  
          deallocate( x1 )
          deallocate( x2 )
          return

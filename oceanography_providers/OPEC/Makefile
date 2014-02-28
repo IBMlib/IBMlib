@@ -8,7 +8,9 @@
 #
 #     TODO: add big_endian CF option
 ##########################################################################
-LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o read_cmod_ergom.o opec.o
+READ_CMOD_ERGOM = read_cmod_ergom
+#READ_CMOD_ERGOM = read_cmod_ergom_Silicate_hack
+LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o $(READ_CMOD_ERGOM).o opec.o
 
 GENERIC_MESH = ../generic_elements
 
@@ -18,8 +20,8 @@ physical_fields.a: dependences.mk $(LOCAL_OBJ)
 
 physical_fields.mod:
 
-# read_cmod.f must be compiled with big_endian option
-read_cmod_ergom.o: read_cmod_ergom.f
+# read_cmod_ergom implementation must be compiled with big_endian option
+$(READ_CMOD_ERGOM).o: $(READ_CMOD_ERGOM).f
 	$(FC) -c $(FCFLAGS) $(BIG_ENDIAN) $(FPPFLAGS) $< -o $@
 
 

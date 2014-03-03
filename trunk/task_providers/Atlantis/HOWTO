@@ -1,0 +1,52 @@
+
+TODO: 
+
+  mesh_grid: is_wet should return false on land
+           (split rank deficit/dry condition in return status)
+
+  
+
+  BGM file
+===========================================================================================
+-----------------------------------------------------------------------------------
+  box_info.dat                                                                   OK
+        atlantis_input0.f + public scope in atlantis_grid  
+	---
+        ibmrun_info task_providers/Atlantis/setups/simpar_phys_14Feb2014 > info.log 2>&1 &                                     
+	mv box_info.dat results
+         
+-----------------------------------------------------------------------------------
+  physical input                                               -                 OK 
+        atlantis_input.f
+	---
+        ibmrun_phys task_providers/Atlantis/setups/simpar_phys_14Feb2014 > phys.log 2>&1 &     
+	mv task_providers/Atlantis/*.nc results
+-----------------------------------------------------------------------------------
+  box averages                                                                  OK
+        atlantis_input2.f  
+	---    
+        ibmrun_box task_providers/Atlantis/setups/simpar_bgc_14Feb2014 > bgc.log 2>&1 &   
+        mv task_providers/Atlantis/*.dat   results                                        
+-----------------------------------------------------------------------------------
+  zo1/zo2                                                                       OK
+        atlantis_input3.f + read_cmod_ergom.f (line 964) zoo hacks 
+	---
+        ibmrun_zo1 task_providers/Atlantis/setups/simpar_bgc_14Feb2014 > zo1.log 2>&1 &    
+	mv task_providers/Atlantis/zoo_14Feb2014.dat results/zo1_14Feb2014.dat                   
+	ibmrun_zo2 task_providers/Atlantis/setups/simpar_bgc_14Feb2014 > zo2.log 2>&1 &    
+	mv task_providers/Atlantis/zoo_14Feb2014.dat results/zo2_14Feb2014.dat
+-----------------------------------------------------------------------------------
+  silicate         
+        atlantis_input3.f + read_cmod_ergom_Silicate_hack.f  +  cp sal -> _si
+        ---
+        ibmrun_si task_providers/Atlantis/setups/simpar_bgc_14Feb2014 > si.log 2>&1 &    
+        mv task_providers/Atlantis/sal_14Feb2014.dat results/si_14Feb2014.dat
+===========================================================================================
+
+------------------------------------------------------------------------------------------------------------
+sudo mount -t nfs 172.18.127.12:/volume1/OPEC_20yr_hindcast  /mnt 
+------------------------------------------------------------------------------------------------------------
+
+
+mesh_grid: is_wet should return false on land
+           (split rank deficit/dry condition in return status)

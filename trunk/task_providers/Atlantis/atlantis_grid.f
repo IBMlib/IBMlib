@@ -18,6 +18,7 @@ c     The module can represent only one Atlantis grid (a singleton)
 c     The preprocessor flag WITH_BGC (test: #ifdef WITH_BGC) controls whether 
 c     the biogeochemical interface is activated in addition to the physics-only interface
 c     Currently WITH_BGC must be set locally
+c     All fill values for physical observables should be 0 (assumed when adding up samplings)
 c
 c     NOTE: the BGM file must be preprocessed to places all whitespaces (except "\n") with " "
 c           using e.g. the script regularize_blanks.py
@@ -578,6 +579,7 @@ c     where d is the demersal layer. In terms of physics, we
 c     probe to quantity at the bottom and associate this with 
 c     layer d. "_" is the fill value. Notice that layers written is
 c     nlayers + 1, the last being sediment
+c     sediment layer is only evaluated, if box is wet (box%nwet>0)
 c     -------------------------------------------------------
       real, intent(out)         :: buff(0:,0:) ! shape = (0:nlaýers, 0:nboxes-1) = Atlantis layout
       character*(*), intent(in) :: prop        ! property tag
@@ -618,26 +620,30 @@ c
 c
          enddo  !  ilay
 c
-c        ---- evaluate sediment layer; ignore slope contribution to jacobian of seabed 
+c        -------- evaluate sediment layer if box%nwet > 0          --------
+c                 ignore slope contribution to jacobian of seabed   
 c
-         val_acc  = 0.0
-         area_acc = 0.0  ! accepted area
-         do ixy = 1, size(box%xy, 2)  ! horizontal mesh loop
-            geo(1:2) = box%xy(:,ixy)
-            call interpolate_wdepth(geo, cwd, istat) 
-            if (istat /= 0) cycle       ! dry point or other exception, continue with next ixy
-            geo(3) = min(cwd, cwd-1e-3) ! hover just over bottum
-            call interpolate_property(geo, prop, value, istat)
-            if (istat == 0) then !   assume same, no padding if /= 0 
-               a        = box%da(ixy) ! area associated with this sampling, ignore slope
-               val_acc  = val_acc + a*value
-               area_acc = area_acc + a
+         if (box%nwet > 0) then
+            val_acc  = 0.0
+            area_acc = 0.0      ! accepted area
+            do ixy = 1, size(box%xy, 2) ! horizontal mesh loop
+               geo(1:2) = box%xy(:,ixy)
+               call interpolate_wdepth(geo, cwd, istat) 
+               if (istat /= 0) cycle ! dry point or other exception, continue with next ixy
+               geo(3) = min(cwd, cwd-1e-3) ! hover just over bottum
+               call interpolate_property(geo, prop, value, istat)
+               if (istat == 0) then !   assume same, no padding if /= 0 
+                  a        = box%da(ixy) ! area associated with this sampling, ignore slope
+                  val_acc  = val_acc + a*value
+                  area_acc = area_acc + a
+               endif
+            enddo               ! ixy
+c
+            if (area_acc > 1e-6) then ! else pad applies
+               buff(nlayers,ibox)  = val_acc/area_acc ! sediment goes into last layer position
             endif
-         enddo                  ! ixy
+         endif ! if (box%nwet > 0)
 c
-         if (area_acc > 1e-6) then    ! else pad applies
-            buff(nlayers,ibox)  = val_acc/area_acc    ! sediment goes into last layer position
-         endif
       enddo ! ibox
 
       end subroutine get_box_averages
@@ -903,9 +909,11 @@ c
       allocate( dest_k(max_dest, nlayers, nboxes)   )
       allocate( h_destmap(3, nlayers, 0:nfaces-1)  )  ! index map to easily fill exchange
       allocate( v_destmap(3, nlayers, 0:nboxes-1 ) )  ! index map to easily fill exchange
-      dest_b = dest_fill  ! set _FillValue
-      dest_k = dest_fill  ! set _FillValue
-      dest   = 1   ! dest < max_dest
+      dest_b    = dest_fill  ! set _FillValue
+      dest_k    = dest_fill  ! set _FillValue
+      h_destmap = dest_fill 
+      v_destmap = dest_fill
+      dest      = 1   ! dest < max_dest
 c
 c     -------- scan over all connections --------
 c
@@ -1219,11 +1227,13 @@ c     --------------------------------------------------------------------------
 c     ---- set exchange buffer ----
       allocate( exchange(dest, nlayers, nboxes) ) 
       exchange = hydro_fill            ! _FillValue
+
       do ifc = 0, nfaces-1
          do ilay = 1, nlayers     ! scan all, regardless zeros
             id = h_destmap(1, ilay, ifc)
             il = h_destmap(2, ilay, ifc)
             ib = h_destmap(3, ilay, ifc)
+            if (id == dest_fill) cycle  ! no connection
             exchange(id, il, ib) =  htransp(ilay, ifc)
           enddo
       enddo
@@ -1232,6 +1242,7 @@ c     ---- set exchange buffer ----
             id = v_destmap(1, ilay, ibox)
             il = v_destmap(2, ilay, ibox)
             ib = v_destmap(3, ilay, ibox)
+            if (id == dest_fill) cycle  ! no connection
             exchange(id, il, ib) =  vtransp(ilay, ibox)
           enddo
       enddo
@@ -1296,7 +1307,7 @@ c
 c     --- clean-up buffers ---
 c
       deallocate(exchange)
-
+c
       end subroutine write_input_file_frames
 
 
@@ -1391,8 +1402,8 @@ c     -------------------------------------------------------
             call get_vertical_water_fluxes(vflux)
             htransp = htransp + hflux*dt_sampling ! simple Eulerian flux integration
             vtransp = vtransp + vflux*dt_sampling ! simple Eulerian flux integration
-            call get_box_averages(temp_now, "temp", temp_fill) 
-            call get_box_averages(salt_now, "salt", salt_fill)
+            call get_box_averages(temp_now, "tem", temp_fill) 
+            call get_box_averages(salt_now, "sal", salt_fill)
             temp_avg = temp_avg + temp_now  
             salt_avg = salt_avg + salt_now
             call add_seconds_to_clock(tnow, dt_sampling) 

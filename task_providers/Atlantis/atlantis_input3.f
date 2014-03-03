@@ -1,6 +1,7 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Generate misc box average inputs for Atlantis
+c     Generate misc box average inputs for Atlantis 
+c     - hacked extracts
 c     ---------------------------------------------------
 
 c     $Rev: $
@@ -36,19 +37,8 @@ c     ------------ declarations ------------
       integer            :: nsamppts, nlayers, idum4(4)
       integer            :: dt_sampling
       character(len=999) :: fnametemp
-      integer, parameter :: nprop = 12
-      character(len=3), parameter :: proplist(nprop) = (/"zoo",
-     +                                                "oxy",
-     +                                                "nh4",
-     +                                                "no3",
-     +                                                "po4",
-     +                                                "dia",
-     +                                                "fla",
-     +                                                "cya",
-     +                                                "odt",
-     +                                                "din",
-     +                                                "tem",
-     +                                                "sal"/) 
+      integer, parameter :: nprop = 2
+      character(len=3), parameter :: proplist(nprop) = (/"zoo","sal"/) 
 c     ----------------------------------------------------------------------------------------------------
 c     Atlantis units 
 c       Dissolved oxygen concentration  -> [mg-O2 per m3]
@@ -57,18 +47,7 @@ c       Silicate concentrations:   -> [mg-Si per m3]
 c       Phosphorus concentrations: -> [mg-P per m3]
 c     ----------------------------------------------------------------------------------------------------
       real,parameter     :: mmolN2kgDW = 14./1000/0.074/1000 ! conversion factor mmol N/m3 -> kg DW/m3 
-      real,parameter    :: multifac(nprop) = (/14.0/mmolN2kgDW,
-     +                                      32.0,
-     +                                      14.0,
-     +                                      14.0,
-     +                                      31.0,
-     +                                      14.0,
-     +                                      14.0,
-     +                                      14.0,
-     +                                      14.0,
-     +                                      14.0,
-     +                                       1.0,
-     +                                       1.0/) 
+      real,parameter     :: multifac(nprop) = (/14.0/mmolN2kgDW, 14.0/)   ! 1 mole Si per mole SiO4, Si molar mass = 14 mg/mmol
 c     ----------------------------------------------------------------------------------------------------
 
 c     ------------   show time starts  ------------

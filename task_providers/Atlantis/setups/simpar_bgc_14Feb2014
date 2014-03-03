@@ -11,8 +11,8 @@ include_biogeochem = T     ! T/F, default  = T
 !--------------------------------------------------------------------------------
 bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm   ! preprocessed BGM file name defining Atlantis geometry
 layer_widths          =  5  5  20  10  10  50  100 1000               ! [m] integer vector defining widths of vertical layers, 
-samplings_per_layer   = 10                                            ! how many times a layer i subdivided at vertical integral sampling
-horiz_sampling_lenght = 500                                           ! [m] lenght scale for generating horizontal integration meshes
+samplings_per_layer   = 5                                            ! how many times a layer i subdivided at vertical integral sampling
+horiz_sampling_lenght = 2000                                           ! [m] lenght scale for generating horizontal integration meshes
 start_time            = 2005 01 01 0                                  ! YYYY MM DD SSS  - start time of time frame genaration
 end_time              = 2005 03 31 86399                              ! YYYY MM DD SSS  - end time of time frame genaration
 dt_sampling           = 86400                                         ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)

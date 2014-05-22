@@ -1,0 +1,24 @@
+!##########################################################################################################
+!   Current strata: 0-5m, 5-10, 10-30, 30-40, 40-50, 50-100, 100-200, >200 = 8 wet + 1 sediment layer
+!
+!   sudo mount -t nfs 172.18.127.12:/volume1/OPEC_20yr_hindcast  /mnt  
+!   sudo umount /mnt 
+!   ibmrun_phys_OPEC_noBGC task_providers/Atlantis/simpar_phys_14Feb2014 > phys_14Feb2014.log  2>&1 &
+!##########################################################################################################
+hydroDBpath   = /mnt
+cmod_data_set = coarse     ! value of X above
+include_biogeochem = F     ! T/F, default  = T
+!--------------------------------------------------------------------------------
+bgmfile               = task_providers/Atlantis/Baltic_geometry_latlong_only_spaces.bgm    ! preprocessed BGM file name defining Atlantis geometry
+layer_widths          =  5  5  20  10  10  50  100 1000               ! [m] integer vector defining widths of vertical layers, 
+samplings_per_layer   = 5                                            ! how many times a layer i subdivided at vertical integral sampling
+horiz_sampling_lenght = 2000                                           ! [m] lenght scale for generating horizontal integration meshes
+start_time            = 2005 01 01 0                                  ! YYYY MM DD SSS  - start time of time frame genaration
+end_time              = 2005 12 31 86399                              ! YYYY MM DD SSS  - end time of time frame genaration
+dt_frames             = 43200                                         ! [sec] period between subsequent time frames
+dt_sampling           = 3600                                          ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
+hydro_fname           = task_providers/Atlantis/hydro_14Feb2014.nc    ! name of hydrodynamic fluxes 
+temp_fname            = task_providers/Atlantis/temp_14Feb2014.nc     ! name of box temperatures
+salt_fname            = task_providers/Atlantis/salt_14Feb2014.nc     ! name of box salinities
+mass_conservation     = top_down                                      ! not_applied / top_down
+#

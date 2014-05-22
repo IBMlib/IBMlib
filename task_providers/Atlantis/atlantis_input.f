@@ -37,7 +37,8 @@ c     ------------ declarations ------------
       real               :: lwbuf(lwmax), drhoz
       integer            :: nsamppts, nlayers, idum4(4)
       integer            :: dt_frames, dt_sampling
-      character(len=999) :: hydro_fname, temp_fname, salt_fname
+      integer            :: mass_conservation
+      character(len=999) :: hydro_fname, temp_fname, salt_fname, mcstr
 c     ------------   show time starts  ------------
       call init_run_context()
 c.....    
@@ -68,6 +69,16 @@ c.....set clocks
       call read_control_data(simulation_file,"hydro_fname", hydro_fname)
       call read_control_data(simulation_file,"temp_fname", temp_fname)
       call read_control_data(simulation_file,"salt_fname", salt_fname)
+      call read_control_data(simulation_file,"mass_conservation", mcstr)
+      if     (mcstr(1:11)  == "not_applied") then
+         mass_conservation =  no_mass_cons
+      elseif (mcstr(1:8)   == "top_down") then
+         mass_conservation = top_down_mass_cons
+      else
+         write(*,*) "unknown mass_conservation option",
+     +              trim(mcstr)
+         stop 488
+      endif
       call init_physical_fields(start_time)
       call update_physical_fields()
       call initialize_atlantis_grid(bgmfile, lwbuf(1:nlayers), nsamppts, 
@@ -77,7 +88,8 @@ c.....currently set time offset to start time
       call make_physics_input_files(start_time, end_time, 
      +                      dt_frames, dt_sampling,
      +                      start_time, hydro_fname,
-     +                      temp_fname, salt_fname)
+     +                      temp_fname, salt_fname,
+     +                      mass_conservation)
 
       call close_atlantis_grid()
 

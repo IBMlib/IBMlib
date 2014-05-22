@@ -59,7 +59,7 @@ c     -------------------------------------------------------------------
       integer, pointer     :: faces(:)          ! surrounding (dynamic) face numbers, referring to list Faces
       integer, pointer     :: neighbors(:)      ! neighboring (dynamic) box numbers , referring to list Boxes
       integer              :: nwet              ! number of wet polygons in this column. Layers numbered 1 ... from surface and down. nwet==0 for dry boxes, e.g. island boxes
-      real, pointer        :: xy(:,:)           ! input (2, 1:nintgpts) wet horizontal integral mesh inside polygon
+      real, pointer        :: xy(:,:)           ! input (2, 1:nintgpts) wet horizontal integral mesh along face
       real, pointer        :: da(:)             ! (1:nintgpts) area associated each point in xy
       real                 :: max_depth         ! [meters] max depth encountered in this box
       real                 :: avg_depth         ! [meters] average depth encountered in this box
@@ -84,8 +84,8 @@ c     -------------------------------------------------------------------
       real, pointer    :: xy(:,:)           ! input (2, 1:nintgpts) wet horizontal integral mesh inside polygon
       real, pointer    :: dl(:)             ! (1:nintgpts) length associated with each point in xy
       end type
-
-
+ 
+ 
 c     ------------------------------------------------------------------------------------------ 
 c                                    Module data section
 c     ------------------------------------------------------------------------------------------ 
@@ -119,6 +119,10 @@ c     -------------------- misc module data ------------------------------------
       integer, parameter :: taglength = 64    ! string length for identifiers
       integer            :: verbose = 1
 
+c     -------------------- mass conservation handles ------------------------------------------
+      integer, parameter :: no_mass_cons = 0              ! Fluxes as computed (default)
+      integer, parameter :: top_down_mass_cons = 1        ! Define vertical fluxes top-down from horizontal, residual in deepest layer
+    
 c     -------------------- NetCDF aux data ---------------------------------------------------
 c     1) hydro data set    
 c
@@ -168,6 +172,9 @@ c     ---------------- define the public scope --------------------
       public :: close_atlantis_grid  
       public :: make_physics_input_files
       public :: make_txt_input
+      public :: no_mass_cons               ! do not enforce mass conservation on fluxes
+      public :: top_down_mass_cons         ! enforce mass conservation top-down, allow box0 connectivity
+
 c     =========================================================================================
                                         contains
 c     =========================================================================================
@@ -715,17 +722,20 @@ c     -------------------------------------------------------
       integer                     :: nboxes, maxlayers, nintgpts
       type(AtlantisBox), pointer  :: box
       real                        :: geo(3), uvw(3), intg
+      logical                     :: open_bottom
 c     ----------------------------------------------------
       vflux     = hydro_fill     ! default pad
       nboxes    = size(Boxes)    ! 0:nboxes-1
       maxlayers = size(zgrid_CC) 
       do ibox = 0, nboxes-1
          box  => Boxes(ibox)
-c        ---- resolve number of layers to scan
-         if (box%nwet == maxlayers) then
-            nscan = maxlayers   ! allow of water flux through bottom a layer column
+c        ---- resolve number of layers to scan 
+         if ((box%nwet == maxlayers).and.(ibox>0)) then ! open bottom for box0 causes an unbalanced flux
+            nscan = maxlayers     ! allow of water flux through bottom a layer column
+            open_bottom = .true.  ! for this water column
          else 
-            nscan = box%nwet-1  ! water flux through bottom layer implicitly zero
+            nscan = box%nwet-1    ! water flux through bottom layer implicitly zero
+            open_bottom = .false. ! for this water column
          endif
          nintgpts  = size(box%xy, 2) ! number of horizontal integration points
          do ilay = 1, nscan          ! layer loop (possibly void)
@@ -735,10 +745,16 @@ c        ---- resolve number of layers to scan
                   geo(1:2) = box%xy(:,ixy)
                   call interpolate_currents(geo, uvw, istat)
                   if (istat > 0) uvw = 0.0                 ! Faulty interpolations (whatever reason) are padded with 0
-                  intg = intg - uvw(3)*box%da(ixy)        ! minus: IBMlib fluxes are positive down, Atlantis(?) up 
+                  intg = intg - uvw(3)*box%da(ixy)        ! minus: IBMlib fluxes are positive down, Atlantis positive up 
             enddo
             vflux(ilay, ibox) = intg
          enddo ! ilay
+c
+c        if open_bottom Atlantis convention is to subtract flux from bottom layer of box 0 to conserve mass in the system
+c     
+         if (open_bottom) then
+            vflux(Boxes(0)%nwet, 0) = vflux(Boxes(0)%nwet, 0) - intg  ! vflux(:, 0) set in first ibox loop
+         endif
       enddo    ! ibox
  
       end subroutine get_vertical_water_fluxes
@@ -1316,7 +1332,8 @@ c
 
       subroutine make_physics_input_files(tstart, tend, dt_frames, 
      +                            dt_sampling, toffset, 
-     +                            hydrofname, tempfname, saltfname)
+     +                            hydrofname, tempfname, saltfname,
+     +                            mass_conservation)
 c     -------------------------------------------------------
 c     Generate physics input files (water flow, salinity and temperature) for Atlantis
 c     in netCDF format in the period [tstart, tend] with time frame interval dt_frame
@@ -1329,7 +1346,8 @@ c     toffset: time offset for time variable in physics input files
 c     hydrofname: file name for hydrodynamic data
 c     tempfname:  file name for temperature data
 c     saltfname:  file name for salinity data
-c     
+c     mass_conservation: which mass conservation scheme to enforce on computed fluxes
+c
 c     Round number of sampling steps truncated, if dt_frames/dt_sampling is not an integer
 c     Apply simple Eulerian flux integration to evaluate net transport
 c     -------------------------------------------------------
@@ -1341,6 +1359,7 @@ c     -------------------------------------------------------
       character*(*), intent(in) :: hydrofname    ! file name for hydrodynamic data
       character*(*), intent(in) :: tempfname     ! file name for temperature data
       character*(*), intent(in) :: saltfname     ! file name for salinity data
+      integer, intent(in)       :: mass_conservation ! options, see module data section
 c
       real, allocatable          :: hflux(:,:)    ! horizontal water flux     [m3/sec] shape = (1:nlayers, 0:nfaces-1) 
       real, allocatable          :: vflux(:,:)    ! vertical water flux       [m3/sec] shape = (1:nlayers, 0:nboxes-1) 
@@ -1399,7 +1418,7 @@ c     -------------------------------------------------------
          do it = 1, ntinner      ! inner loop begin
             call update_physical_fields()
             call get_horizontal_water_fluxes(hflux)
-            call get_vertical_water_fluxes(vflux)
+            call get_vertical_water_fluxes(vflux) ! also in case of top_down_mass_conservation, if some bottoms are open
             htransp = htransp + hflux*dt_sampling ! simple Eulerian flux integration
             vtransp = vtransp + vflux*dt_sampling ! simple Eulerian flux integration
             call get_box_averages(temp_now, "tem", temp_fill) 
@@ -1411,6 +1430,13 @@ c     -------------------------------------------------------
          enddo  ! it (inner time loop)
          temp_avg = temp_avg/ntinner  ! plain average over inner time steps
          salt_avg = salt_avg/ntinner  ! plain average over inner time steps
+c
+c        ... apply posteori mass conservation schmes, if requested
+c
+         if     (mass_conservation==top_down_mass_cons) then
+            call apply_top_down_mass_cons(htransp, vtransp)
+         endif
+         call check_mass_conservation(htransp, vtransp)
          call write_input_file_frames(t, vtransp, htransp, 
      +                                temp_avg, salt_avg) 
       enddo     ! iframe (outer time loop)
@@ -1619,5 +1645,9 @@ c     --------------------------------------------------------------------
 
       end subroutine close_atlantis_grid    
 
-  
+c     ==========================  includes   ========================
+      
+      include "mass_conservation.inc"
+      include "plotting.inc"
+
       end module

@@ -17,8 +17,8 @@ start_time            = 2005 01 01 0                                  ! YYYY MM 
 end_time              = 2005 12 31 86399                              ! YYYY MM DD SSS  - end time of time frame genaration
 dt_frames             = 43200                                         ! [sec] period between subsequent time frames
 dt_sampling           = 3600                                          ! [sec] minor time step to generate each time frame (dt_sampling < dt_frames)
-hydro_fname           = task_providers/Atlantis/hydro_14Feb2014.nc    ! name of hydrodynamic fluxes 
-temp_fname            = task_providers/Atlantis/temp_14Feb2014.nc     ! name of box temperatures
-salt_fname            = task_providers/Atlantis/salt_14Feb2014.nc     ! name of box salinities
+hydro_fname           = task_providers/Atlantis/hydro_22May2014.nc    ! name of hydrodynamic fluxes 
+temp_fname            = task_providers/Atlantis/temp_22May2014.nc     ! name of box temperatures
+salt_fname            = task_providers/Atlantis/salt_22May2014.nc     ! name of box salinities
 mass_conservation     = top_down                                      ! not_applied / top_down
 #

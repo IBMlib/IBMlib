@@ -414,6 +414,8 @@ c            Jun 16, 2011: capture rare cases where dz creates negative depths
          enddo
       enddo
 
+      call update_data_rev_tag_mesh_grid()  ! announce to potential mesh_grid clients that new data revision is available
+
 
       end subroutine syncronize_data
 

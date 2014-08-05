@@ -18,6 +18,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: init_lonlat_polygon
       public :: delete_lonlat_polygon
       public :: print_lonlat_polygon
+      public :: get_polygon_name
       public :: get_bounding_box
       public :: is_inside_polygon
       public :: polygon_member_mask
@@ -149,7 +150,29 @@ c     ----------------------------------------------------
       end subroutine print_lonlat_polygon
 
 
+
+
+      subroutine get_polygon_name(poly, polyname)
+c     ----------------------------------------------------
+c     Print lonlat_polygon instance to logical unit iunit
+c     ----------------------------------------------------
+      type(lonlat_polygon), intent(in) :: poly
+      character*(*), intent(out)       :: polyname
+      integer                          :: buflen, namlen
+c     ----------------------------------------------------
+      namlen = len(poly%name)
+      buflen = len(polyname)
+      if (namlen>buflen) then
+         polyname = poly%name(1:buflen)
+      else
+         polyname = poly%name
+      endif
+c     ----------------------------------------------------
+      end subroutine get_polygon_name
+
       
+
+
       subroutine get_bounding_box(poly,BB)
 c     ------------------------------------------------------------
 c     return bounding_box as BB = SWlon, SWlat, NElon, NElat

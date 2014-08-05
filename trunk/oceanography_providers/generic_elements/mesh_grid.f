@@ -20,8 +20,11 @@ c     * host nz
 c     * host 3D data arrays
 c     
 c     LOG: 
-c       stripped out time components (deal only with space/data) ASC Feb 16, 2011
-c       made biogeochemical components optional                  ASC May 2013
+c     * stripped out time components (deal only with space/data) ASC Feb 16, 2011
+c     * made biogeochemical components optional                  ASC May 2013
+c     * added optional data revision logging, to allow plugins 
+c       to minimize update overhead                              ASC Jun 2013
+c
 c     TODO:
 c       * introduce an "only" list for fields (applied at init time), to reduce memory usage
 c         as number of water quality parameters is steadily growing
@@ -65,17 +68,29 @@ c
       public :: is_land                 ! reexport from horizontal_representation
       public :: horizontal_range_check  ! reexport from horizontal_grid_transformations
       public :: coast_line_intersection ! reexport from horizontal_representation
+    
+c     ---------- data revision monitoring ----------
+c
+c     allows independent services to defer updating data dependent on data 
+c     in mesh_grid until it is required. Currently revision is a integer*16 (data_revision_tag) 
+c     making it extremely unlikely to accidentially miss an update (due to the fact that
+c     revision cycles after a finite number of updates
+c  
+      public :: get_data_rev_tag_mesh_grid    ! poll current data revision
+      public :: update_data_rev_tag_mesh_grid ! update current data revision (after modifications)
       
 c     ---------- other exports ----------
 
-      public :: get_grid_coordinates     ! formerly named get_ncc_coordinates
-
+      public :: get_grid_coordinates       ! formerly named get_ncc_coordinates
+      public :: interpolate_cc_3Dgrid_data ! generic interpolator for 3D CC data
+      public :: interpolate_cc_2Dgrid_data ! generic interpolator for 2D CC data
+ 
 c     -------------------- module data --------------------  
 
       integer, parameter :: verbose = 0  ! debugging output control
       real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
-      real, parameter    :: default_padding = 0.0 ! used, if not specified by user
-
+      real, parameter    :: default_padding = 0.0  ! used, if not specified by user
+      integer(kind=selected_int_kind(16)) :: data_revision_tag = -1 ! allow plugins to defer updates (-1 = unset data)
 c
 c     ------ grid dimensions:   ------
 c     
@@ -265,6 +280,8 @@ c
       write(*,*) "padval_dslm    :", padval_dslm
       write(*,*) "padval_bgc     :", padval_bgc
 
+      data_revision_tag = -1      !  -1 = unset data
+
       end subroutine init_mesh_grid
        
 
@@ -307,9 +324,43 @@ c
      +                        deallocate( dissolv_inorg_nitrogen ) 
       if (allocated( chlorophyl )) deallocate( chlorophyl )
 
+      data_revision_tag = -1      !  -1 = unset data
+
       call close_horizontal_representation()
 
       end subroutine close_mesh_grid
+
+c
+c     data revision monitoring tools
+c
+
+      subroutine get_data_rev_tag_mesh_grid(i16)
+c     -------------------------------------------------------
+c     Return current revision in i16 (with representation KIND = selected_int_kind(16))
+c     i16 = -1 means unset data (or that mesh_grid clients
+c     has not invoked update_data_rev_tag_mesh_grid) 
+c     -------------------------------------------------------
+      integer(kind=selected_int_kind(16)), intent(out) :: i16
+      i16 = data_revision_tag ! 
+      end subroutine get_data_rev_tag_mesh_grid
+
+
+      subroutine update_data_rev_tag_mesh_grid()
+c     -------------------------------------------------------
+c     mesh_grid clients should invoke this method once
+c     they are done with modifying mesh_grid data
+c     This allows other mesh_grid clients only perform 
+c     necessary updates.
+c     Currently counter data_revision_tag is incremented
+c     - we could also set a random number
+c     -------------------------------------------------------
+      if (data_revision_tag<0) data_revision_tag = 0
+      if (data_revision_tag == huge(data_revision_tag)) 
+     +   data_revision_tag = 0    ! HUGE(X) The largest positive number
+      data_revision_tag = data_revision_tag + 1
+      end subroutine update_data_rev_tag_mesh_grid
+      
+
 
 
       subroutine interpolate_cc_3Dgrid_data(geo,array,deriv,padval,

@@ -42,7 +42,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_currents
       public :: interpolate_temp
 
-c      public :: interpolate_salty   ! currently unused
+      public :: interpolate_salty   ! currently unused
 c      public :: interpolate_wind    ! currently unused
       public :: interpolate_zooplankton
       public :: interpolate_wdepth

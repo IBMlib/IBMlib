@@ -1,10 +1,10 @@
 207         174          50                      ! nx, ny, nz
 -4.08333333333333  0.166666666666667             ! lambda1, dlam
 48.5500000000000   0.100000000000000             ! phi1, dphi
-coarse      ../convertor/ModelGrid/coarse_grid_depth_Lars     
+coarse      coarse_grid_depth_Lars     
 
 198         241          52                      ! nx, ny, nz
 9.3472222222222 0.02777777777777778              ! lambda1, dlam
 53.591666666666 0.0166666666666                  ! phi1, dphi 
-fine        ../convertor/ModelGrid/fine_grid_depth_Lars      
+fine        fine_grid_depth_Lars      
 

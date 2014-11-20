@@ -1,0 +1,9 @@
+#
+#  parts of control file read by task
+#  list any number of settlement habitat (as lon-lat boxes, giving SW and NE corners)
+#
+start_time               = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time                 = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the d
+particle_time_step       = 1800              ! seconds
+connectivity_matrix_file = connect.nc        ! netcdf filename
+#

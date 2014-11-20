@@ -357,7 +357,7 @@ c     --------------------------------------------------
       O2_mlperl = oxy*mmolm3_2_mll      ! mmol/m3 -> ml/l
       O2scaled  = 0.71*O2_mlperl
 c     --- check range of O2scaled to avoid exceptions for exp or **     
-      i    f (O2scaled < 1.0e-2) then
+      if (O2scaled < 1.0e-2) then
          homeostatic_OES_probability = 0.0
       elseif (O2scaled > 60) then 
          homeostatic_OES_probability = 1.0

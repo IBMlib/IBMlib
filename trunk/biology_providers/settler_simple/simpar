@@ -1,0 +1,6 @@
+#
+#  parts of control file read by settlement logic
+#  list any number of settlement habitat (as lon-lat boxes, giving SW and NE corners)
+#
+square_settlement_habitat  =  11.0 56.0  11.5 56.5   #  SWlon SWlat NElon NElat
+square_settlement_habitat  =  11.5 56.5  12.0 57.0   #  SWlon SWlat NElon NElat

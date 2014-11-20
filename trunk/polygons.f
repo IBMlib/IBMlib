@@ -1,4 +1,4 @@
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
 c     Polygons module
 c     ---------------------------------------------------
@@ -8,14 +8,16 @@ c     $LastChangedBy: asch $
 c
 c     Provides basic functionality about polygons
 c     
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c     Enable speed-up in processing by classifying polygons at instantiation
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module polygons
       use geometry
       implicit none
       private
 
       public :: lonlat_polygon  
-      public :: init_lonlat_polygon
+      public :: init_lonlat_polygon   ! generic constructor
+      public :: init_alligned_rectangle ! variant constructor for alligned rectangles, allow speed-up
       public :: delete_lonlat_polygon
       public :: print_lonlat_polygon
       public :: get_polygon_name
@@ -26,10 +28,11 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 C     public :: get_surrounding_ICESrectangle   ! LON,LAT -> TAG
      
 c     --------------------------------
-c     
+c     Polytype polygon
 c     --------------------------------
       type lonlat_polygon     
       private
+         logical       :: is_alligned_rectangle ! polygon is flagged as rectangle alligned with lon,lat axes
          real, pointer :: nodes(:,:)        ! input (2,nnode) implicit closure between first and last point  
          character*256 :: name              ! input: auxillary name   
          real          :: bounding_box(2,2) ! (SWlon,SWlat,NElon,NElat) of surrounding bounding box; inferred from nodes
@@ -76,19 +79,31 @@ c     ----------------------------------------------------------------
       
       subroutine init_lonlat_polygon(poly, nodes, name)
 c     ----------------------------------------------------
+c     Generic polygon constructor
+c
+c     TODO: add a numerically robust algorithm to spot and flag alligned rectangles
+c     ----------------------------------------------------
       type(lonlat_polygon), intent(inout) :: poly
       real, intent(in)                    :: nodes(:,:) ! (2+,nnode)  ignore vertical coordinate, if present
       character*(*), intent(in), optional :: name 
 c
-      integer                             :: nn,icut
+      integer                             :: n1,n2,icut
 c     ----------------------------------------------------
-      nn = size(nodes, 2)
-      if (nn<3) then
-         write(*,*) "init_lonlat_polygon: too few nodes ", nn
+      n1 = size(nodes, 1)
+      n2 = size(nodes, 2)
+      if (n1<2) then
+         write(*,*) "init_lonlat_polygon: space dim < 2 ", n1
          stop
       endif
-      allocate(poly%nodes(2,nn))
+      if (n2<3) then
+         write(*,*) "init_lonlat_polygon: too few nodes ", n2
+         stop
+      endif
+      
+      allocate(poly%nodes(2,n2))
       poly%nodes = nodes(1:2,:)  ! copy nodes; ignore vertical coordinate, if present
+c     ------ polygon classification flags ------
+      poly%is_alligned_rectangle = .false. ! only for processing speed-up
 c     ------ infer bounding box ------
       poly%bounding_box(1,1) = minval(poly%nodes(1,:)) ! SWlon
       poly%bounding_box(2,1) = minval(poly%nodes(2,:)) ! SWlat
@@ -107,6 +122,66 @@ c     ------ set name
 c     ----------------------------------------------------      
       end subroutine init_lonlat_polygon
       
+
+
+
+      subroutine init_alligned_rectangle(poly, corners, name)
+c     ----------------------------------------------------
+c     Variant constructor for alligned rectangles, allow speed-up
+c
+c     Opposed to init_lonlat_polygon, only a set of opposite corners
+c     should be provided at instantiation
+c
+c     TODO: make a variant that accepts vector corners = (SWlon, SWlat, NElon, NElat)
+c           along with an interface
+c     ----------------------------------------------------
+      type(lonlat_polygon), intent(inout) :: poly
+      real, intent(in)                    :: corners(:,:) ! (2+,2)  ignore vertical coordinate, if present
+      character*(*), intent(in), optional :: name 
+c
+      integer                             :: n1,n2,icut
+c     ----------------------------------------------------
+      n1 = size(corners, 1)
+      n2 = size(corners, 2)
+      if (n1<2) then
+         write(*,*) "init_alligned_rectangle: space dim < 2 ", n1
+         stop
+      endif
+      if (n2/=2) then
+         write(*,*) "init_alligned_rectangle: nodes /= corners ", n2
+         stop
+      endif
+c     ------ infer bounding box from corners ------
+      poly%bounding_box(1,1) = minval(corners(1,:)) ! SWlon
+      poly%bounding_box(2,1) = minval(corners(2,:)) ! SWlat
+      poly%bounding_box(1,2) = maxval(corners(1,:)) ! NElon
+      poly%bounding_box(2,2) = maxval(corners(2,:)) ! NElat
+c     ------ assign nodes counter clockwise from bounding box ------ 
+c            ignore vertical coordinates, if present
+      allocate(poly%nodes(2,4))
+      poly%nodes(:,1) =  poly%bounding_box(:,1) ! SW corner
+      poly%nodes(1,2) =  poly%bounding_box(1,2) ! SE corner, lon
+      poly%nodes(2,2) =  poly%bounding_box(2,1) ! SE corner, lat
+      poly%nodes(:,3) =  poly%bounding_box(:,2) ! NE corner
+      poly%nodes(1,4) =  poly%bounding_box(1,1) ! NW corner, lon
+      poly%nodes(2,4) =  poly%bounding_box(2,2) ! NW corner, lat
+c     ------ polygon classification flags ------
+      poly%is_alligned_rectangle = .true. ! only for processing speed-up
+c     ------ infer auxillary exterior point ------
+      poly%extpt = poly%bounding_box(:,2) + 1.0  ! add arbitrary safety dist to NE corner to get an external point
+c     ------ set name
+      if (present(name)) then
+         icut = min(len(poly%name), len(name))
+         poly%name = name(1:icut) 
+         poly%name = adjustl(poly%name)   
+      else
+         poly%name = "no_name" 
+      endif 
+c     ----------------------------------------------------      
+      end subroutine init_alligned_rectangle
+
+
+
 
       subroutine delete_lonlat_polygon(poly)
 c     ----------------------------------------------------
@@ -131,6 +206,7 @@ c     ----------------------------------------------------
 c     ----------------------------------------------------
       nn = size(poly%nodes, 2)
       write(iunit,533) trim(adjustl(poly%name)), nn
+      write(iunit,535) poly%is_alligned_rectangle
       write(iunit,540) "SW", poly%bounding_box(:,1)
       write(iunit,540) "NE", poly%bounding_box(:,2)
       write(iunit,542) poly%extpt
@@ -140,6 +216,7 @@ c     ----------------------------------------------------
       enddo
 c     -------------
  533  format("lonlat_polygon instance ", a, " with ", i5, " nodes")
+ 535  format("is_alligned_rectangle flag = ", l8)
  540  format("bounding box ",a, " corner = ", 
      +       f10.4," degE ", f10.4," degN")  
  542  format("auxillary external point", 
@@ -183,10 +260,36 @@ c     ------------------------------------------------------------
       end subroutine get_bounding_box
 
 
+      
+      logical function is_inside_bounding_box(poly, xy)
+c     ----------------------------------------------------
+c     Test whether xy is inside bounding box of polygon:
+c
+c        (SWlon < x < NElon) .and. (SWlat  < y < NElat)
+c
+c     This function could be moved to the public interface, 
+c     if useful outside
+c     ----------------------------------------------------
+      type(lonlat_polygon), intent(in) :: poly
+      real, intent(in)                 :: xy(:)  ! size = 2+;  ignore vertical coordinate, if present
+c
+      is_inside_bounding_box = ((poly%bounding_box(1,1) < xy(1)).and.
+     +                          (poly%bounding_box(1,2) > xy(1)).and.
+     +                          (poly%bounding_box(2,1) < xy(2)).and.
+     +                          (poly%bounding_box(2,2) > xy(2)))
+      end function is_inside_bounding_box
+
+
+
       logical function is_inside_polygon(poly, xy)
 c     ----------------------------------------------------
 c     Test whether xy is inside polygon or not, using the ray tracing algortihm  
-c     ray tracing algortihm: odd number of crossings of polygon side going from xy to exterior point => xy inside    
+c     ray tracing algortihm: odd number of crossings of polygon side going from xy to exterior point => xy inside 
+c   
+c     If flag is_alligned_rectangle is .true. redirect to is_inside_bounding_box which is faster   
+c     TODO: update scan over line segments with faster algorithm which 
+c           uses a smarter external point - the numerical robustness
+c           needs to be assessed though
 c     ----------------------------------------------------
       type(lonlat_polygon), intent(in) :: poly
       real, intent(in)                 :: xy(:)  ! size = 2+;  ignore vertical coordinate, if present
@@ -195,6 +298,11 @@ c
       real                             :: s
       logical                          :: cross
 c     ----------------------------------------------------
+      if (poly%is_alligned_rectangle) then
+         is_inside_polygon = is_inside_bounding_box(poly, xy)  ! faster if applicable
+         return
+      endif
+c     ------- apply generic ray tracing algortihm for inside test 
       ncross = 0
       nnodes = size(poly%nodes, 2)
       do inode = 1, nnodes-1

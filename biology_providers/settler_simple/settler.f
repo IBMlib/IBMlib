@@ -325,8 +325,8 @@ c
 c     ----------------------------------------------------- 
 c     State polling method to inquire source/setting boxes
 c     of the particle
-c     Descriptors (frombox, tobox) are only 
-c     set, if is_settled is .true.
+c     Descriptor tobox is only set, if is_settled is .true.
+c     frombox is always set
 c     survival == 0 means particle is dead
 c     ----------------------------------------------------- 
       type(state_attributes), intent(in) :: state 
@@ -335,10 +335,10 @@ c     -----------------------------------------------------
       integer, intent(out)               :: tobox   
       real,    intent(out)               :: survival   
 c     ----------------------------------------------------- 
-      survival   = state%survival ! always pass on
+      survival = state%survival   ! always pass on
+      frombox  = state%sourceBox  ! always pass on
       if (state%type == particle_settled) then
-         is_settled = .true.
-         frombox    = state%sourceBox  
+         is_settled = .true. 
          tobox      = state%settleBox
       else
          is_settled = .false.

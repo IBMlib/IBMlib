@@ -22,6 +22,18 @@ thisdir = os.path.dirname(__file__)  # allow remote import
 earth_radius  = 6371.0   # Earth average radius in km
 
 
+def nice_matrix(m, fmt="%12.7f"):
+    # -------------------------------------------
+    # convert matrix m to a readable string
+    # formatted by fmt
+    # -------------------------------------------
+    res = ""
+    for row in m:
+        for item in row: res += fmt % item
+        res += "\n"
+    return res
+
+
 # ------------ bounding box functionality ------------
 
 def get_common_bbox(bbox1, bbox2):
@@ -49,6 +61,37 @@ def lonlat_dist(lon0,lat0, lon1,lat1):
 	rho  = cos(lam0)*cos(phi0)*cos(lam1)*cos(phi1) + sin(lam0)*cos(phi0)*sin(lam1)*cos(phi1) + sin(phi0)*sin(phi1)
         rho = min(max(rho, 0.0), 1.0)
 	return earth_radius*arccos(rho)
+
+
+
+pie_colors = ['red','blue','green','yellow','magenta','purple']
+ 
+def draw_pie(ax,ratios,X,Y,size):
+	# -------------------------------------------------------
+	# Draw pie chart from scratch
+	# Code from
+	#   http://www.geophysique.be/2010/11/15/matplotlib-basemap-tutorial-05-adding-some-pie-charts/
+	# Adaptations: Added assertion that sum(ratios) ~ 1
+	#              Applied trigonometry/pi from numpy corresponding to all-import 
+	# Arguments:
+	#   ax:     subplot, where pie chart should be added
+	#   ratios: pie ratios
+	#   X,Y:    pie center in plot
+	#   size:   pie size
+	# -------------------------------------------------------
+	N = len(ratios)
+	assert abs(sum(ratios)-1) < 1e-4
+	xy = []
+	start = 0.
+	for ratio in ratios:
+		x = [0] + cos(linspace(2*pi*start,2*pi*(start+ratio), 30)).tolist()
+		y = [0] + sin(linspace(2*pi*start,2*pi*(start+ratio), 30)).tolist()
+		xy1 = zip(x,y)
+		xy.append(xy1)
+		start += ratio
+	for i, xyi in enumerate(xy):
+		ax.scatter([X],[Y] , marker=(xyi,0), s=size, facecolor=pie_colors[i], zorder=100)
+
 
 
 class TransportMatrix:
@@ -92,17 +135,17 @@ class TransportMatrix:
         nt = len(self.time)
         nd = len(dest_groups)
         ns = len(src_groups)
-        tagg = zeros((nd,ns), float)
+        tagg = zeros((nt,nd,ns), float)
         for it in range(nt):
             for (ide, degr) in enumerate(dest_groups):
                 for (isc, scgr) in enumerate(src_groups):
                     tagg[it, ide,isc] = sum(take(take(self.tmat[it], degr, axis=0), scgr, axis=1))/len(scgr)
         # --- configure child instance ---
         child = TransportMatrix() # clean object
-        agg.tmat   = tagg
-        agg.time   = self.time # no copy, shared object
-        agg.parent = self
-        return agg
+        child.tmat   = tagg
+        child.time   = self.time # no copy, shared object
+        child.parent = self
+        return child
 
     def get_survival_by_source(self, frame=-1):
         return sum(self.tmat[frame], axis=0)
@@ -221,16 +264,25 @@ class TransportMatrix:
         return landboxes.bbox
 
 
-    def _get_dist_tmat_lists(self, tmin, frame=-1):
+    def _get_dist_tmat_lists(self, tmin, frame=-1, dest="all", src="all"):
         # ------------------------------------------------------
 	# Resolve lists of tmat[i,j], dist[i,j] for all
 	# elements where tmat > tmin
+	# dest/src are optional indices of groups (default all destinations/sources)
 	# ------------------------------------------------------
 	nti, nde, nsc = self.tmat.shape
 	tlist = []
 	dlist = []
-	for ide in range(nde):
-	        for isc in range(nsc):
+	if dest   == "all":
+		destset = range(nde)
+	else:
+		destset = dest
+	if src == "all":
+		srcset = range(nsc)
+	else:
+		srcset = src
+	for ide in destset:
+	        for isc in srcset:
 			t = self.tmat[frame,ide,isc]
 			if t>tmin:
 				tlist.append(t)
@@ -239,27 +291,30 @@ class TransportMatrix:
 				dlist.append( lonlat_dist(lon0,lat0, lon1,lat1) )
 	return dlist, tlist
 
-    def plot_dist_tmat(self, tmin, frame=-1):
+    def plot_dist_tmat(self, tmin, frame=-1, dest="all", src="all"):
         # ------------------------------------------------------
         # Make scatter plot of (distances, transport_probability)
 	# Attributes destinations and sources must have been set
+	# dest/src are optional indices of groups (default all destinations/sources)
         # ------------------------------------------------------
-        dlist, tlist = self._get_dist_tmat_lists(tmin, frame)
+        dlist, tlist = self._get_dist_tmat_lists(tmin, frame, dest, src)
 	plt.scatter(dlist, tlist)
 	plt.xlabel('distance[km]')
 	plt.ylabel('transport probability')
 	plt.show()
 
-    def plot_dist_histogram(self, tmin, frame=-1):
+    def plot_dist_histogram(self, tmin, frame=-1, dest="all", src="all"):
         # ------------------------------------------------------
         # Make scatter plot of (distances, transport_probability)
 	# Attributes destinations and sources must have been set
+	# dest/src are optional indices of groups (default all destinations/sources)
         # ------------------------------------------------------
-        dlist, tlist = self._get_dist_tmat_lists(tmin, frame)
+        dlist, tlist = self._get_dist_tmat_lists(tmin, frame,  dest, src)
 	plt.hist(dlist)
 	plt.xlabel('distance[km]')
 	plt.ylabel('frequency')
 	plt.show()
+
 
 
 class BoxSet(list):
@@ -267,7 +322,7 @@ class BoxSet(list):
     # Represent and ordered list of lon-lat boxes
     # Attributes:
     #    self[ibx]:  box ibx as (SWlon, SWlat, NElon, NElat)
-    #    tags[ibx]:  optional tag for box ibx
+    #    tags[ibx]:  optional tag for box ibx (default is "")
     #    bbox:       minimal bounding box for box set as (SWlon, SWlat, NElon, NElat)
     # ========================================================== 
     def __init__(self, fname):
@@ -290,6 +345,39 @@ class BoxSet(list):
                 self.tags.append("")
             self.bbox = get_common_bbox(self.bbox, self[-1])
         f.close()
+
+	
+    def get_groups(self, tagmap = lambda x:x):
+	# ---------------------------------------------------
+        # Return a mapping of lon-lat boxes
+	#    {tag1: indices_of_tag1,
+	#     tag2: indices_of_tag2, ...}
+	# where tags corresponds to items in tagmap(self.tags)
+	# By default transformation tagmap is the identity map
+	# indices (in self) are those boxes whose tagmap(fulltag) maps to tag key
+	# It is not assumed that tags appear consequetively in self.tags
+	# tag tested identity by == operator on tagmap(fulltag)
+        # ---------------------------------------------------    
+	groupmap = {}
+	for it,fulltag in enumerate(self.tags):
+            tag = tagmap(fulltag) # possibly same
+	    if not tag in groupmap.keys():
+	         groupmap[tag] = []
+	    groupmap[tag].append(it)
+	return groupmap
+
+    def get_group(self, tag, tagmap = lambda x:x):
+	# ---------------------------------------------------
+        # Return indices of boxes with tag==tagmap(fulltag) in self.tags
+	# tag tested identity by == operator on tagmap(fulltag)
+	# By default transformation tagmap is the identity map
+        # ---------------------------------------------------
+	indices = []
+	for it in range(len(self.tags)):
+            if tag == tagmap(self.tags[it]):
+	         indices.append(it)
+	return indices # probably empty
+	 
         
 
 if __name__ == "__main__":
@@ -307,4 +395,6 @@ if __name__ == "__main__":
     tmat.plot_sinkiness_by_destination(landboxes, bbox=(8,55,15,58))
     #tmat.plot_dist_tmat(1e-5)
     #tmat.plot_dist_histogram(1e-5)
+    #jutland zeeland sweden jammerbugt
+    #tmat.plot_dist_histogram(1e-5, dest = tmat.destinations.get_group("jammerbugt", lambda x: x.split("_")[0]))   
     #

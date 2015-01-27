@@ -580,8 +580,10 @@ c     ---- load horizontal turbulent diffusivity ----
 c          Jan2015: currently interpolate_turbulence_deriv
 c                   does not generate horizontal derivatives for non uniform hdiffus
 c
-      call NetCDFcheck( nf90_inq_varid(ncid, "amm", varid) )
-      call NetCDFcheck( nf90_get_var(ncid, varid, hdiffus)) 
+      if (constant_horiz_diffusivity < 0) then
+         call NetCDFcheck( nf90_inq_varid(ncid, "amm", varid) )
+         call NetCDFcheck( nf90_get_var(ncid, varid, hdiffus)) 
+      endif
 c
 c     ---- apply molecular diffusivity lower limit ~ 1.e-9 m2/s   ---
 c

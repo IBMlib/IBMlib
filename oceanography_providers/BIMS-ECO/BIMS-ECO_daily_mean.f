@@ -17,8 +17,7 @@ c     the vertical coordinate from -H < z < eta onto -1 < sigma_POM < 0, where e
 c     reference depth (ncvariable h(x,y) -> wdepth0)
 c
 c     TODO: add parallel load of biogeochemistry (optional load)
-c           vertical/horizontal derivatives of diffusivity
-c           smagorinsky horizontal diffusivity
+c           horizontal derivatives of diffusivity
 c           add minor correction to convert potential temperature to physical temperature
 c   
 c     NOTES: black_sea.grid.4096.h (variables z and zz) suggests that nz is number of faces vertically
@@ -26,6 +25,7 @@ c            so that the number of wet cells is nz-1 vertically. Cell-centered a
 c            are padded with an arbitrary value in last element iz=35 (surface cell at iz=1)
 c     
 c     LOG: initial version without biogeochemistry tested 17 Dec 2014    
+c          Elaborations from Sinan S. Arkin [sinan.arkin@ims.metu.edu.tr] January 23, 2015 incorporated
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
@@ -468,16 +468,20 @@ c     POM employs sigma coordinates, which are bottom-following coordinates that
 c     the vertical coordinate from -H < z < eta onto -1 < sigma_POM < 0, where z is -depth below ref level (not sea surface)
 c     H > 0 is the static variable h(x,y) (in grid file) loaded into wdepth0
 c     eta is dynamic variable elb(x,y) (in physics file) )
-
+c
+c     nz is number of faces vertically so that the number of wet cells is nz-1 vertically. 
+c     Cell-centered arrays like t (temperature) are padded with an arbitrary value in last element iz=35 (surface cell at iz=1)
+c     netCDF variable w(x,y,z) refers to vertical faces (not cell centers), so w(x,y,1) ~ 0 at sea surface and w(x,y,nz=35) = 0 at the sea bed.
 c     Currently load these fields (in native units/conventions, c-declaration index order):
 c
-c     float elb(y, x)  = "surface elevation in external mode at -dt"   units = "metre" ;     staggering  = (east_e, north_e)
-c     float u(z, y, x) = "x-velocity"                                  units = "metre/sec" ; staggering  = (east_u, north_u, zz) 
-c     float v(z, y, x) = "y-velocity"                                  units = "metre/sec" ; staggering  = (east_v, north_v, zz) 
-c     float w(z, y, x) = "sigma-velocity"                              units = "metre/sec" ; staggering  = (east_e, north_e, zz) ... or z ??
-c     float t(z, y, x) = "potential temperature" ;                     units = "K" ;         staggering  = (east_e, north_e, zz) 
-c     float s(z, y, x) = "salinity x rho / rhoref" ;                   units = "PSS" ;       staggering  = (east_e, north_e, zz) 
-c     float kh(z, y, x) = "vertical diffusivity" ;                     units = "m^2/sec";    staggering  = (east_e, north_e, zz) 
+c     float elb(y, x)    = "surface elevation in external mode at -dt"  units = "metre" ;     staggering  = (east_e, north_e)
+c     float u(z, y, x)   = "x-velocity"                                 units = "metre/sec" ; staggering  = (east_u, north_u, zz) 
+c     float v(z, y, x)   = "y-velocity"                                 units = "metre/sec" ; staggering  = (east_v, north_v, zz) 
+c     float w(z, y, x)   = "sigma-velocity"                             units = "metre/sec" ; staggering  = (east_e, north_e, z) (error in netcdf attribute, Sinan Jan 23,2015)
+c     float t(z, y, x)   = "potential temperature" ;                    units = "K" ;         staggering  = (east_e, north_e, zz) 
+c     float s(z, y, x)   = "salinity x rho / rhoref" ;                  units = "PSS" ;       staggering  = (east_e, north_e, zz) 
+c     float kh(z, y, x)  = "vertical diffusivity" ;                     units = "m^2/sec";    staggering  = (east_e, north_e, zz) 
+c     float aam(z, y, x) = "horizontal kinematic viscosity" ;           units = "metre^2/sec";staggering  = (east_e, north_e, zz) 
 c
 c     fortran index order opposite CDL dump order
 c     fortran: fastests index left most
@@ -537,7 +541,7 @@ c     ---- load v current component ----
 c     ---- load w current component ---- 
       call NetCDFcheck( nf90_inq_varid(ncid, "w", varid) )
       call NetCDFcheck( nf90_get_var(ncid, varid, w, count=count3D) )
-      w = -w  ! w positive direction downward 
+      w = -w  !  In BIMS-ECO positive direction for w is up, whereas downward in IBMlib
 
 
 c     ---- load temperature (ignore difference beteen potential and physical temperature)----
@@ -572,12 +576,15 @@ c          some data sets define data points at vertical faces
       
 
 c
-c          NB: horizontal derivatives NOT implemented
-c          when spatially non constant hdiffus are applied,
-c          interpolate_turbulence_deriv must be updated
+c     ---- load horizontal turbulent diffusivity ----
+c          Jan2015: currently interpolate_turbulence_deriv
+c                   does not generate horizontal derivatives for non uniform hdiffus
 c
-c     ---- currently no horizontal turbulent diffusivity: set to
-c          molecular diffusivity lower limit ~ 1.e-9 m2/s   ---
+      call NetCDFcheck( nf90_inq_varid(ncid, "amm", varid) )
+      call NetCDFcheck( nf90_get_var(ncid, varid, hdiffus)) 
+c
+c     ---- apply molecular diffusivity lower limit ~ 1.e-9 m2/s   ---
+c
       where (vdiffus<1.e-9)
          vdiffus = 1.e-9
       end where

@@ -581,7 +581,7 @@ c          Jan2015: currently interpolate_turbulence_deriv
 c                   does not generate horizontal derivatives for non uniform hdiffus
 c
       if (constant_horiz_diffusivity < 0) then
-         call NetCDFcheck( nf90_inq_varid(ncid, "amm", varid) )
+         call NetCDFcheck( nf90_inq_varid(ncid, "aam", varid) )
          call NetCDFcheck( nf90_get_var(ncid, varid, hdiffus)) 
       endif
 c
@@ -591,7 +591,7 @@ c
          vdiffus = 1.e-9
       end where
       where (hdiffus<1.e-9)
-         hdiffus = 1.e-9  
+         hdiffus = 1.e-9
       end where     
 
 c     ------------ update state handlers ------------

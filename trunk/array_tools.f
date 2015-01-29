@@ -39,7 +39,7 @@ c     ------------------------------------------------------
       endif
 c     --- do loop: keep vlist(i) < v < vlist(ip) and i<ip
       i  = 1  ! we know v > vlist(1)
-      ip = n  ! we know v < vlist(1)
+      ip = n  ! we know v < vlist(n)
       do while ((ip-i)>1)
          itest = (i+ip)/2 ! integer arithmetics: i<itest<ip
          if (vlist(itest)>v) then

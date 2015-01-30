@@ -100,14 +100,14 @@ c     ------------------------------------------
 
       subroutine get_horiz_grid_coor_scalar(geo,x,y)
 c     -------------------------------------------------------- 
-c     Compute continuous horizontal grid coordinates (x,y)
-c     of lon-lat position xy (which may include the z component)
+c     Compute continuous horizontal grid coordinates x,y
+c     of lon-lat position geo (which may include the z components etc)
 c     Mesh points are on integer values of (x,y) and the
 c     first mesh point is at (x,y) = (1,1), i.e. fortran offset
 c     no range check     
 c     -------------------------------------------------------- 
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: x,y
+      real, intent(in)   :: geo(:)
+      real, intent(out)  :: x,y
 c     -------------------------------------------------------- 
       x  = 1.0 + (geo(1)-lambda1)/dlambda 
       y  = 1.0 + (geo(2)-phi1)/dphi         
@@ -116,9 +116,17 @@ c     --------------------------------------------------------
       
       subroutine get_horiz_grid_coor_vector(geo,xy)  
 c     -------------------------------------------------------- 
-      real, intent(in)     :: geo(:)
-      real, intent(out)    :: xy(:)
+c     Compute continuous horizontal grid coordinates xy
+c     of lon-lat position geo (which may include the z components etc)
+c     Copy geo(3:max) to xy, if both buffers are larger than 2
+c     no horizontal range check     
 c     -------------------------------------------------------- 
+      real, intent(in)   :: geo(:)
+      real, intent(out)  :: xy(:)
+      integer            :: n
+c     -------------------------------------------------------- 
+      n = min(size(geo), size(xy))
+      if (n>2) xy(3:n) = geo(3:n)  ! copy rest of geo buffer to xy, if any
       call get_horiz_grid_coor_scalar(geo,xy(1),xy(2))
       end subroutine get_horiz_grid_coor_vector
 
@@ -139,10 +147,18 @@ c     --------------------------------------------------------
 
       
       subroutine get_horiz_geo_coor_vector(xy,geo)
+c     -------------------------------------------------------- 
+c     Compute lon-lat position geo corresponding to 
+c     continuous horizontal grid coordinates xy
+c     Buffer geo may contain z value 
+c     Copy xy(3:max) to geo, if both buffers are larger than 2
 c     --------------------------------------------------------  
       real, intent(in)    :: xy(:)
       real, intent(out)   :: geo(:)
+      integer             :: n
 c     -------------------------------------------------------- 
+      n = min(size(geo), size(xy))
+      if (n>2) geo(3:n) = xy(3:n) ! copy rest of xy buffer to geo, if any
       call get_horiz_geo_coor_scalar(xy(1),xy(2),geo)
       end subroutine get_horiz_geo_coor_vector
 

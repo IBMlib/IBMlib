@@ -1,9 +1,21 @@
-#
-#  parts of control file read by task
-#  list any number of settlement habitat (as lon-lat boxes, giving SW and NE corners)
-#
+!-----------------------------------------------------------------------------------
+!  parts of control file read by task
+!  list any number of settlement habitat (as lon-lat boxes, giving SW and NE corners)
+!-----------------------------------------------------------------------------------
 start_time               = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
 end_time                 = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the d
 particle_time_step       = 1800              ! seconds
+!
+!--------------- particle source locations --------------------------------------
+!     time window   : t1 < t2 (direction not relevant here)
+!     positions     : xmin xmax == longitude [degrees]
+!                     ymin ymax == latitude  [degrees]
+!                     zmin zmax == relative to depth   (0=surf < zmin < zmax < 1=bottom) 
+!     n             : number of particles released at each point
+!     [additional biological parameters]
+!--------------------------------------------------------------------------------
+!                   t1                 t2         xmin  ymin zmin     xmax ymax zmax     n  
+emitbox  = 1995 03 20 10000   1995 03 20 12000    11.0 56.5  0.0      11.5 57.0 1.0     1000  ! there may be additional biological parameters
+!
 connectivity_matrix_file = connect.nc        ! netcdf filename
-#
+!

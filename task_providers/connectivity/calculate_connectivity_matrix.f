@@ -31,7 +31,9 @@ c     ------------ declarations ------------
       integer :: i, last, final_year
       integer :: idum(4), istep, nemax
       integer :: nsrc, ndest
-      real    :: time_step, xyz(3)
+      logical :: is_settled
+      integer :: frombox, tobox
+      real    :: time_step, xyz(3), survival
       real, allocatable    :: tmat(:,:), tmat_prior(:)
       integer, allocatable :: num_emit(:)
       character*256        :: filename
@@ -98,15 +100,22 @@ c
       call get_connectivity_matrix(state_stack, num_emit,
      +                                   tmat_prior, tmat)
 
-c$$$c     --- debug:begin
+
+c$$$c     --- misc dumps: begin
+c$$$      open(56, file="finalpos.dat")
 c$$$      do i=1,last
-c$$$         write(*,'(72("-"))') 
-c$$$         call write_state_attributes(state_stack(i))
+c$$$c         write(*,'(72("-"))') 
+c$$$c          call write_state_attributes(state_stack(i))
 c$$$         call get_particle_position(get_particle(par_ens,i), xyz)
-c$$$         write(*,*) "position=", xyz
+c$$$c          write(*,*) "position=", xyz
+c$$$         call inquire_settling_success(state_stack(i), is_settled, 
+c$$$     +                                 frombox, tobox, survival)  
+c$$$         write(56,*) xyz, is_settled, frombox
 c$$$      enddo
-c$$$c     --- debug:end
+c$$$      close(56)
+c$$$c     --- misc dumps:end
       
+
 c
 c     -------- dump connectivity to file as netCDF --------
 c

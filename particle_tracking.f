@@ -184,6 +184,8 @@ c     .... currently domainBC can only be sticky
       public :: set_bottom_BC 
       public :: set_surface_BC
       
+      public :: is_ashore
+
       public :: create_emission_boxes
       public :: activate_emission_box
       public :: write_emission_box
@@ -1173,6 +1175,15 @@ c------------------------------------------------------------
          stop
       endif   
       end subroutine set_surface_BC     
+
+
+
+      logical function is_ashore(tracattr)
+c------------------------------------------------------------ 
+      type(spatial_attributes),intent(in) :: tracattr
+c------------------------------------------------------------ 
+      is_ashore = tracattr%ashore
+      end function is_ashore
 
 
 c============================================================

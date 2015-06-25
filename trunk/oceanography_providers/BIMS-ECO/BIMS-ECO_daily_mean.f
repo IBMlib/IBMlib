@@ -361,7 +361,6 @@ c     ------------------------------------------------------------
       integer             :: dimid,varid,idum, gncid
       integer             :: ix,iy
       real,allocatable    :: fsm(:,:)
-      real,parameter      :: very_deep = 1.0e5
 c     ------------------------------------------------------------
       if (data_in_buffers) stop "init_topography:unexpected"
       write(fname,361) trim(adjustl(hydroDBpath))
@@ -394,12 +393,8 @@ c     ---- render vertical grid tables well defined in all points, including dry
 c          ccdepth/acc_width in wet points will be updated dynamically, 
 c          when hydrographical frames are loaded
       
-      ccdepth(:,:,1)   = very_deep 
-      ccdepth(:,:,2:)  = 2*very_deep
-      acc_width(:,:,1) = 0.0        ! including surface layer (iz=1)
-      acc_width(:,:,2) = 2*very_deep
-      acc_width(:,:,3:)= 2*very_deep
-
+      ccdepth   = 0.0
+      acc_width = 0.0
 
       end subroutine init_topography
 
@@ -686,7 +681,7 @@ c     --------------------------------------------------------------------------
       real                 :: x,y,z, sx,sy,sz
 c     ------------------------------------------ 
       if (.not.is_wet(xyz)) then
-         uvw    = 0.
+         uvw    = 0.0
          status = 3  ! signal dry point
          return
       endif

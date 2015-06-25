@@ -123,7 +123,8 @@ c     --------------------------------------------------------------
      +              buoyancy
          stop 653
       endif
-      v_active = sink_speed
+      v_active(1:2) = 0.0
+      v_active(3)   = sink_speed ! positive down
       end subroutine get_active_velocity
 
 

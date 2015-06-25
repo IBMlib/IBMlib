@@ -53,8 +53,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_turbulence_deriv
       public :: interpolate_currents
       public :: interpolate_temp
+      public :: interpolate_salty   
 
-c      public :: interpolate_salty   ! currently unused
 c      public :: interpolate_wind    ! currently unused
 c      public :: interpolate_zooplankton
 

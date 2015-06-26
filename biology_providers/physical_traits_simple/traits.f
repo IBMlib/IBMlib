@@ -63,9 +63,9 @@ c     buoyancy = 0: additive fixed sinking speed, in addition to turbulent veloc
 c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant object density (no default) 
 
       integer    :: buoyancy             ! buoyancy model, default = 0
-      real       :: sink_speed           ! [m/s], applies for buoyancy=0, positive down
-      real       :: rho_particle         ! fixed particle density [kg/m**3], applies for buoyancy=1
-      real       :: radius_particle      ! for Stokes law, applies for buoyancy=1
+      real       :: sink_speed           ! [m/s],    applies for buoyancy=0, positive down
+      real       :: rho_particle         ! [kg/m**3] fixed particle density, applies for buoyancy=1
+      real       :: radius_particle      ! [m]       for Stokes law, applies for buoyancy=1
 c     ===============================================================
                                   contains
 c     ===============================================================

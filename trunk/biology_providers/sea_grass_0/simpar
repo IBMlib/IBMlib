@@ -1,0 +1,4 @@
+! ---------------   biological dynamics     ---------------
+settle_period_start = 1      ! days since instantiation 
+settle_period_end   = 55     ! days since instantiation 
+settle_height       = 1      ! meters above bottom, settle below this

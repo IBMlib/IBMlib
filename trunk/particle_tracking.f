@@ -329,9 +329,8 @@ c     Lift these cases to just above (== wlift) the sea bed
 c     Do nothing, if ashore/outofdomain/atbottom or vertically frozen
 c-------------------------------------------------------------
       type(spatial_attributes), intent(inout) :: tracattr
-      real    :: wd
+      real    :: wd, zmin
       integer :: istat
-      real, parameter :: wlift = 0.01 ! [m] lift affected particles wlift above sea bed
 c-------------------------------------------------------------
       if (tracattr%ashore .or. 
      +    tracattr%outofdomain .or.
@@ -344,9 +343,9 @@ c-------------------------------------------------------------
          write(*,*) "renormalize_vertical_position: negative wdepth=",wd
          stop 
       endif
-      if (tracattr%position(3)>wd) then
-         tracattr%position(3) = max(0.5*wd, wd-wlift) ! avoid negative pos if very shallow
-      endif
+      zmin = max(0.5*wd, wd-vert_eps)  ! avoid negative pos if very shallow
+      if (tracattr%position(3) > zmin) tracattr%position(3) = zmin 
+      
       end subroutine renormalize_vertical_position
 
 

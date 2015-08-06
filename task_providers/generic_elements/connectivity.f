@@ -177,6 +177,12 @@ c     -------------------------------------------------------------
       call nccheck( nf90_create(FILE_NAME, NF90_CLOBBER, ncfh%ncid)) 
  
 c     --- create dims
+      if ((nto < 1).or.(nfrom < 1)) then
+         write(*,*) "tmatnc_start: dimensions < 1 for connect matrix"
+         write(*,*) "ndest   = ", nto
+         write(*,*) "nsource = ", nfrom
+         stop 382
+      endif
       call nccheck( nf90_def_dim(ncfh%ncid, "ndest",   nto,   
      +                           dimid_to) )
       call nccheck( nf90_def_dim(ncfh%ncid, "nsource", nfrom, 

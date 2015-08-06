@@ -753,8 +753,8 @@ c     -----------------------------------------------------
          shoreenc = .TRUE.
          if      (tracattr%shoreBC == BC_sticky) then
             virpos    = xyzhit
-            virpos(3) = 0. ! put ashore tracer sat surface
-            tracattr%position = xyzhit
+            virpos(3) = 0.             ! put ashore tracer sat surface
+            tracattr%position = virpos ! asc: fix bug, previously assigned to xyzhit
             tracattr%mobility = 0
             tracattr%ashore   = .TRUE.
 c...........BC exit point

@@ -1,0 +1,14 @@
+!#########################################################
+!   input file example for task = probe_water_column
+!#########################################################
+
+#  ==== set time period for average ====
+
+start_time         = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time           = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+time_step          = 2000              ! period between time samplings in seconds
+
+# 
+zgrid     = 0.1 0.2 0.5 0.8 0.9 ! relative vertical sampling position, positive down
+xystation = a1  4.1  56.0       ! tag lon lat
+xystation = a2  3.2  55.4       ! tag lon lat

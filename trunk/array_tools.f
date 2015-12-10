@@ -11,6 +11,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       implicit none
       private
       public ::  search_sorted_list
+      public ::  histogram_by_bins
 
 c     ---------
       contains
@@ -50,5 +51,41 @@ c     --- do loop: keep vlist(i) < v < vlist(ip) and i<ip
       enddo
 c     ------------------------------------------------------
       end subroutine search_sorted_list
+
+
+
+      subroutine histogram_by_bins(bins, obs, histogram, above, below)
+c     ------------------------------------------------------
+c     Create a histogram corresponding to dense (adjecent) bins from
+c     input data obs.
+c     histogram(i) are occurences in obs(:) of numbers
+c     in range [bins(i); bins(i+1)]. Entries in obs outside
+c     bins are added as occurences in counter (above, below). 
+c     The output buffer histogram must have at least (len(bins)-1) entries
+c     bins are assumed to be a sorted list of range delimiters
+c     ------------------------------------------------------
+      real, intent(in)     :: bins(:), obs(:)
+      integer, intent(out) :: histogram(:)
+      integer, intent(out) :: above, below
+      integer              :: n,i,j
+c     ------------------------------------------------------
+      below     = 0
+      above     = 0
+      histogram = 0
+      n         = size(obs)
+      do i = 1,n
+         call search_sorted_list(obs(i),bins,j)
+         if     (j==0) then
+            below = below + 1
+         elseif (j==n) then
+            above = above + 1
+         else
+            histogram(j) = histogram(j) + 1
+         endif
+      enddo
+      
+c     ------------------------------------------------------
+      end subroutine histogram_by_bins
+
 
       end module 

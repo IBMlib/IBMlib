@@ -1,0 +1,4 @@
+stations          = ../station_list.dat
+output            = hydrography_at_station_list.dat               
+samplings_per_day = 24
+wet_point_file    = wetpoints.lonlat

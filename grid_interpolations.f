@@ -94,7 +94,7 @@ c     Now calculate the interpolated values /derivatives
      &                  (k010*(1 - sx) + k110*sx)*sy +
      &                  (k011*(1 - sx) + k111*sx)*sy
       else
-         call abort("interp_3Dbox_data","unhandled deriv request")
+         call abort_run("interp_3Dbox_data","unhandled deriv request")
       endif
 
 c     Check results 

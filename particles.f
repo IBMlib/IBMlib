@@ -618,30 +618,30 @@ c------------------------------------------------------------
       type(polytype), intent(out) :: bucket
       integer, intent(out) :: status
 c----------locals-------
-      type(clock), pointer:: clock
+      type(clock), pointer:: aclock
       integer :: year, month, day, secs, jday
 c------------------------------------------------------------  
       status=0  !Variable is present
-      clock => get_master_clock()
+      aclock => get_master_clock()
       select case (get_name(var))
       case ("POSIX")
-        call construct(bucket,"POSIX",get_POSIXtime(clock))
+        call construct(bucket,"POSIX",get_POSIXtime(aclock))
       case ("datetime")
-        call construct(bucket,"datetime",get_datetime(clock))
+        call construct(bucket,"datetime",get_datetime(aclock))
       case ("year")
-        call get_date_from_clock(clock, year, month, day)
+        call get_date_from_clock(aclock, year, month, day)
         call construct(bucket,"year",year)
       case ("month")
-        call get_date_from_clock(clock, year, month, day)
+        call get_date_from_clock(aclock, year, month, day)
         call construct(bucket,"month",month)
       case ("day")
-        call get_date_from_clock(clock, year, month, day)
+        call get_date_from_clock(aclock, year, month, day)
         call construct(bucket,"day",day)
       case ("jday")
-        call get_julian_day(clock, jday)
+        call get_julian_day(aclock, jday)
         call construct(bucket,"jday",jday)
       case ("secs")
-        call get_second_in_day(clock, secs)
+        call get_second_in_day(aclock, secs)
         call construct(bucket,"secs",secs)
       case default
         status=1   !Cannot find variable name

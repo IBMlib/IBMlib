@@ -3,8 +3,9 @@
 # 
 ############################################################
 
-task.a: basic_simulation_with_output.o
-	ar rcs task.a basic_simulation_with_output.o
+PROVIDERS = basic_simulation.o     # basic_simulation_with_output.o
+task.a: $(PROVIDERS)   
+	ar rcs task.a $(PROVIDERS) 
 
 include $(COMMON_RULES)
 

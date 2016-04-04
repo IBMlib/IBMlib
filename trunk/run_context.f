@@ -36,8 +36,17 @@ c.....For debugging only: allow any including level to signal and capture stop r
       
 
       subroutine init_run_context()
-c---------------------------------------------------------
-      integer, external :: iargc
+c-----------------------------------------------------------------------------
+c     Pre fortran 2003 standard conforming handling of iargc() 
+c
+c     compiler   flags set
+c     ifort      -std90    
+c     gfortran   -fall-intrinsics -std=f95 
+c     gfortran   -fall-intrinsics -std=gnu 
+c     pgf90      -Mstandard
+c-----------------------------------------------------------------------------
+c      integer, external :: iargc   
+      integer           :: iargc    ! standard conforming on ifort/gfortran/pgf90 
       character*999     :: str
       integer           :: iarg, narg
       character*10      :: date, time, zone

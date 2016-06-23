@@ -1,0 +1,12 @@
+#  ==== set time period for averaging ====
+
+start_time         = 1995 03 20 10000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time           = 1995 03 20 20000  ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+time_step          = 2000              ! period between time samplings in seconds
+
+#  ==== transect definition ====
+
+transect   =  4  54  0   6  56  20     ! lon0[deg]  lat0[deg]  depth0[m] lon1[deg]  lat1[deg]  depth1[m]
+resolution =  3000 2                   ! sampling resolution : horizontal [m]  vertical[m] 
+
+outputfile =  jj.dat

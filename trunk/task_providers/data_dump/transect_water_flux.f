@@ -90,7 +90,7 @@ c
       call read_control_data(simulation_file,"outputfile", filename)  !
       open(iout, file=filename)
       write(iout, 232) "# time[days] after start", "flux [m3/s]", 
-     +               "flux integral [m3]"
+     +               "flux integral / area [m]"
  232  format(a30,   2(5x, a20))
  233  format(f30.6, 2(5x, e20.6))     
 
@@ -116,7 +116,7 @@ c
          hflux_intg = hflux_intg + hflux*time_step ! unit m3
 c     
          write(*,   265) istep,                   hflux, hflux_intg
-         write(iout,233) istep*time_step/86400.0, hflux, hflux_intg
+         write(iout,233) istep*time_step/86400.0, hflux, hflux_intg/area
          istep = istep + 1
       enddo
       close(iout)

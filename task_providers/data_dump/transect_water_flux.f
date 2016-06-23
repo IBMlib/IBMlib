@@ -89,10 +89,10 @@ c     --- vertical sampling ---
 c
       call read_control_data(simulation_file,"outputfile", filename)  !
       open(iout, file=filename)
-      write(iout, 232) "# time[sec] after start", "flux [m3/s]", 
+      write(iout, 232) "# time[days] after start", "flux [m3/s]", 
      +               "flux integral [m3]"
  232  format(a30,   2(5x, a20))
- 233  format(e30.6, 2(5x, e20.6))     
+ 233  format(f30.6, 2(5x, e20.6))     
 
 c   
 c     =====================  main time loop =====================
@@ -115,8 +115,8 @@ c
          enddo
          hflux_intg = hflux_intg + hflux*time_step ! unit m3
 c     
-         write(*,   265) istep,           hflux, hflux_intg
-         write(iout,233) istep*time_step, hflux, hflux_intg
+         write(*,   265) istep,                   hflux, hflux_intg
+         write(iout,233) istep*time_step/86400.0, hflux, hflux_intg
          istep = istep + 1
       enddo
       close(iout)

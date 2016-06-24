@@ -59,14 +59,14 @@ c     --- horizontal sampling ---
       allocate( dl(mh) )     ! length of faces corresponding to sampling points
       allocate( nvec(3,mh) ) ! Cartesian face normals
       dlonlat  = (r6(4:5) - r6(1:2))/mh  ! dlon,dlat
-      nvec = 0.0 ! zero vertical component
+      nvec = 0.0             ! zero vertical component
       do ih = 1, mh
          xy(:,ih) = r6(1:2) + (ih-0.5)*dlonlat ! face mid point
          call get_xyz2cart_jacobian(xy(:,ih), jacob)
          dr = jacob(1:2)*dlonlat
          dl(mh) = sqrt(sum(dr*dr))
-         drhat(1)     = -dr(2)
-         drhat(2)     =  dr(1)
+         drhat(1)     = -dr(2)  ! rotate counter clockwise
+         drhat(2)     =  dr(1)  ! rotate counter clockwise
          nvec(1:2,ih) =  drhat/sqrt(sum(drhat*drhat)) 
       enddo
 
@@ -83,16 +83,18 @@ c     --- vertical sampling ---
       write(*,*) "Scanning transect from ", r6(1:2), " to ", r6(4:5)
       write(*,*) "Depth range from ", r6(3), " to ", 
      +           r6(6), " m below ses surface"
-      write(*,*) "Horizontal sampling = ", mh
-      write(*,*) "Vertical sampling   = ", mz
-      write(*,*) "Transect area       = ", area, " m2"
-c
+      write(*,*) "Horizontal sampling     = ", mh
+      write(*,*) "Vertical sampling       = ", mz
+      write(*,*) "Transect area           = ", area, " m2"
+      write(*,*) "Average transect normal = ", sum(nvec, dim=2)/mh
+
       call read_control_data(simulation_file,"outputfile", filename)  !
       open(iout, file=filename)
-      write(iout, 232) "# time[days] after start", "flux [m3/s]", 
-     +               "flux integral / area [m]"
+      write(iout, 232) "# time[days] after start", 
+     +                 "flux integral / area [km]", 
+     +                 "flux [m3/s]" 
  232  format(a30,   2(5x, a20))
- 233  format(f30.6, 2(5x, e20.6))     
+ 233  format(f30.6, 5x, e20.6, 5x, f20.6)     
 
 c   
 c     =====================  main time loop =====================
@@ -115,14 +117,16 @@ c
          enddo
          hflux_intg = hflux_intg + hflux*time_step ! unit m3
 c     
-         write(*,   265) istep,                   hflux, hflux_intg
-         write(iout,233) istep*time_step/86400.0, hflux, hflux_intg/area
+         write(*,   265) istep,  hflux_intg,  hflux 
+         write(iout,233) istep*time_step/86400.0, 
+     +                   hflux_intg/area/1000.0, 
+     +                   hflux   ! unit days, km, m3/s,
          istep = istep + 1
       enddo
       close(iout)
 
- 265  format("STEP", 1x, i8, 2x, "FLUX = ", e14.6, " m3/s   FLUXINTG = ", 
-     +       e14.6, " m3")
+ 265  format("STEP", 1x, i8, 2x, "FLUXINTG = ", e14.6, " m3   FLUX = ", 
+     +       e14.6, " m3/s")
 
       write(*,*) "normal end of simulation"
 

@@ -28,6 +28,7 @@ c     ------------ declarations ------------
       character(len=999)  :: filename
       real                :: uvw(3), dlonlat(2), area, r6(6), r2(2)
       real                :: dr(2), drhat(2), hflux, hflux_intg
+      real                :: thickness, z0, z1
       real                :: jacob(2), dz, geo(3), dist, tot_area
       real, allocatable   :: xy(:,:), dl(:), nvec(:,:), z(:)
 
@@ -72,17 +73,21 @@ c     --- horizontal sampling ---
 
 c     --- vertical sampling ---
 
-      mz = max(1, int(0.5 + (r6(6)-r6(3))/r2(2))) ! positive definite
+      
+      thickness = abs(r6(6)-r6(3))  ! vertical thickness of transect
+      z0 = min(r6(6), r6(3))        ! upper point
+      z1 = max(r6(6), r6(3))        ! lower point
+      mz = max(1, int(0.5 + thickness/r2(2))) ! positive definite
       allocate(  z(mz) )      ! vertical sampling points
-      dz = (r6(6)-r6(3)) / mz ! vertical step
+      dz = thickness / mz     ! vertical step > 0
       do iz = 1, mz
-         z(iz) = r6(3) + (iz-0.5)*dz ! face mid point
+         z(iz) = z0 + (iz-0.5)*dz ! face mid point
       enddo
 
-      tot_area = (r6(6)-r6(3))*dist ! of the full rectangular transect
+      tot_area = thickness*dist ! of the full rectangular transect
       write(*,*) "Scanning transect from ", r6(1:2), " to ", r6(4:5)
-      write(*,*) "Depth range from ", r6(3), " to ", 
-     +           r6(6), " m below ses surface"
+      write(*,*) "Depth range from ", z0, " to ", 
+     +           z1, " m below ses surface"
       write(*,*) "Horizontal sampling     = ", mh
       write(*,*) "Vertical sampling       = ", mz
       write(*,*) "Transect area           = ", tot_area, " m2"

@@ -28,7 +28,7 @@ c     ------------ declarations ------------
       character(len=999)  :: filename
       real                :: uvw(3), dlonlat(2), area, r6(6), r2(2)
       real                :: dr(2), drhat(2), hflux, hflux_intg
-      real                :: jacob(2), dz, geo(3), dist
+      real                :: jacob(2), dz, geo(3), dist, tot_area
       real, allocatable   :: xy(:,:), dl(:), nvec(:,:), z(:)
 
 c     ------------   show time starts  ------------
@@ -53,7 +53,7 @@ c     ------------  read transect grid   ------------
 
 c     --- horizontal sampling ---
 
-      call get_horizontal_distance(r6(4:5), r6(1:2), dist) ! width of bounding box in meters
+      call get_horizontal_distance(r6(1:2), r6(4:5), dist) ! width of bounding box in meters
       mh = max(1, int(0.5 + dist / r2(1))) ! positive definite
       allocate( xy(2,mh) )   ! horizontal sampling points (face centers)
       allocate( dl(mh) )     ! length of faces corresponding to sampling points
@@ -64,7 +64,7 @@ c     --- horizontal sampling ---
          xy(:,ih) = r6(1:2) + (ih-0.5)*dlonlat ! face mid point
          call get_xyz2cart_jacobian(xy(:,ih), jacob)
          dr = jacob(1:2)*dlonlat
-         dl(mh) = sqrt(sum(dr*dr))
+         dl(ih) = sqrt(sum(dr*dr))
          drhat(1)     = -dr(2)  ! rotate counter clockwise
          drhat(2)     =  dr(1)  ! rotate counter clockwise
          nvec(1:2,ih) =  drhat/sqrt(sum(drhat*drhat)) 
@@ -79,27 +79,27 @@ c     --- vertical sampling ---
          z(iz) = r6(3) + (iz-0.5)*dz ! face mid point
       enddo
 
-      area = (r6(6)-r6(3))*dist ! of the full rectangular transect
+      tot_area = (r6(6)-r6(3))*dist ! of the full rectangular transect
       write(*,*) "Scanning transect from ", r6(1:2), " to ", r6(4:5)
       write(*,*) "Depth range from ", r6(3), " to ", 
      +           r6(6), " m below ses surface"
       write(*,*) "Horizontal sampling     = ", mh
       write(*,*) "Vertical sampling       = ", mz
-      write(*,*) "Transect area           = ", area, " m2"
+      write(*,*) "Transect area           = ", tot_area, " m2"
       write(*,*) "Average transect normal = ", sum(nvec, dim=2)/mh
 
       call read_control_data(simulation_file,"outputfile", filename)  !
       open(iout, file=filename)
       write(iout, 232) "# time[days] after start", 
-     +                 "flux integral / area [km]", 
-     +                 "flux [m3/s]" 
- 232  format(a30,   2(5x, a20))
- 233  format(f30.6, 5x, e20.6, 5x, f20.6)     
+     +                 "avg transport length [km]", 
+     +                 "avg transect current [m/s]" 
+ 232  format(a30,   2(5x, a30))
+ 233  format(f30.6, 5x, f30.6, 5x, e30.6)     
 
 c   
 c     =====================  main time loop =====================
 c
-      istep      = 0
+      istep      = 1
       hflux_intg = 0.0
       do while (compare_clocks(current_time, end_time) <= 0)
          call add_seconds_to_clock(current_time, nint(time_step)) ! loop apply to time step end point 
@@ -113,14 +113,17 @@ c
                if (istat > 0) uvw = 0.0 ! Faulty interpolations (whatever reason) are padded with 0
                area = dl(ih)*dz ! m2, area element associated with this sampling
                hflux = hflux + sum(nvec(:,ih)*uvw)*area ! unit m3/sec
+c               write(*,*) iz, ih, uvw, sum(nvec(:,ih)*uvw)
             enddo
          enddo
-         hflux_intg = hflux_intg + hflux*time_step ! unit m3
+c      
+         hflux_intg = hflux_intg + hflux*time_step ! integrated water flux, unit m3
 c     
+         
          write(*,   265) istep,  hflux_intg,  hflux 
          write(iout,233) istep*time_step/86400.0, 
-     +                   hflux_intg/area/1000.0, 
-     +                   hflux   ! unit days, km, m3/s,
+     +                   hflux_intg/tot_area/1.0d3, 
+     +                   hflux/tot_area   ! unit: days, km, m/s,
          istep = istep + 1
       enddo
       close(iout)

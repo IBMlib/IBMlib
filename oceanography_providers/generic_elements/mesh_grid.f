@@ -142,7 +142,7 @@ c     ---- optional biogeochemistry
 
 c     --- 2D grids ---
       
-      real,allocatable,public     :: wdepth (:,:)      ! current depth at cell-center, including dslm [m]
+      real,allocatable,public     :: wdepth(:,:)      ! current depth at cell-center, including dslm [m]. wdepth = 0 at dry points
       integer, allocatable,public :: bottom_layer(:,:) ! last wet layer (0 for dry points) nx,ny
       real,allocatable,public     :: u_wind_stress(:,:) ! u of wind stress[N/m2] (positive east)
       real,allocatable,public     :: v_wind_stress(:,:) !  v of wind stress[N/m2] (positive north)   
@@ -553,7 +553,7 @@ c
       integer           :: cx(4), cy(4)
       logical           :: valid(4)
 c     --------------------------------------------------------------------
-       if (.not.horizontal_range_check(geo)) then
+      if (.not.horizontal_range_check(geo)) then
           result = padval
           status = 1
           return
@@ -710,18 +710,39 @@ c     ------------------------------------------
       end subroutine 
 
 
-      subroutine interpolate_wdepth(geo, r, status) 
-c     ------------------------------------------ 
-c     Multiply by is_land to ensure piecewise linear coastlines
-c     defined by wdepth=0 
-c     ------------------------------------------ 
+      subroutine interpolate_wdepth(geo, result, status) 
+c     -------------------------------------------------- 
+c     Do not apply interpolate_cc_2Dgrid_data which uses
+c     wet-point interpolation, but unrestricted interpolation (wdepth=0 at dry points)
+c     (otherwise problems in coastal regions)
+c     -------------------------------------------------- 
       real, intent(in)     :: geo(:) 
-      real, intent(out)    :: r
-      integer, intent(out) :: status    
+      real, intent(out)    :: result
+      integer, intent(out) :: status   
+c
+      integer           :: ix,iy,ix0,iy0,ix1,iy1
+      real              :: sx,sy,vc(4)    
 c     ------------------------------------------ 
-      call interpolate_cc_2Dgrid_data(geo,wdepth,0,padval_wdepth,
-     +                                r,status)
-c      if (is_land(geo)) r=0.0
+      if (.not.horizontal_range_check(geo)) then
+          result = padval_wdepth
+          status = 1
+          return
+      endif
+      if (is_land(geo)) then
+          result = 0.0 ! fixed value for dry points
+          status = 3
+          return
+      endif
+c     --- delegate normal interior interpolation to interp_2Dbox_data
+      call get_surrounding_box(geo,ix,iy,sx,sy)
+      ix0 = min(max(ix,    1),nx)  ! cover boundary layers
+      ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
+      iy0 = min(max(iy,    1),ny)  ! cover boundary layers
+      iy1 = min(max(iy + 1,1),ny)  ! cover boundary layers
+      vc(1:2) = wdepth(ix0, iy0:iy1)
+      vc(3:4) = wdepth(ix1, iy0:iy1)
+      call interp_2Dbox_data(sx, sy, vc, 0, result)
+      status = 0
 c     ------------------------------------------ 
       end subroutine 
 
@@ -1036,35 +1057,66 @@ c     ------------------------------------------
       end function
 
 
-
       subroutine get_grid_coordinates(geo,x,y,z)  ! formerly named get_ncc_coordinates
-c     ------------------------------------------ 
+c     -------------------------------------------------------------------------------- 
 c     Get continuous node-centered grid coordinates with grid points 
 c     on integer values of (x,y,z) from geo = (lon,lat,depth)
 c     water surface is at z = 0.5, sea bed at z = bottum_layer+0.5
 c     It is not checked that z is above the sea bed. The inter grid
 c     range is 0.0 <= z <= nz+0.5.
 c     If vertical range is exceeded the first/last layer, respectively,
-c     is used to extrapolate a vertical grid coordinate 
+c     is used to extrapolate a vertical grid coordinate smoothly
 c     (no extrapolation is flagged) 
-c     ------------------------------------------ 
+c     Include intracell interpolation of layer spacings
+c     -------------------------------------------------------------------------------- 
       real, intent(in)  :: geo(:)
       real, intent(out) :: x,y,z
 
-      integer           :: ixc,iyc,izc
-      real, pointer     :: this_col(:)
-      real              :: layerw
+      integer           :: ix,iy,ix0,iy0,ix1,iy1,iz
+      
+      real, pointer     :: z00(:), z01(:)
+      real, pointer     :: z10(:), z11(:)
+      real, allocatable :: z0(:), z1(:), acclay(:)
+      real              :: layerw,sx,sy,cwd
 c     ------------------------------------------ 
-      call get_horiz_grid_coordinates(geo,x,y)
-      call get_horiz_ncc_index(geo,ixc,iyc) 
-c     --- locate vertical cell ---
-      this_col => acc_width(ixc, iyc, :) ! range = 1:nz+1
-      call search_sorted_list(geo(3), this_col, izc) ! 0<=izc<=nz+1
-      izc = min(max(izc,1),nz) ! capture vertical range excess
-      layerw = this_col(izc+1) -  this_col(izc) 
-      z      = (izc - 0.5) + (geo(3)-this_col(izc))/layerw
+      allocate( z0(nz+1)     )
+      allocate( z1(nz+1)     )
+      allocate( acclay(nz+1) )
+      call get_horiz_grid_coordinates(geo,x,y)   ! define x,y
+c
+c     ----- interpolate local layer spacings from acc_width: acclay -----
+c
+      call get_surrounding_box(geo,ix,iy,sx,sy)
+c     
+      ix0 = min(max(ix,  1),nx)  ! cover grid edges
+      ix1 = min(max(ix+1,1),nx)  ! cover grid edges
+      iy0 = min(max(iy,  1),ny)  ! cover grid edges
+      iy1 = min(max(iy+1,1),ny)  ! cover grid edges
+c     --- trilin interpolation  ---
+      z00 => acc_width(ix0, iy0, :)  ! range = 1:nz+1
+      z01 => acc_width(ix0, iy1, :)  ! range = 1:nz+1
+      z10 => acc_width(ix1, iy0, :)  ! range = 1:nz+1
+      z11 => acc_width(ix1, iy1, :)  ! range = 1:nz+1
+      z0  = z00 + sx*(z10 - z00)   ! vector operation (south face)
+      z1  = z01 + sx*(z11 - z01)   ! vector operation (north face)
+      acclay = z0 + sy*(z1-z0)     ! vector operation (north-south)  
+c
+c     ----- interpolate z from local layer spacings -----
+c
+c     search_sorted_list: result = iz (0 <= iz <= nz+1)
+c                         acclay(iz) < geo(3) < acclay(iz+1)   (iz<=nz)
+c                         acclay(1) = 0
+c
+      call search_sorted_list(geo(3), acclay, iz)  ! iz is layer numer, where geo(3) belongs
+      iz = min(max(iz,1),nz) ! capture vertical range excess 
+      layerw = acclay(iz+1) -  acclay(iz) 
+      z      = (iz - 0.5) + (geo(3) - acclay(iz))/layerw ! provides smooth extrapolation at range excess 
+c
+      deallocate( z0, z1, acclay  )
+      nullify( z00, z01, z10, z11 )
 c     ------------------------------------------ 
       end subroutine get_grid_coordinates
+
 
 
       end module

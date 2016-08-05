@@ -112,7 +112,7 @@ class BoxAverage:
         self.ncfile   = NetCDFFile(ncfilename, 'r')
         self.nframes  = self.ncfile.dimensions['t']
         self.nboxes   = self.ncfile.dimensions['b']
-        self.nlayerss = self.ncfile.dimensions['z']  # including sediment == wet layers + 1
+        self.nlayers  = self.ncfile.dimensions['z']  # including sediment == wet layers + 1
         self.data     = self.ncfile.variables[varname].getValue()  # shape = (t, b, z)
         self.time     = self.ncfile.variables['t'].getValue()
     def __get_item__(self, what):

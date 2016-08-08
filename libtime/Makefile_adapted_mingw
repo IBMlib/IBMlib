@@ -1,0 +1,299 @@
+# this is <Makefile>
+# ----------------------------------------------------------------------------
+# Makefile for work/src/libs/libtime
+# ($Id: Makefile_adapted_asc,v 1.1.1.1 2008-06-27 12:05:47 asch Exp $)
+# 
+# 06/08/2000 by Thomas Forbriger (IfG Stuttgart)
+# 
+# how to build all flavours of libtime
+# 
+# REVISIONS and CHANGES
+#    06/08/2000   V1.0   Thomas Forbriger
+#    12/10/2000   V1.1   get BINPREFIX from environment
+#    22/12/2000   V1.2   introduced example++
+#    29/03/2001   V1.3   added a package output and default target 'all'
+# ============================================================================ 
+# asbjorn adaptations for making libtime77.a (Aug 12 2005)
+#   1) modified FC, CC, GXX to Intel compilers
+#   2) removed newlib from archiver - unknown functionality
+# ============================================================================
+# check for cross compiler
+BINPREFIX=/usr/bin/x86_64-w64-mingw32-
+
+#FC=$(BINPREFIX)ifort
+#FC=$(BINPREFIX)pgf90
+CC=$(BINPREFIX)gcc
+GXX=$(BINPREFIX)gcc
+AR=$(BINPREFIX)ar
+AS=$(BINPREFIX)as
+RANLIB=$(BINPREFIX)ranlib
+
+LIBF2C=-lm -lf2c -L${SERVERLIBDIR}
+F2CFLAGS=-f -u
+#FFLAGS=-Wall
+CFLAGS=-O2
+CPPFLAGS=-I. -I${SERVERINCLUDEDIR} -I${LOCINCLUDEDIR}
+LIBTIME=-ltime -L$(LOCLIBDIR)
+LIBTIME77=-ltime77 -L$(LOCLIBDIR)
+LIBCTIME=-lctime -L$(LOCLIBDIR)
+LIBCXXTIME=-ltime++ -L$(LOCLIBDIR)
+LIBTIMETRAD=-ltime_trad -L$(LOCLIBDIR)
+
+# external homemade library (needed by testlibtime)
+LIBSFFU=-lsffu -L$(LOCLIBDIR)
+LIBSFFU77=-lsffu77 -L$(LOCLIBDIR)
+
+all: install doc example exectests
+install: install-headers libraries 
+doc: doxyview libtime.doc
+example: tests/example++; tests/example++
+exectests: tests
+
+#======================================================================
+#
+# source code package definitions
+# -------------------------------
+
+# the libtime kernel written in FORTRAN
+KERNEL=kernel/time_add.f kernel/time_clear.f kernel/time_compare.f \
+       kernel/time_copy.f kernel/time_div.f kernel/time_finish.f \
+       kernel/time_fullyear.f kernel/time_getdate.f kernel/time_isleapyear.f \
+       kernel/time_libversion.f kernel/time_mul.f kernel/time_nfit.f \
+       kernel/time_norm.f kernel/time_setdoy.f kernel/time_sub.f
+
+# language specific code
+# FORTRAN
+FCODE=    kernel/time_sprint.f kernel/time_read.f
+FHANDLER= kernel/time_util_fatal.f kernel/time_util_warning.f
+
+# C
+CWRAPPER=Cwrapper/ctime_add.c Cwrapper/ctime_clear.c \
+         Cwrapper/ctime_compare.c Cwrapper/ctime_copy.c Cwrapper/ctime_div.c \
+         Cwrapper/ctime_finish.c Cwrapper/ctime_fullyear.c \
+         Cwrapper/ctime_getdate.c Cwrapper/ctime_isleapyear.c \
+         Cwrapper/ctime_libversion.c Cwrapper/ctime_mul.c \
+         Cwrapper/ctime_nfit.c Cwrapper/ctime_norm.c Cwrapper/ctime_setdoy.c \
+         Cwrapper/ctime_sub.c
+
+# language specific code
+CCODE=   Cwrapper/ctime_sprint.c Cwrapper/ctime_read.c 
+CHANDLER=Cwrapper/ctime_util_fatal.c Cwrapper/ctime_util_warning.c
+CXXHANDLER=C++wrapper/cxxtime_util_fatal.cc C++wrapper/cxxtime_util_warning.cc
+
+# C++ functions
+CXXCODE= C++wrapper/base_constr.cc \
+  C++wrapper/convert.cc \
+  C++wrapper/now.cc \
+  C++wrapper/ranges.cc \
+  C++wrapper/error.cc \
+  C++wrapper/usage.cc \
+  C++wrapper/cxxtime_util_fatal.cc \
+  C++wrapper/cxxtime_util_warning.cc
+
+# test code
+CTESTS=  tests/ctlibtime.c tests/timer.c tests/timeutil.c 
+FTESTS=  tests/testlibtime.f tests/ttime_read.f
+CXXTESTS=tests/testtime++.cc tests/example++.cc
+
+HEADERS=libtime.h libtime++.h
+
+ALLCODE=$(KERNEL) $(FCODE) $(FHANDLER) $(CWRAPPER) $(CCODE) $(CHANDLER) \
+        $(CXXCODE) $(CTESTS) $(FTESTS) $(CXXTESTS) timeutil.c \
+        $(HEADERS)
+
+#======================================================================
+#
+# dependencies
+# ------------
+%.d: %.c 
+	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) $< \
+                     | sed '\''s,\($*\)\.o[ :]*,\1.o $@ : ,g'\'' > $@; \
+                     [ -s $@ ] || rm -f $@'
+%.d: %.cc
+	$(SHELL) -ec '$(CC) -M $(CPPFLAGS) $< \
+                     | sed '\''s,\($*\)\.o[ :]*,\1.o $@ : ,g'\'' > $@; \
+                     [ -s $@ ] || rm -f $@'
+
+-include $(patsubst %.c,%.d,$(CWRAPPER) $(CCODE) $(CHANDLER) $(CTESTS))
+-include $(patsubst %.cc,%.d,$(CXXTESTS) $(CXXCODE))
+
+#======================================================================
+# 
+# rules
+# -----
+
+# how to create object files thorugh f2c
+%.o: %.f
+	f2c $(F2CFLAGS) -d $(@D) $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(<:.f=.c) -c 
+	@rm  $(<:.f=.c)
+
+# how to create pure f77 object files
+%.o77: %.f; $(FC) $(FFLAGS) -c -o $@ $^
+
+# C++ stuff
+%.o: %.cc; $(CXX) -o $@ $< -c -I$(LOCINCLUDEDIR)
+
+# how to build a library (removed newlib - unknown functionality)
+# %.a: ; $(AR) rcv $@ $^ ; $(RANLIB) $@ ; newlib $@  
+%.a: ; $(AR) rcv $@ $^ ; $(RANLIB) $@ 
+#======================================================================
+#
+# misc targets
+# ------------
+.PHONY: clean edit install-headers
+
+clean:
+	find . \( -name \*.bak -o -name \*.o -o -name \*.o77 -o -name \*.d \) | \
+          xargs --no-run-if-empty /bin/rm -v
+	-/bin/rm -v flist libtime.doc *.tmp *.htmp
+
+#
+# --- add this to bring directory back to pristine state before untar
+#
+cleanall: clean
+	  rm -rf Cwrapper C++wrapper kernel  tests README* *.a *.c *.h Makefile
+
+flist: $(KERNEL) $(FCODE) $(CWRAPPER) $(CCODE) $(wildcard Makefile README*) \
+       timeutil.c timeutil.h libtime.h $(FHANDLER) $(CHANDLER) \
+       $(CTESTS) $(FTESTS) libtime++.h $(CXXTESTS) $(CXXCODE) doxyfull.cfg
+	echo $^ | tr ' ' '\n' | sort > $@
+
+edit: flist; vim $<
+
+install-headers: $(HEADERS) ; newinclude $^
+
+#======================================================================
+#
+# library dependency definitions
+# ------------------------------
+libraries: libtime_trad.a libtime.a libtime77.a libctime.a libtime++.a
+
+# traditional libtime
+libtime_trad.a: $(patsubst %.f,%.o,$(KERNEL) $(FCODE) $(FHANDLER)) \
+                $(patsubst %.c,%.o,$(CWRAPPER) $(CCODE)) timeutil.o
+
+# pure FORTRAN libtime (f2c version)
+libtime.a: $(patsubst %.f,%.o,$(KERNEL) $(FCODE) $(FHANDLER))
+
+# pure FORTRAN libtime (f77 version)
+libtime77.a: $(patsubst %.f,%.o77,$(KERNEL) $(FCODE) $(FHANDLER))
+
+# pure C libtime
+libctime.a: $(patsubst %.f,%.o,$(KERNEL)) \
+            $(patsubst %.c,%.o,$(CWRAPPER) $(CCODE) $(CHANDLER))
+
+# C++ classlib
+libtime++.a: $(patsubst %.f,%.o,$(KERNEL)) \
+            $(patsubst %.c,%.o,$(CWRAPPER) $(CCODE) $(CXXHANDLER)) \
+            $(patsubst %.cc,%.o,$(CXXCODE))
+
+#======================================================================
+#
+# test code
+# ---------
+
+$(patsubst %.f,%,$(FTESTS)): %: %.o libtime.a
+	$(CC) -o $@ $< $(LIBTIME) $(LIBSFFU) $(LIBF2C)
+
+$(patsubst %.f,%77,$(FTESTS)): %77: %.o77 libtime.a
+	$(FC) -o $@ $< $(LIBTIME77) $(LIBSFFU77)
+
+tests/timer: %: %.o; $(CC) -o $@ $<
+tests/ctlibtime: %: %.o; $(CC) -o $@ $< $(LIBCTIME)
+tests/timeutil: %: %.o; $(CC) -o $@ $< -static $(LIBTIMETRAD) $(LIBF2C)
+tests/example++ tests/testtime++: %: %.o libtime++.a
+	$(CXX) -o $@ $< $(LIBCXXTIME)
+
+TESTS=$(patsubst %.c,%,$(CTESTS)) $(patsubst %.f,%,$(FTESTS)) \
+       $(patsubst %.f,%77,$(FTESTS)) $(patsubst %.cc,%,$(CXXTESTS))
+
+tests: $(patsubst %.c,%,$(CTESTS)) $(patsubst %.f,%,$(FTESTS)) \
+       $(patsubst %.f,%77,$(FTESTS)) $(patsubst %.cc,%,$(CXXTESTS))
+	for d in $^; do /bin/echo -e "\n\nGO FOR $$d?"; read a; $$d; done
+
+%.run: tests/%; $<; /bin/rm -fv $<
+
+testsexe:
+	for d in $(TESTS); do /bin/echo -e "\n\nGO FOR $$d?"; read a; $$d; done
+
+#======================================================================
+#
+# DOC
+# ---
+
+kernel.tmp: $(KERNEL)
+fortran.tmp: $(FCODE)
+
+%.tmp:
+	/usr/bin/awk 'BEGIN{ hot=0; } \
+        /^cS/ { hot=1; \
+          print "  c\n  c -----------------------------------------\n  c"; \
+          next; } \
+        /^cE/ { hot=0; } \
+        { if (hot==1) { print "  " $$0; } }' $^ > $@
+
+%.htmp: %.h
+	/usr/bin/awk 'BEGIN{ hot=0; } \
+        /^\/\*S\*\// { hot=1; next; } \
+        /^\/\*E\*\// { hot=0; } \
+        { if (hot==1) { print "  " $$0; } }' $^ > $@
+
+libtime.doc: README kernel.tmp fortran.tmp libtime.htmp timeutil.htmp \
+             libtime++.htmp $(ALLCODE)
+	cat README > $@
+	echo -e " \n \nDOCUMENTATION OF THE FORTRAN LIBRARAY KERNEL" \
+                  "\n============================================\n\n" >> $@
+	cat kernel.tmp >> $@
+	echo -e ' \n \nDOCUMENTATION OF THE FORTRAN SPECIFIC CODE' \
+                  '\n==========================================\n' >> $@
+	cat fortran.tmp >> $@
+	echo -e ' \n \nDOCUMENTATION OF THE C WRAPPER CODE' \
+                      '\n===================================\n' >> $@
+	cat libtime.htmp >> $@
+	echo -e ' \n \nDOCUMENTATION OF THE TIMEUTIL C++ CLASSES' \
+                    '\n=========================================\n' >> $@
+	cat libtime++.htmp >> $@
+	echo -e ' \n \nDOCUMENTATION OF THE OLD TIMEUTIL C CODE' \
+                    '\n========================================\n' >> $@
+	cat timeutil.htmp >> $@
+	echo -e ' \n \nCVS REVISIONS' \
+                    '\n=============\n' >> $@
+	ident `find . -type f` | egrep '^ +\$$Id.+\$$' | cut -c 5- \
+        | sort | uniq | awk '{printf "%5s %25s %6s %12s %10s %8s %s\n", \
+          $$1, $$2, $$3, $$4, $$5, $$6, $$7;}' >> $@
+
+#======================================================================
+# WWW distribution
+WWWPATH=$(HOME)/public_html/download/software/libtime
+
+wwwdistrib: libtime.tar.gz libtime.doc
+	mkdir -pv $(WWWPATH)
+	ln -sfv $(WWWPATH) wwwpath
+	/bin/cp -v $< wwwpath
+	/bin/cp -v libtime.doc wwwpath/libtime.txt
+	/bin/cp -vf tests/example++.cc README* wwwpath
+	/usr/bin/yes end | $(MAKE) tests 
+	/usr/bin/yes end | $(MAKE) testsexe > wwwpath/tests.out
+	tests/example++ > wwwpath/example.out
+
+wwwclean:
+	/bin/rm -rfv wwwpath/* wwwpath
+
+WWWDOXYPATH=$(HOME)/public_html/txt/cxx/libtimexx
+doc: ; /bin/mkdir -pv $(WWWDOXYPATH); /bin/ln -sfv $(WWWDOXYPATH) doc
+doc/html/index.html: doc doxyfull.cfg $(ALLCODE); doxygen $(word 2,$^)
+doxydoc doxyfull: doc/html/index.html
+doxyclean: ; /bin/rm -rfv doc/* doc
+
+doxyview: doc/html/index.html; mozilla file://$(shell pwd)/$< &
+
+#======================================================================
+#
+# distribution package
+# --------------------
+libtime.tar.gz: $(ALLCODE) Makefile libtime.doc \
+         README README.changes README.files README.unsplit
+	tar cvfz $@ $^
+
+# ----- END OF Makefile ----- 

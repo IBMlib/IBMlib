@@ -24,5 +24,5 @@ LINKFLAGS  = -fall-intrinsics   # -i4 is standard
 LINKLIBS  +=                    # -L/usr/local/include 
 
 
-export LITTLE_ENDIAN = -fconvert=little_endian
-export BIG_ENDIAN    = -fconvert=big_endian
+export LITTLE_ENDIAN = -fconvert=little-endian
+export BIG_ENDIAN    = -fconvert=big-endian

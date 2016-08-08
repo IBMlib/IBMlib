@@ -1,0 +1,11 @@
+
+
+! ================================================================
+! The ECOSMO physical_fields module expects the following tags
+! defined in the input file (tag values below are examples)
+! ================================================================
+
+fixed_hydro_file = /home/data/ECOSMO_tl5/ECOSMO_tl5_physics_testframe.dat
+grid_desc   = oceanography_providers/ECOSMO_new/grid_desc_ecosmo
+topography  = oceanography_providers/ECOSMO_new/postinfo.for
+

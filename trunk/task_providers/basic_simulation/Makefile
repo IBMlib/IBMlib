@@ -3,7 +3,7 @@
 # 
 ############################################################
 
-PROVIDERS = basic_simulation_ULF.o     # basic_simulation_with_output.o
+PROVIDERS = basic_simulation.o     # basic_simulation_with_output.o
 task.a: $(PROVIDERS)   
 	ar rcs task.a $(PROVIDERS); ranlib task.a
 

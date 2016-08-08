@@ -10,8 +10,9 @@
 #           to actual used compiler for the PBI to work
 #
 ############################################################
-FCFLAGS += $(LITTLE_ENDIAN) # add local compiler flag, defined in compiler_defaults.mk
-LOCAL_OBJ = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o ecosmo_pbi.o 
+FCFLAGS     += $(LITTLE_ENDIAN) # add local compiler flag, defined in compiler_defaults.mk
+PBI_HEAD_OBJ = ecosmo_pbi_onlyphysics_singleframe.o
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o $(PBI_HEAD_OBJ)
 
 GENERIC_MESH = ../generic_elements
 

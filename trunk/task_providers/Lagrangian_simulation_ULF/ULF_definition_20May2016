@@ -1,0 +1,65 @@
+// ============================================================================
+// Definition of Unified Lagrangian Format (ULF) version 0.1
+//
+// General remarks:
+//     * Dimension order as C (i.e. opposite fortran def, but as displayed by ncdump)
+//     * Output consists of different, independent sections
+//     * Each section may have different layouts; layout is announced by mode tags 
+//       which are stored as global attributes to data set for easy probing
+//       Value of mode tags are unimportant, only their existence matters (implicit boolean)
+//     * Currently this format adresses only spatial aspects of particle dynamics
+//
+// ------------------ section 0: premises  ------------------------------------
+//
+//  premises (input, version, configurations, ...) - not implemented yet
+//  
+// ------------------ section 1: optional topography (for visualization)  -----
+//
+// for visualization of output
+// Available mode tags: topography_file and topography_scan
+// Only one of the mode tags topography_file and topography_scan can be set (possibly none)
+//   topography_file: a topography file name is provided for visualization (in same format as below)
+//   topography_scan: the topography is sampled on a regular lon-lat array and saved
+//
+// ------------------ section 2: optional particle tracks    ------------------
+//
+// number of frames bind to unlimited dimension)
+// Available modes: tracks_xy and tracks_xyz
+// Only one of the modes tracks_xy and tracks_xyz can be set (possibly none)
+//   tracks_xy:  horizontal mode (save only horizontal positions)
+//   tracks_xyz: 3D mode (save full positions)
+//
+// ------------------ section 3: optional connectivity matrix    --------------
+//                
+// - not implemented yet
+//
+// ============================================================================
+global attributes:
+    
+dimensions:
+	nxtop = 6 ;                            // optional, defined if topography_scan
+	nytop = 12 ;                           // optional, defined if topography_scan 
+        nframes = UNLIMITED ; // (3 currently) // optional, defined if tracks_xy or tracks_xyz
+        nparticles = 48;                       // optional, defined if tracks_xy or tracks_xyz
+variables:
+        // 0 for land, negative for outside domain
+	float topography(nxtop, nytop) ;   // depth in meters; optional, defined if topography_scan
+	float topolon(nxtop) ;             // longitudes for topography; optional, defined if topography_scan
+	float topolat(nytop) ;             // latitudes for topography;  optional, defined if topography_scan
+
+        float lon(nframes, npart) ;        // optional, defined if tracks_xy or tracks_xyz
+        float lat(nframes, npart) ;        // optional, defined if tracks_xy or tracks_xyz
+	float depth(nframes, npart) ;      // optional, defined if racks_xyz
+
+variables:
+        // time points corresponding to positions
+	int time(nframes, 4) ; // (year, month, day, second) optional, defined if tracks_xy or tracks_xyz
+	
+
+// global attributes:
+	:topography_file = "topography_sampling.nc" // only one of topography_file and topography_scan can be set, possibly none
+        :tracks_xy       = "anything"               // only one of tracks_xy and tracks_xyz can be set, possibly none
+	:topography_scan = "anything"               // only one of topography_file and topography_scan can be set, possibly none
+
+}
+

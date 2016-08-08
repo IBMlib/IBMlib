@@ -20,8 +20,8 @@ MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRIT
 FCFLAGS += $(addprefix -I,$(MODDIRS))  
 
 # linker settings
-LINKFLAGS =     # -i4 is standard
-LINKLIBS  +=    -fall-intrinsics # -L/usr/local/include 
+LINKFLAGS  = -fall-intrinsics   # -i4 is standard
+LINKLIBS  +=                    # -L/usr/local/include 
 
 
 export LITTLE_ENDIAN = -fconvert=little_endian

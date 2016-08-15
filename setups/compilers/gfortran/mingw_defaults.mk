@@ -20,7 +20,7 @@ export FCFLAGS   = -std=gnu -fall-intrinsics -I$(IBMLIB_DIR) # Fortran90 as stan
 export FPPFLAGS  = -fall-intrinsics                          # preprocessing automaticalyy invoked for .f, otherwise apply -cpp 
 export CC        = /usr/bin/x86_64-w64-mingw32-gcc
 export AR        = /usr/bin/x86_64-w64-mingw32-ar
-
+export RANLIB    = /usr/bin/x86_64-w64-mingw32-ranlib
 
 export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows/mingw_netcdf/working/NETCDF
 

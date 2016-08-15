@@ -221,7 +221,7 @@ libtime/libtime77.a: FORCE  libtime/Makefile
 libtime/Makefile:
 	@echo ""
 	cd libtime; tar xvfz libtime.tar.gz; rm -f Makefile; \
-        ln -s Makefile_adapted_asc Makefile
+        ln -s Makefile_common Makefile
 
 
 clean: FORCE

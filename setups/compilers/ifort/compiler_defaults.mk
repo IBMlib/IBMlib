@@ -15,9 +15,9 @@
 export FC        = ifort
 export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR)
 export FPPFLAGS  = -fpp 
-export CC        = gcc
+export CC        = icc
 export AR        = ar
-
+export RANLIB    = ranlib
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS))  

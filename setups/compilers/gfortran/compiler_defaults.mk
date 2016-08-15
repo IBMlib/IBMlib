@@ -18,6 +18,7 @@ export FCFLAGS   = -std=gnu -fall-intrinsics -I$(IBMLIB_DIR) #  Fortran90 as sta
 export FPPFLAGS  = -fall-intrinsics                          # preprocessing automaticalyy invoked for .f, otherwise apply -cpp 
 export CC        = gcc
 export AR        = ar
+export RANLIB    = ranlib
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS))  

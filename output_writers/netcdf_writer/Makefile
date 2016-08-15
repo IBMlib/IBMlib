@@ -10,7 +10,7 @@ netcdf_writer.mod netcdf_writer.o: netcdf_writer.f particle_state.a
 
 
 include $(COMMON_RULES)
-FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
+#FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 
 clean: FORCE
 	rm -f  *.o  *.a  *.mod  dependences.mk

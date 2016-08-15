@@ -103,7 +103,7 @@ export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared bet
 
 # currently define the output set statically
 OUTPUT_DIR         = output_writers
-OUTPUT_WRITERS     = ascii_writer  netcdf_writer # here you select which writers to build
+OUTPUT_WRITERS     = #ascii_writer  netcdf_writer # here you select which writers to build
 OUTPUT_WRITER_DIRS = $(addprefix $(OUTPUT_DIR)/, $(OUTPUT_WRITERS))
 
 # load build configuration 
@@ -117,13 +117,11 @@ include  config.mk                            # mandatory include
 #Define Objects and their grouping
 EXT_LIBS     = libtime/libtime77.a
 BASELIBS     = grid_interpolations.o  runtime_tools.o  string_tools.o 
-BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
-               run_context.mod  output.mod  geometry.mod  polygons.mod array_tools.mod  spline.mod
-BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
+BASEMODS     = time_tools.mod  run_context.mod  output.mod  polygons.mod  geometry.mod  random_numbers.mod  array_tools.mod spline.mod input_parser.mod constants.mod
+BASEOBJS     = $(patsubst %.mod,%.o,$(BASEMODS)) $(BASELIBS) $(EXT_LIBS) 
 OUTPUT_MODS  = $(addsuffix .mod, $(OUTPUT_WRITERS))
 OUTPUT_ARCS  = $(addsuffix .a,   $(OUTPUT_WRITERS))
-IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
-               particles.o $(OUTPUT_ARCS) task.a 
+IBMLIB_OBJS  = task.a  particle_tracking.o particles.o  particle_state.a  physical_fields.a  $(OUTPUT_ARCS) $(BASEOBJS) 
 
 #Variables relating to the packaging
 IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but the working copy there
@@ -163,7 +161,7 @@ all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(IBMLIB_OBJS)
 	@echo ""
-	$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
+	$(FC)  $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
 
 
 # 

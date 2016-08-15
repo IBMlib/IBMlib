@@ -3,7 +3,7 @@
 ############################################################
 
 particle_state.a: particle_state.o
-	ar rcs particle_state.a particle_state.o
+	$(AR) rcs particle_state.a particle_state.o
 
 particle_state.mod particle_state.o: passive.f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o

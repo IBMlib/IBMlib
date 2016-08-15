@@ -18,6 +18,9 @@
 export FC        =  /usr/bin/x86_64-w64-mingw32-gfortran     # 32 bit host to 64 bit target
 export FCFLAGS   = -std=gnu -fall-intrinsics -I$(IBMLIB_DIR) # Fortran90 as standard can not be selected, -i4 is standard
 export FPPFLAGS  = -fall-intrinsics                          # preprocessing automaticalyy invoked for .f, otherwise apply -cpp 
+export CC        = /usr/bin/x86_64-w64-mingw32-gcc
+export AR        = /usr/bin/x86_64-w64-mingw32-ar
+
 
 export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows/mingw_netcdf/working/NETCDF
 
@@ -26,7 +29,7 @@ FCFLAGS += $(addprefix -I,$(MODDIRS))
 
 # linker settings
 LINKFLAGS =    -static -fall-intrinsics  # -i4 is standard
-LINKLIBS  +=    # -L/usr/local/include 
+LINKLIBS  +=    -L$(NETCDF)/lib -lnetcdff -lnetcdf 
 
 
 export LITTLE_ENDIAN = -fconvert=little-endian

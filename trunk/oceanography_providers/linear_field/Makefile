@@ -5,7 +5,7 @@
 
 
 physical_fields.a: physical_fields.o
-	ar rcs physical_fields.a physical_fields.o; ranlib physical_fields.a
+	$(AR) rcs physical_fields.a physical_fields.o
 
 physical_fields.mod physical_fields.o: linear_field.f
 	$(FC) -c $(FCFLAGS) $(FPPFLAGS) $< -o $*.o

@@ -13,24 +13,23 @@
 
 # compiler settings   
 export FC        = pgf90
-#export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR) -check bounds -check uninit -traceback  #Add bounds checking and tracebacks
 export FCFLAGS   =  -I$(IBMLIB_DIR) 
-#export FPPFLAGS  = -fpp 
 export FPPFLAGS  = 
 export NETCDF_DIR = /appl/netcdf/pgi/4.2
+
+export CC        = gcc    # why not pgcc ??
+export AR        = ar
+export RANLIB    = ranlib
+
 
 MODDIRS = $(NETCDF_DIR)/include $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS)) 
 
 # linker settings
 LINKFLAGS = -i4
-LINKLIBS  += -L$(NETCDF_DIR)/lib -lcurl 
+LINKLIBS  += -L$(NETCDF_DIR)/lib -lnetcdff -lnetcdf -lcurl 
 
 
 export LITTLE_ENDIAN = -convert little_endian
 export BIG_ENDIAN    = -convert big_endian
 
-#Test for presence of loaded module
-ifeq ($(FC),ifort)
-	stop
-endif

@@ -9,9 +9,8 @@
 # $LastChangedDate: 2011-01-24 12:08:32 +0100 (Mon, 24 Jan 2011) $
 # $LastChangedBy: mpay $ 
 #
-# compiler settings   
+# This example illustrates how to include/link to a custom NetCDF build 
 # export directive faciliates that variables are passed to sub-make
-# (unless locally overwritten)
 #ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 # compiler settings   

@@ -28,3 +28,5 @@ topography_file   = topofile.nc                   ! reference just passed on to 
 !save_xyz_frequency =      ! seconds inbetween or < 0 for only last frame
          
 ! ---- section 3) optional connectivity matrix                
+
+save_connectivity = something    ! if tag present, save connectivity matrix in last time step

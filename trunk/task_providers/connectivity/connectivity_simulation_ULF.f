@@ -25,7 +25,10 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use run_context
       use physical_fields
       use particles
-     
+      use particle_tracking
+      use particle_state     !  get_settlement_habitats
+      use connectivity
+
       implicit none
 c     ------------ declarations ------------      
       type(clock),target  :: start_time, end_time
@@ -217,7 +220,7 @@ c
          nsrc  = size(emitboxes)  ! emitboxes has been initialized
          ndest = size(get_settlement_habitats()) ! particular particle_state method
          call nfcheck( nf90_put_att(ncid, NF90_GLOBAL, 
-     +                 "connectivity_final", "yes") 
+     +                 "connectivity_final", "yes")) 
          call nfcheck( nf90_def_dim(ncid, "nsource", nsrc, nsrc_id))
          call nfcheck( nf90_def_dim(ncid, "ndest", ndest, ndest_id))
          call nfcheck( nf90_def_var(ncid, "connectivity_matrix", 

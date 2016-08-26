@@ -1,0 +1,30 @@
+! -----------------------------------------------------------------
+!     task definition
+! -----------------------------------------------------------------
+
+start_time  = 2005 03 01 0    !  year  month  day  second_of_day
+end_time    = 2005 03 18 0    !  year  month  day  second_of_day
+
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+emitbox = 2005 03 02 0     2005 03 02 3600  2 54 0   3 55 1  10   par1 5.6  whatever
+emitbox = 2005 03 02 3600  2005 03 02 7200  4 54 0   5 56 1  10   par1 par2 par3
+
+outputfile  = result.nc
+ 
+!
+! ---- section 1: optional topography
+!      give either of these two tags to embed topography information in outputfile
+!
+topography_file   = topofile.nc                   ! reference just passed on to outputfile
+!sample_topography = 9.0 14.0 0.1   56.0 58.0 0.17 ! lon0,lon1,dlon  lat0,lat1,dlat  
+
+!
+! ---- section 2: optional tracks
+!      give either of these two tags to save tracks to outputfile
+!
+!save_xy_frequency  =      ! seconds inbetween or < 0 for only last frame
+!save_xyz_frequency =      ! seconds inbetween or < 0 for only last frame
+         
+! ---- section 3) optional connectivity matrix                

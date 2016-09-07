@@ -45,8 +45,8 @@ c     ------------ declarations ------------
       real    :: time_step, t, rdum6(6), dt_save
       real, allocatable :: topography(:,:), topolon(:), topolat(:)
       logical :: save_tracks, save_xy, save_xyz, topo_scan
-      character*256 :: filename, topofilename
-      logical :: save_connectivity
+      character*256 :: filename, topofilename, sconn
+      integer :: save_connectivity
       integer :: nsrc, ndest, nsrc_id, ndest_id, conmat_id
       integer :: nemax
       real, allocatable    :: tmat(:,:), tmat_prior(:)
@@ -215,8 +215,19 @@ c        -------- define depth --------
 c
 c.....prepare output: section 3 (connectivity)    
 c     
+c     map input tag save_connectivity to integer variable save_connectivity:
+c     save_connectivity  =  0: do not save connectivity matrix
+c     save_connectivity  =  1: save connectivity matrix corresponding to last time step
+c
+      save_connectivity = 0 ! also matches absent tag save_connectivity 
       if (count_tags(simulation_file, "save_connectivity") > 0) then
-         save_connectivity  = .true.
+         call read_control_data(simulation_file, "save_connectivity", 
+     +        sconn)
+         if (trim(adjustl(sconn)) == "last") save_connectivity = 1
+      endif
+
+!     --- prepare writing last connectivity matrix ---
+      if (save_connectivity == 1) then
          nsrc  = size(emitboxes)  ! emitboxes has been initialized
          ndest = size(get_settlement_habitats()) ! particular particle_state method
          call nfcheck( nf90_put_att(ncid, NF90_GLOBAL, 
@@ -229,8 +240,6 @@ c
      +                 "probability of particle transport")) 
          call nfcheck( nf90_put_att(ncid, lon_id, "unit", 
      +                 "0 < probability < 1")) 
-      else
-         save_connectivity  = .false.
       endif
 
 c
@@ -266,7 +275,7 @@ c
 
 c     --------- generate and save final connectivity, if requested ---------
 
-      if (save_connectivity) then
+      if (save_connectivity == 1) then
          allocate( tmat(nsrc, ndest) )
          allocate( num_emit(nsrc)    )
          allocate( tmat_prior(nsrc)  )
@@ -278,7 +287,7 @@ c     --------- generate and save final connectivity, if requested ---------
          call get_connectivity_matrix(state_stack, num_emit,
      +        tmat_prior, tmat)
          call nfcheck( nf90_put_var(ncid, conmat_id, tmat) )
-
+         write(*,*) "wrote connectivity matrix for last time step"
       endif
 
 c     ----------------- close down ---------------------------

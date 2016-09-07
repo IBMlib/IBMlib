@@ -32,7 +32,7 @@
 // ------------------ section 3: optional connectivity matrix    --------------
 //                
 // Only one of the modes connectivity can be set (possibly none)
-//   connectivity_last: connectivity at last time step is stored
+//   connectivity_final: connectivity at last time step is stored
 // ============================================================================
     
 dimensions:

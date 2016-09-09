@@ -838,6 +838,19 @@ ln -sf Makefile_PGI Makefile
 make all
 \end{verbatim}
 
+\section{Little/big endian unformatted data}
+If you interface to a physical data set provided to you as unformatted data (which is efficient), you need to be aware about that
+unformatted data is stored in major forms, little- and big-endian, depending on the order of bytes in each data type. The native 
+storage form depends on the architechture the data provider uses, and the architechture you are trying to build IBMlib on.
+If they do not match, you need to force the compiler to recast data into the endian type used on your architechture, when you
+open a data set as {\tt open(file=..., form=unformatted, ...)} by e.g. adding the corresponing compiler flag in the makefile
+of the physical data set (see templates). Plese notice that the GNU fortran compiler can apparently not handle per-file
+application of endianess - you need to add the endianess flag to the common flags flags, so that everything incl. main is
+compiled with the endianess. GNU fortran tries to lure you to apply a conversion specifier to {\tt open}, like
+{\tt open(file=..., form=unformatted, ..., convert=big-endian)}, which is elegant, but not standard conforming.
+
+\section{Cross compilation}
+Experimental - more to follow
 
 %%====================================================================
 \chapter{FAQ (programmers)}

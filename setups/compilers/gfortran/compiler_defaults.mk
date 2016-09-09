@@ -8,6 +8,9 @@
 #
 # This example illustrates how to include/link to a custom NetCDF build
 # export directive faciliates that variables are passed to sub-make
+#
+# Notes:
+#   for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 #ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 # compiler settings   
@@ -18,6 +21,8 @@ export FPPFLAGS  = -fall-intrinsics                          # preprocessing aut
 export CC        = gcc
 export AR        = ar
 export RANLIB    = ranlib
+
+# FCFLAGS += fconvert=big-endian   # for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS))  

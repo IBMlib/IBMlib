@@ -1,6 +1,6 @@
 #ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 # ----------------------------------------------------------------
-# MinGW cross compiler (Linux -> Windows) default flags 
+# MinGW cross compiler (Linux -> Windows) default flags  (EXPERIMENTAL!)
 # 
 # Currently distributed at https://sourceforge.net/projects/mingw
 # Project home page: http://www.mingw.org/  (partially outdated)
@@ -11,6 +11,9 @@
 #
 # This example illustrates how to include/link to a custom NetCDF build 
 # export directive faciliates that variables are passed to sub-make
+#
+# Notes:
+#   for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 #ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 # compiler settings   
@@ -20,8 +23,9 @@ export FPPFLAGS  = -fall-intrinsics                          # preprocessing aut
 export CC        = /usr/bin/x86_64-w64-mingw32-gcc
 export AR        = /usr/bin/x86_64-w64-mingw32-ar
 export RANLIB    = /usr/bin/x86_64-w64-mingw32-ranlib
-
 export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows/mingw_netcdf/working/NETCDF
+
+# FCFLAGS += fconvert=big-endian   # for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS) $(NETCDF)/include
 FCFLAGS += $(addprefix -I,$(MODDIRS))  

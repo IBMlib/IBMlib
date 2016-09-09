@@ -8,6 +8,8 @@
 #
 #     TODO: add big_endian CF option
 ##########################################################################
+FCFLAGS     += $(BIG_ENDIAN) # add local compiler flag, defined in compiler_defaults.mk
+
 READ_CMOD_ERGOM = read_cmod_ergom
 #READ_CMOD_ERGOM = read_cmod_ergom_Silicate_hack
 #
@@ -22,8 +24,8 @@ physical_fields.a: dependences.mk $(LOCAL_OBJ)
 physical_fields.mod:
 
 # read_cmod_ergom implementation must be compiled with big_endian option
-$(READ_CMOD_ERGOM).o: $(READ_CMOD_ERGOM).f
-	$(FC) -c $(FCFLAGS) $(BIG_ENDIAN) $(FPPFLAGS) $< -o $@
+#$(READ_CMOD_ERGOM).o: $(READ_CMOD_ERGOM).f
+#	$(FC) -c $(FCFLAGS) $(BIG_ENDIAN) $(FPPFLAGS) $< -o $@
 
 
 # --- interface assembling rules: point to variants that provides sub interfaces

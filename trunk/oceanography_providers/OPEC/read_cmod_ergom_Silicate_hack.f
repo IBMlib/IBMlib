@@ -206,9 +206,20 @@ c----------------------------------------------------------------------------+
       character(LEN=999)        :: cfgfile
       real(8)                   :: xmin, ymin, xmax, ymax
 c----------------------------------------------------------------------------+ 
-      hydroDBpath = trim(adjustl(path)) // "/" ! prepend linux delimiter
-      write(*,*) "init_read_cmod_ergom: path = ", trim(hydroDBpath)
       write(*,*) "WARNING: HACKED VERSION ! (silicate shadow load)"
+
+      lp      = len(path)
+      sbuf    = adjustr(path)
+      lastchr = sbuf(lp:lp)
+      if     (lastchr == "/") then                  ! found explicit linux seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      elseif (lastchr == "\") then                  ! found explicit windows seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      else
+         hydroDBpath = trim(adjustl(path)) // "/"   ! no separator, assume linux and prepend linux delimiter
+      endif
+      write(*,*) "init_read_cmod_ergom: path = ", trim(hydroDBpath)
+
 
       include_bio = readbio
       if (include_bio) then
@@ -421,11 +432,11 @@ c        ---------- first physics ----------
          open(iunit_phy,file=fname, form='unformatted',status='old',
      +               iostat=ios )                                ! keep same logical unit
          if (ios /= 0) then
-            write(*,'(a,a)') "error opening data file ", 
+            write(*,'(a,a)') "error opening data-file ", 
      +                       trim(adjustl(fname))
             stop
          else
-            write(*,'(a,a)') "update_buffers: opened new data file", 
+            write(*,'(a,a)') "update_buffers: opened new data-file ", 
      +                       trim(adjustl(fname))
          endif
          call reset_tempfile(iunit_phy) ! wind to first frame
@@ -518,7 +529,8 @@ c     --------------------------------------------------------------------------
 c     ----------------------------------------------------------------------------+
       rewind(lun)
       read(lun) aufdat ! advance file pointer to first frame 
-      write(*,*) "reset_tempfile: ready to read first frame"
+      write(*,*) "reset_tempfile: ready to read first frame from set ", 
+     +            aufdat
       end subroutine reset_tempfile
 
 
@@ -560,7 +572,6 @@ c     --------------------------------------------------------------------------
  
       integer(4)               :: ia,it,ios,istat
       integer(4)               :: ncid,varid
-      character(len=11)        :: aufdat
       character(len=19)        :: ctim
       real(8)                  :: tim
       integer                  :: treq, tcur

@@ -193,13 +193,26 @@ c     readbio controls wheter ecosystem varaible are read
 c----------------------------------------------------------------------------+ 
       character*(*), intent(in) :: path ! applied as prefix to file names (without trailing slash)
       logical, intent(in)       :: readbio
+      character(len=len(path))  :: sbuf
+      character                 :: lastchr
       integer(4)                :: ios
-      integer(4)                :: lun,ia,ie
+      integer(4)                :: lun,ia,ie,lp
       character(LEN=999)        :: cfgfile
       real(8)                   :: xmin, ymin, xmax, ymax
 c----------------------------------------------------------------------------+ 
-      hydroDBpath = trim(adjustl(path)) // "/" ! prepend linux delimiter
+c     --- provide primitive runtime linux/windows recognition, by allowing user to supply path separator 
+      lp      = len(path)
+      sbuf    = adjustr(path)
+      lastchr = sbuf(lp:lp)
+      if     (lastchr == "/") then                  ! found explicit linux seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      elseif (lastchr == "\") then                  ! found explicit windows seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      else
+         hydroDBpath = trim(adjustl(path)) // "/"   ! no separator, assume linux and prepend linux delimiter
+      endif
       write(*,*) "init_read_cmod_ergom: path = ", trim(hydroDBpath)
+
 
       include_bio = readbio
       if (include_bio) then
@@ -413,7 +426,7 @@ c        ---------- first physics ----------
      +                       trim(adjustl(fname))
             stop
          else
-            write(*,'(a,a)') "update_buffers: opened new data file", 
+            write(*,'(a,a)') "update_buffers: opened new data-file ", 
      +                       trim(adjustl(fname))
          endif
          call reset_tempfile(iunit_phy) ! wind to first frame
@@ -425,7 +438,7 @@ c        ---------- then biochemistry ----------
             open(iunit_bio,file=fname, form='unformatted',status='old',
      +           iostat=ios )                                ! keep same logical unit
             if (ios /= 0) then
-               write(*,'(a,a)') "error opening data file ", 
+               write(*,'(a,a)') "error opening data-file ", 
      +              trim(adjustl(fname))
                stop
             else
@@ -506,11 +519,11 @@ c     --------------------------------------------------------------------------
 c     ----------------------------------------------------------------------------+
       rewind(lun)
       read(lun) aufdat ! advance file pointer to first frame 
-      write(*,*) "reset_tempfile: ready to read first frame"
+      write(*,*) "reset_tempfile: ready to read first frame from set ", 
+     +            aufdat
       end subroutine reset_tempfile
 
 
-      
 
       subroutine read_frame(request_time)
 c     ----------------------------------------------------------------------------+
@@ -546,11 +559,10 @@ c     it is assumed that data is time ordered: tim1 < tim2 < ...
 c     ----------------------------------------------------------------------------+ 
       integer,intent(in)       :: request_time(4) ! year, month, day, hour in day
  
-      integer(4)               :: ia,it,ios
-      character(len=11)        :: aufdat
-      character(len=19)        :: ctim
+      integer(4)               :: ia,it
+      character(len=19)        :: ctim 
       real(8)                  :: tim
-      integer                  :: treq, tcur
+      integer                  :: treq, tcur, ios
       integer                  :: time_stamp(4)
 c     ----------------------------------------------------------------------------+      
 c

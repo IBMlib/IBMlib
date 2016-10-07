@@ -151,8 +151,15 @@ c     Counter for issuing stamps by create_emission_boxes to emission_box instan
 c     emission_box_counter applies to next box created (not last)
 c     so that total number created currently is emission_box_counter - 1
 
-      integer :: emission_box_counter   
+      integer   :: emission_box_counter   
+
+
+      integer            :: dry_emission_box_behavior
+      integer, parameter :: dry_stop   = 0
+      integer, parameter :: dry_ignore = 1
+        
       
+
 c.... Define public operator set  ..............................     
 
       
@@ -203,8 +210,8 @@ c     ============================================================
       subroutine init_particle_tracking()
 c     ---------------------------------------------------
 c     ---------------------------------------------------
-      character(len=32)  :: intg_tag
-      integer            :: idum3(3), ntt
+      character(len=32)  :: intg_tag, behavior
+      integer            :: idum3(3), ntt, ntags
 c     ---------------------------------------------------
       call read_control_data(simulation_file, 
      +                       "advec_intg_method", intg_tag)
@@ -224,7 +231,31 @@ c     ---------------------------------------------------
       write(*,*) "init_particle_tracking: advec_intg_method ", 
      +            trim(intg_tag)
 
+c     ---- emission boxes ----
+
       emission_box_counter = 1   ! applies to next box created
+      
+c     ..... set module behavior, if emission_boxes are deemed dry
+c           behavior controlled by module variable dry_emission_box_behavior
+c           controlled by optional tag dry_emission_boxes = ignore|stop(default)
+
+      ntags  = count_tags(simulation_file, "dry_emission_boxes") 
+      if (ntags>0) then        
+         call read_control_data(simulation_file, 
+     +                       "dry_emission_boxes", behavior)
+         behavior = adjustl(behavior)
+         if (behavior(1:6) == "ignore") then
+            dry_emission_box_behavior = dry_ignore
+         elseif (behavior(1:4) == "stop") then
+            dry_emission_box_behavior = dry_stop
+         else
+            write(*,*) "init_particle_tracking: unhandled option for "//
+     +                 "dry_emission_boxes = ", behavior
+         endif
+      else   
+         dry_emission_box_behavior = dry_stop  ! set default behavior (stop)
+      endif
+      
 
       end subroutine init_particle_tracking
 
@@ -1489,7 +1520,7 @@ c                  only the sign is important (keeps as real, for
 c                  compartability, so time_step can be used); release 
 c                  is now determined from current_time in relation 
 c                  to emission_interval
-c
+c     Oc7 07 2016: allowed gracefull ignoring of dry emission boxes
 c----------------------------------------------------------------- 
       type(emission_box),intent(inout)     :: emit_box
       real,intent(in)                      :: time_dir ! >0: forward, <0
@@ -1500,7 +1531,7 @@ c     ..............................................
       integer, parameter     :: pos_attemps = 10**4  ! max attemps to find a wet point in box
       logical                :: pos_OK, absspec
       integer                :: iatt, nwish, maxp_mem, maxp_box,ip
-      integer                :: i, forw_back, istat
+      integer                :: i, forw_back, istat, nend
       real                   :: dr(3), u3(3), abs_time_step, newpos(3)
       real                   :: curdepth
       type(clock),pointer    :: current_time
@@ -1520,7 +1551,7 @@ c     total tracer buffer size and box cap
       call calc_number_of_releases(emit_box, current_time,
      +                             forw_back, nwish)
 
-      npar    = min(nwish, maxp_box, maxp_mem)
+      npar    = min(nwish, maxp_box, maxp_mem) ! make static for this call
       
 c
 c.....Determine whether vertical release is specified as absolute or relative
@@ -1539,26 +1570,50 @@ c
 check that lon lat change is OK in emitter
 check that sign change on release delimiter is OK everywhere
 
-      do ip = nstart, nstart+npar-1         ! OK for npar==0
+      nend = nstart+npar-1  ! inclusive, OK for npar==0
+
+      do ip = nstart, nend   
 c
 c........First horizontal: make sure tracer is initialized in a wet position
 c        (eventhough basic checks are performed at setup stage of 
 c         release box, box may contain dry areas at release time)
 c
-         iatt = 1
-         do 
+         iatt   = 1
+         pos_OK = .false.
+         do while (iatt < pos_attemps)
             call random_number(u3) ! uniform derivate, length 3
             newpos = emit_box%SW + dr*u3
 c...........test if there is wet points at this horizontal position
-            if (.not.is_land(newpos)) exit 
-c...........terminate, if upper bound were hit (iatt==pos_attemps+1)
-            if (iatt > pos_attemps) then
-               write(*,*) "too many dry attempts in release box"
-               call write_emission_box(emit_box)
-               stop
+            if (.not.is_land(newpos)) then
+                pos_OK = .true.
+                exit  ! no more attempts needed
             endif
             iatt = iatt + 1
-         enddo
+         enddo 
+c        
+c        ....... handle spatial exceptions .......
+c
+         if (.not.pos_OK) then
+c
+c        .... only allow dry_ignore if it is first particle in this batch
+c             (otherwise it is likely undersampling)
+c
+            if ((ip==nstart).and.
+     +           (dry_emission_box_behavior==dry_ignore)) then
+               write(*,*) "emission box ", emit_box%emission_boxID, 
+     +                 "appears dry - no particles emitted", 
+     +                 "(dry_ignore was set)"
+               npar = 0 
+               exit             ! loop : ip = nstart, nend  
+            else
+               write(*,*) "emission box ", emit_box%emission_boxID, 
+     +              "appears dry - no particles emitted"
+               call write_emission_box(emit_box)
+               stop  
+            endif
+         endif
+
+
 
 
 c........Now we know horizontal position of is newpos wet   

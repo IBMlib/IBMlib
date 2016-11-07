@@ -1,6 +1,6 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     Particles module
+c     Particles module 
 c     ---------------------------------------------------
 c     $Rev$
 c     $LastChangedDate$
@@ -102,9 +102,10 @@ c     .............................................................
       public :: setup_ensemble_from_file
       public :: delete_ensemble
 
-      interface generate_particles
-         module procedure generate_particles_single
-         module procedure generate_particles_vector      
+      interface generate_particles 
+         module procedure generate_particles_single     ! from single emission box
+         module procedure generate_particles_vector     ! from emission box vector
+         module procedure make_particles_direct         ! create particle explicitly from position now
       end interface
       public :: generate_particles  ! using an emission_box (overloaded subroutine)
         
@@ -276,14 +277,12 @@ c     ---------------------------------------------------
       real,intent(in)                       :: time_dir ! >0: forward, <0 backward
 c     ...................................................
       integer                               :: npar,ip,boxID
-      integer                               :: nstart
       character*999                         :: strdat
 c     ---------------------------------------------------
 c
 c     activate_emission_box chacks that stack capacity is
 c     not exceeded by new emissions
 c
-      nstart = par_ens%last+1 ! position where to start ghenerating new particles
       call activate_emission_box(emit_box, 
      +                           time_dir, par_ens%space_stack,
      +                           par_ens%last+1, npar)
@@ -343,6 +342,59 @@ c     ---------------------------------------------------
 
       end subroutine generate_particles_vector
 
+
+
+      subroutine make_particles_direct(par_ens, pos, time_dir, npar, 
+     +                                 label, strdat)
+c     ---------------------------------------------------  
+c     Create npar particles explicitly at position pos right now into
+c     ensemble par_ens in next free position 
+c     Delegate initialization of corresponding state attributes of 
+c     particles to init_state_attributes
+c     Pass integer label to particle (to origin tracking)
+c     ---------------------------------------------------  
+      type(particle_ensemble),intent(inout) :: par_ens
+      real,intent(in)                       :: pos(:)
+      real,intent(in)                       :: time_dir ! >0: forward, <0 backward
+      integer, intent(in)                   :: npar
+      integer, intent(in)                   :: label
+      character*(*), intent(in)             :: strdat
+c
+      integer          :: ip, ipmax
+      logical          :: isOK
+c     ...................................................
+      ipmax = par_ens%last + npar ! index of last new particle
+      if (ipmax > size(par_ens%space_stack)) then
+         write(*,*) " make_particles_direct: ensemble too small"
+         stop
+      endif  
+
+      isOK = horizontal_range_check(pos).and.is_wet(pos)  ! left-to-right evaluation
+      if (.not.isOK) then
+         write(*,*) " make_particles_direct: invalid position: ", pos
+         write(*,*) " make_particles_direct: horizontal_range_check = ", 
+     +                horizontal_range_check(pos)   
+         write(*,*) " make_particles_direct: is_wet                 = ", 
+     +              is_wet(pos)  
+         stop
+      endif
+
+      do ip = par_ens%last+1, par_ens%last+npar 
+         call set_tracer_defaults(par_ens%space_stack(ip)) ! no position default
+         call set_tracer_position(par_ens%space_stack(ip), pos)
+         
+         call init_state_attributes(par_ens%state_stack(ip), 
+     +                              par_ens%space_stack(ip),
+     +                              time_dir, strdat, label) 
+      enddo
+      par_ens%last =  par_ens%last + npar
+
+      if (verbose>0) then
+        write(*,*) "make_particles_direct_single: created ",npar,
+     +              " particles at ", pos(1:3)
+      endif
+
+      end subroutine make_particles_direct
 
 
 

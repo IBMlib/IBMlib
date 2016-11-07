@@ -186,6 +186,7 @@ c.... Define public operator set  ..............................
       public :: set_tracer_mobility_stop
       public :: get_tracer_position
       public :: set_tracer_position
+      public :: set_tracer_defaults
 c     .... currently domainBC can only be sticky
       public :: set_shore_BC  
       public :: set_bottom_BC 
@@ -1160,6 +1161,23 @@ c------------------------------------------------------------
       end subroutine set_tracer_position
       
 
+      subroutine set_tracer_defaults(tracattr)
+c------------------------------------------------------------ 
+c     No defaults for position
+c------------------------------------------------------------ 
+      type(spatial_attributes),intent(inout) :: tracattr
+      tracattr%mobility     = 0       ! vector assignment
+      tracattr%ashore       = .FALSE. ! check this ...
+      tracattr%outofdomain  = .FALSE. ! check this ...
+      tracattr%atbottom     = .FALSE. ! check this ...
+      tracattr%atsurface    = .FALSE. ! check this ...
+      tracattr%shoreBC      = BC_reflect ! customize ...
+      tracattr%domainBC     = BC_sticky ! customize ...
+      tracattr%bottomBC     = BC_reflect ! customize ...
+      tracattr%surfaceBC    = BC_reflect ! customize ..
+      end subroutine set_tracer_defaults
+
+
       subroutine set_shore_BC(tracattr, BChandler)
 c------------------------------------------------------------ 
       type(spatial_attributes),intent(out) :: tracattr
@@ -1636,19 +1654,10 @@ c........Catch other misreleases
             stop
          endif
             
-c........assign acceptable position newpos           
-         parbuf(ip)%position     = newpos ! assign validated position
-            
-c........initialize other spatial attributes  
-         parbuf(ip)%mobility     = 0       ! vector assignment
-         parbuf(ip)%ashore       = .FALSE. ! check this ...
-         parbuf(ip)%outofdomain  = .FALSE. ! check this ...
-         parbuf(ip)%atbottom     = .FALSE. ! check this ...
-         parbuf(ip)%atsurface    = .FALSE. ! check this ...
-         parbuf(ip)%shoreBC      = BC_reflect ! customize ...
-         parbuf(ip)%domainBC     = BC_sticky  ! customize ...
-         parbuf(ip)%bottomBC     = BC_reflect ! customize ...
-         parbuf(ip)%surfaceBC    = BC_reflect ! customize ...
+c........set tracer state          
+         
+         call set_tracer_position(parbuf(ip), newpos) ! assign validated position
+         call set_tracer_defaults(parbuf(ip))         ! initialize other spatial attributes          
 
       enddo
 

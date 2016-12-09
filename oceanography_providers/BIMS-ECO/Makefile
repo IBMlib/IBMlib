@@ -6,7 +6,10 @@
 #
 #     
 ############################################################
+
 LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o BIMS-ECO_daily_mean.o
+#LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o ANONYMOUS_daily_mean.o
+
 GENERIC_MESH = ../generic_elements
 
 physical_fields.a: dependences.mk $(LOCAL_OBJ) 
@@ -14,6 +17,17 @@ physical_fields.a: dependences.mk $(LOCAL_OBJ)
 
 
 physical_fields.mod:
+
+
+# --- variants from POM template POM_daily_mean.f
+#     expand symbols TAGLENGTH FILEPREPEND RESOLVE_TAG
+#     BIMS-ECO:  tag = DDDD
+#     ANONYMOUS: tag = YYYY_MM_DD
+BIMS-ECO_daily_mean.f:  
+	fpp -D TAGLENGTH=4  -D FILEPREPEND='"restart."'     -D RESOLVE_TAG='"resolve_tag_BIMS-ECO.f"'   POM_daily_mean.f   BIMS-ECO_daily_mean.f
+
+ANONYMOUS_daily_mean.f:
+	cpp -D TAGLENGTH=10 -D FILEPREPEND='"hydrography_"' -D RESOLVE_TAG='"resolve_tag_ANONYMOUS.f"'  POM_daily_mean.f   ANONYMOUS_daily_mean.f
 
 
 # --- interface assembling rules: point to variants that provides sub interfaces

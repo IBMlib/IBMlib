@@ -1,0 +1,20 @@
+The normal way to interface IBMlib with a new hydrographic format is to add a new physical interface layer that couples the data set to IBMlib. This procedure does not require reformatting of the hydrographic data set, but IBMlib can then read data as-is. Alternatively, one can recast a new hydrographic data set into a format corresponding to an already implemented interface; this alternative should be pursued with caution, because (i) recasting may involve numerical truncation and thus accuracy loss and (ii) recasting may be faulty because the translator either have misunderstood the native hydrographic format or the IBMlib format specification and (iii) some special features of the hydrographic data set may be lost because it can not be represented by the target format. Extensive testing is therefore recommended before actual result generating runs are accomplished.
+
+The suggested target format for recasting is based on the POM output layout (Princeton Ocena Model, see http://www.ccpo.odu.edu/POMWEB/), which is relatively simple and transparent; the abundance of POM setups also gives a chance that very little data transformation actually has to be done, if you are lucky. The format will support many typical usages of IBMlib. The target grid is regular longitude-latitude (with arbitrary user provided longitude-latitude spacing), vertically sigma-type (with number of layers specified by user), dynamic sea-level elevation and arbitrary topography. Data is stored as daily averaged hydrography frames with a filename corresponding to the date. The format is stored in netCDF and consists of 
+
+  (1) A grid desciptor file "grid.nc"
+  (2) A sequence of daily hydrography frames with filename "hydrography_YYYY_MM_DD.nc"
+
+where (YYYY, MM, DD) is year, month and day-in-month number, respectively, with prepended zeroes as necessary, i.e. hydrography for February 15 2016 should be stored in file "hydrography_2016_02_15.nc". For convenience, the grid desciptor file may be merged with each hydrography file, but this requires a little extra storage, because the grid desciptor is duplicated many times. The templates for grid desciptor and hydrography frames are provided "grid.CDL" and "hydrography_YYYY_MM_DD.CDL". CDL is the text translation of netCDF, so these files show exactly what IBMlib expects - just show the CDL file to your hydrography data pusher. The period where you can conduct simulations correspond to the period covered by files hydrography_YYYY_MM_DD.nc. At runtime IBMlib tries to read the needed files hydrography_YYYY_MM_DD.nc and stops, if the file is not found (with the expected filename). You don't have to structure or declare the hydrographic database further, just place expected files in the path announced in the simulation input file with the proper names hydrography_YYYY_MM_DD.nc.
+
+If the format for one reason or another does not match your specific needs, it is recommended that you follow instructions within IBMlib for creating a specific physical interface for the data set and recompile IBMlib for your setup. IBMlib is free and open source, but if fortran programming and code compilation is a dangerous animal to you, you may contact the IBMlib developers to explore possibilities and conditions for a collaboration.
+
+
+// ----------------------------------------------------------------------
+// ncdump -h /home/data/BIMS_ECO_test/2005/black_sea.grid.nc > grid.CDL
+// grep nf90_inq_ BIMS-ECO_daily_mean.f|grep "(gncid"
+// ----------------------------------------------------------------------
+// cat anonymous_data_format.txt|l2w_EOL.py  > ~/WinSharedLib/SRAAM/anonymous_data_format.txt
+// cat grid.CDL|l2w_EOL.py                   > ~/WinSharedLib/SRAAM/grid.CDL
+// cat hydrography_YYYY_MM_DD.CDL|l2w_EOL.py > ~/WinSharedLib/SRAAM/hydrography_YYYY_MM_DD.CDL
+// ----------------------------------------------------------------------

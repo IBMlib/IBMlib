@@ -1,16 +1,26 @@
+
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     ---------------------------------------------------
-c     BIMS-ECO pbi for daily averaged data sets
+c     POM format for daily averaged data sets
 c     ---------------------------------------------------
+c
+c     Initially developed for BIMS-ECO, later other flavors added
+c     Three symbols should be resolved by the preprocessor to expand the template:
+c
+c         TAGLENGTH      ! BIMS-ECO format  == DDDD (days since 1990-01-01)
+c         FILEPREPEND    ! BIMS-ECO prepend == restart.
+c         RESOLVE_TAG    ! defines subroutine resolve_corresp_dataset(aclock, tag)
+c
 c     $Rev: 228 $
 c     $LastChangedDate: 2011-01-26 02:52:59 +0100 (Wed, 26 Jan 2011) $
 c     $LastChangedBy: asch $ 
 c
 c     Based on PBI POLCOMS+ERSEM/offline
 c    
-c     grid def in black_sea.grid.nc
-c     daily avg physics in restart.DDDD.nc       (where DDDD is days since 1990-01-01)
-c     daily avg biology in black_sea.bio.DDDD.nc (where DDDD is days since 1990-01-01)
+c     BIMS-ECO files: 
+c        grid def in black_sea.grid.nc
+c        daily avg physics in restart.DDDD.nc       (where DDDD is days since 1990-01-01)
+c        daily avg biology in black_sea.bio.DDDD.nc (where DDDD is days since 1990-01-01)
 c
 c     POM employs sigma coordinates, which are bottom-following coordinates that map the vertical coordinate from
 c     the vertical coordinate from -H < z < eta onto -1 < sigma_POM < 0, where eta is sea level elevation wrt.
@@ -26,6 +36,9 @@ c            are padded with an arbitrary value in last element iz=35 (surface c
 c     
 c     LOG: initial version without biogeochemistry tested 17 Dec 2014    
 c          Elaborations from Sinan S. Arkin [sinan.arkin@ims.metu.edu.tr] January 23, 2015 incorporated
+c          fixed tab indentation problem for CPP wrt. format statement
+
+ecosmo  \ / solution
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
@@ -73,11 +86,13 @@ c     -------------------- module data --------------------
 c
 c     ------ data frame handler ------
       
-      character*999              :: hydroDBpath ! hydrographic data sets
-      type(clock)                :: time_offset ! 1990-01-01 00:00:00
+      character*999              :: hydroDBpath ! hydrographic data sets (proper trailing separator will be added at read, if not provided)
+      character*999              :: grid_desc   ! grid descriptor file
+      type(clock)                :: time_offset ! 1990-01-01 00:00:00 - this is a particular to BIMS-ECO and should be removed from template ...
       
       
-      integer, parameter         :: tag_lenght = 4     ! format == DDDD (days since 1990-01-01)
+      integer, parameter         :: tag_lenght  = TAGLENGTH   ! BIMS-ECO format  == DDDD (days since 1990-01-01)
+      character*(*), parameter   :: fileprepend = FILEPREPEND ! BIMS-ECO prepend == restart.
       character*(*), parameter   :: not_set_c = "none" ! assume name conflict unlikely
       integer, parameter         :: not_set_i = -9999
      
@@ -112,8 +127,12 @@ c     ===================================================
       subroutine init_physical_fields(time)
 c     ------------------------------------------
 c     Do not trigger data load
+c     primitive runtime linux/windows recognition, by allowing user to supply path separator 
 c     ------------------------------------------
       type(clock), intent(in),optional :: time
+      character(len=len(hydroDBpath))  :: sbuf
+      character                        :: lastchr
+      integer                          :: lp
 c     ------------------------------------------
       if (present(time)) then
          call set_master_clock(time)
@@ -125,9 +144,30 @@ c     ------------------------------------------
       call set_clock(time_offset,1990,1,1,0) 
 
       call read_control_data(simulation_file,"hydroDBpath",hydroDBpath)
+
+    
+c     --- provide primitive runtime linux/windows recognition, by allowing user to 
+c         supply path separator to hydroDBpath
+
+      lp      = len(path)
+      sbuf    = adjustr(path)
+      lastchr = sbuf(lp:lp)
+      if     (lastchr == "/") then                  ! found explicit linux seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      elseif (lastchr == "\") then                  ! found explicit windows seperator
+         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+      else
+         hydroDBpath = trim(adjustl(path)) // "/"   ! no separator, assume linux and prepend linux delimiter
+      endif
+
       write(*,*) "init_physical_fields: hydrographic database path =", 
      +           trim(adjustl(hydroDBpath)) 
       call reset_frame_handler()
+
+      call read_control_data(simulation_file,"grid_descriptor",
+     +                       grid_desc )
+      write(*,*) "init_physical_fields: grid descriptor file =", 
+     +           trim(adjustl(grid_desc)) 
 
 c     ---- test, if a fixed frame should be recycled (fast test mode)
       if (count_tags(simulation_file, "fixed_hydro_frame")/=0) then
@@ -166,9 +206,10 @@ c
          write(*,564) molecular_diffusivity
          hdiffus = molecular_diffusivity
       endif
- 563  format("init_physical_fields: using constant horiz_diffusivity =",
+
+  563 format("init_physical_fields: using constant horiz_diffusivity =",
      +       e12.5," m2/s")
- 564  format("init_physical_fields: init default horiz_diffusivity   =",
+  564 format("init_physical_fields: init default horiz_diffusivity   =",
      +       e12.5," m2/s")
 
 c     ---- specials for this data set / version ----
@@ -222,34 +263,8 @@ c     ------------------------------------------
       end subroutine update_physical_fields
 
 
-
-
-      subroutine resolve_corresp_dataset(aclock, tag)
-c     ------------------------------------------
-c     Resolve tag of data set corresponding to aclock
-c
-c     tag in BIMS-ECO PBI for daily averaged data sets is DDDD,
-c     where DDDD is days since 1990-01-01
-c     In test mode, a fixed frame can be recycled by setting
-c     fixed_hydro_frame = DDDD in simulation file
-c     ------------------------------------------
-      type(clock), intent(in)                :: aclock
-      character(len=tag_lenght), intent(out) :: tag
-      integer                                :: nhours, ndays
-c     ------------------------------------------
-      if (fixed_tag == not_set_c) then
-         call get_period_length_hour(time_offset, aclock, nhours) ! round to nearest hour
-         ndays = int(nhours/24.0) 
-         write(tag, 427) ndays 
- 427     format(i4.4)           !  DDDD
-      else
-         tag = fixed_tag
-         write(*,*) "resolve_corresp_dataset: applying fixed_tag:", tag
-      endif
-
-      end subroutine resolve_corresp_dataset
-
-
+c     ----- load tag resolution for the particular data set
+      include RESOLVE_TAG
 
 
       subroutine update_dataset(tag)
@@ -274,7 +289,7 @@ c     ------------------------------------------
       subroutine load_grid_desc()
 c     -------------------------------------------------------
 c     Should only be invoked at start
-c     grid file = hydroDBpath/black_sea.grid.nc
+c     BIMS-ECO grid file = hydroDBpath/black_sea.grid.nc
 c
 c     assume grid is regular lon-lat oriented W->E, S->N 
 c     -------------------------------------------------------
@@ -285,9 +300,10 @@ c     -------------------------------------------------------
       real                 :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
 c     -------------------------------------------------------
       if (data_in_buffers) stop "load_grid_desc:unexpected"
-      write(fname,336) trim(adjustl(hydroDBpath))
+      write(fname,336) trim(adjustl(hydroDBpath)), 
+     +                 trim(adjustl(grid_desc))
       call NetCDFcheck( nf90_open(fname, NF90_NOWRITE, gncid) )
- 336  format(a,'/black_sea.grid.nc')
+  336 format(2a)
       write(*,*) "load_grid_desc: loading grid from", 
      +           trim(adjustl(fname))
 
@@ -338,11 +354,11 @@ c
       call NetCDFcheck( nf90_close(gncid) )
 
 
- 229  format(a,a)    
- 231  format("load_grid_desc: 3d grid dim (nx,ny,nz) = ", i4,i4,i4)
- 232  format("load_grid_desc: lambda1 = ",f12.7,
+  229 format(a,a)    
+  231 format("load_grid_desc: 3d grid dim (nx,ny,nz) = ", i4,i4,i4)
+  232 format("load_grid_desc: lambda1 = ",f12.7,
      +                      " dlambda = ",f12.7," degrees")  
- 233  format("load_grid_desc: phi1    = ",f12.7,
+  233 format("load_grid_desc: phi1    = ",f12.7,
      +                      " dphi    = ",f12.7," degrees")  
       
       end subroutine load_grid_desc
@@ -363,9 +379,10 @@ c     ------------------------------------------------------------
       real,allocatable    :: fsm(:,:)
 c     ------------------------------------------------------------
       if (data_in_buffers) stop "init_topography:unexpected"
-      write(fname,361) trim(adjustl(hydroDBpath))
+      write(fname,361) trim(adjustl(hydroDBpath)), 
+     +                 trim(adjustl(grid_desc))
       call NetCDFcheck( nf90_open(fname, NF90_NOWRITE, gncid) )
- 361  format(a,'/black_sea.grid.nc')
+  361 format(2a)
       write(*,*) "init_topography: loading topography", 
      +           trim(adjustl(fname))
 
@@ -426,20 +443,20 @@ c     ------------------------------------------
 
 
       subroutine open_data_files(tag)
-c     ------------------------------------------
-c     Open netcdf file set corresponding to tag == DDDD: 
-c     file = hydroDBpath/restart.DDDD.nc
+c     ---------------------------------------------------
+c     Assemble netcdf file name from tag and open data set
+c     path: hydroDBpath / fileprepend + TAG .nc
 c     (currently only load of physics)
-c     ------------------------------------------
+c     ---------------------------------------------------
       character(len=tag_lenght),intent(in) :: tag
       character*999                        :: fname ! assume long enough
       integer :: timedimID, ntime, varid
 c     ------------------------------------------
       call close_data_files() ! in case they are open ...
-      write(fname,333) trim(adjustl(hydroDBpath)), tag
+      write(fname,333) trim(adjustl(hydroDBpath)), fileprepend, tag
 
       call NetCDFcheck( nf90_open(fname, NF90_NOWRITE, ncid) )
- 333  format(a,'/restart.',a,'.nc')
+  333 format(3a,'.nc')
  
       write(*,*) "open_data_files: opened NetCDF set ", 
      +           trim(adjustl(fname))
@@ -475,6 +492,7 @@ c     float v(z, y, x)   = "y-velocity"                                 units = 
 c     float w(z, y, x)   = "sigma-velocity"                             units = "metre/sec" ; staggering  = (east_e, north_e, z) (error in netcdf attribute, Sinan Jan 23,2015)
 c     float t(z, y, x)   = "potential temperature" ;                    units = "K" ;         staggering  = (east_e, north_e, zz) 
 c     float s(z, y, x)   = "salinity x rho / rhoref" ;                  units = "PSS" ;       staggering  = (east_e, north_e, zz) 
+c     float rho(z, y, x)  = "(density-1000)/rhoref" ;                   units = "dimless"     staggering  = (east_e, north_e, zz)
 c     float kh(z, y, x)  = "vertical diffusivity" ;                     units = "m^2/sec";    staggering  = (east_e, north_e, zz) 
 c     float aam(z, y, x) = "horizontal kinematic viscosity" ;           units = "metre^2/sec";staggering  = (east_e, north_e, zz) 
 c

@@ -1,0 +1,4 @@
+hydroDBpath            = /home/data/BIMS_ECO_test/2005
+grid_descriptor        = black_sea.grid.nc
+!fixed_hydro_frame      = 5483 ! optional: file-tag excl prepend+extension
+!horizontal_diffusivity = 50.0 ! optional: m2/s, default 0

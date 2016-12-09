@@ -1,0 +1,45 @@
+// --------------------------------------------------------------------------------------------
+// Grid is regular longitude-latitude (with arbitrary user provided longitude-latitude spacing), 
+// vertically sigma-type (with number of layers specified by user), dynamic sea-level elevation 
+// and arbitrary topography. This grid descriptor may be embedded in each hydrographic data 
+// frame hydrography_YYYY_MM_DD for simplicity.
+// POM employs sigma coordinates, which are bottom-following coordinates that map the vertical 
+// coordinate from the vertical coordinate from -H < z < eta onto -1 < sigma_POM < 0, where z is 
+// -depth below ref level (not sea surface)
+// H > 0 is the static variable h(x,y) (in grid file) loaded into wdepth0
+// eta is dynamic variable elb(x,y) (in physics file) )
+// fsm > 0.0 for wet points, fsm == 0.0 for dry points
+// --------------------------------------------------------------------------------------------
+netcdf grid {
+dimensions:
+	x = 182 ;   // longitude grid points
+	y = 125 ;   // latitude grid points
+	z = 35 ;    // vertical grid points
+variables:
+	double zz(z) ;
+		zz:long_name = "sigma of cell centre" ;
+		zz:units = "sigma_level" ;
+		zz:standard_name = "ocean_sigma_coordinate" ;
+		zz:formula_terms = "sigma: zz eta: elb depth: h" ;
+	double east_e(y, x) ;   // cell centers
+		east_e:long_name = "easting of elevation points" ;
+		east_e:units = "degree" ;
+		east_e:coords = "east_e north_e" ;
+	double north_e(y, x) ;  // cell centers
+		north_e:long_name = "northing of elevation points" ;
+		north_e:units = "degree" ;
+		north_e:coords = "east_e north_e" ;
+	double h(y, x) ;        // at cell centers
+		h:long_name = "undisturbed water depth" ;
+		h:units = "metre" ;
+		h:coords = "east_e north_e" ;
+	double fsm(y, x) ;
+		fsm:long_name = "free surface mask" ;
+		fsm:units = "dimensionless" ;
+		fsm:coords = "east_e north_e" ;
+
+
+// global attributes:
+		:title = "black_sea" ;
+		:description = "POM grid file" ;
+}

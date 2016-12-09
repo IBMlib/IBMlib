@@ -37,8 +37,7 @@ c
 c     LOG: initial version without biogeochemistry tested 17 Dec 2014    
 c          Elaborations from Sinan S. Arkin [sinan.arkin@ims.metu.edu.tr] January 23, 2015 incorporated
 c          fixed tab indentation problem for CPP wrt. format statement
-
-ecosmo  \ / solution
+c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 

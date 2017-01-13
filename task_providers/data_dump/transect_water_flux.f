@@ -3,6 +3,10 @@ c     ---------------------------------------------------
 c     Compute water flux over a given transect for a given period
 c     on a fixed-depth grid (which may include the entire water column)
 c     Flux normal is counter-clockwise to the transect vector
+c     
+c     If the transect crosses land or goes below the seabed, the normalization
+c     area applied is the full transect area, effectively with zeroes
+c     padded to dry transect parts
 c     ---------------------------------------------------
 c     $Rev: $
 c     $LastChangedDate:  $
@@ -115,7 +119,7 @@ c
             do ih = 1, mh       ! horizontal mesh loop
                geo(1:2) = xy(:,ih)
                call interpolate_currents(geo, uvw, istat)
-               if (istat > 0) uvw = 0.0 ! Faulty interpolations (whatever reason) are padded with 0
+               if (istat > 0) uvw = 0.0 ! Faulty interpolations (whatever reason, eg. dry point) are padded with 0
                area = dl(ih)*dz ! m2, area element associated with this sampling
                hflux = hflux + sum(nvec(:,ih)*uvw)*area ! unit m3/sec
 c               write(*,*) iz, ih, uvw, sum(nvec(:,ih)*uvw)

@@ -27,7 +27,8 @@ export RANLIB    = ranlib
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
 FCFLAGS += $(addprefix -I,$(MODDIRS))  
 
-NETCDF  = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows/gfortran_netcdf/working/NETCDF
+# usual installation location for linux systems
+NETCDF  = /usr
 FCFLAGS += -I$(NETCDF)/include
 
 

@@ -2,10 +2,35 @@
            QUICK GUIDE FOR GETTING STARTED  
 ==========================================================
 
-Before you build the code, you must configure it to the
-situation where it should be used
+-------------------------------------------------------
+  Prerequisites:
+-------------------------------------------------------
 
-1) Select overall configuration of code by copying  the 
+Check that your system has the necessary ressources installed
+  1) gmake 
+  2) python2
+  3) a fortran 90+ compiler
+  
+gmake and python2 should be standard in a linux environment. IBMlib has been
+compiled in various configurations with these compilers: 
+  ifort (Intel),
+  gfortran (GNU)
+  pg (Portland Group)
+other compilers should work, but you may need to translate some compiler options
+to the specific compiler. Cross compilation Windows (static build) has been achieved with gfortran
+
+In addition to gmake, python2 and a fortran compiler, you may need other ressources,
+depending on the configuration you build IBMlib for; often, you need netCDF, if you read/write  
+netCDF data sets. If netCDF is not locatable by the compiler, you need to set the environment variables
+or compiler options (compiler_defaults.mk) as. needed
+
+-------------------------------------------------------
+  IBMlib configuration
+-------------------------------------------------------
+
+Before you build the code, you must configure IBVMlib to the situation where it should be used:
+
+1) Select overall configuration of code by copying the 
    file config.mk into the base directory (where this file is)
    The file config.mk tells which modules should be used for
    PHYSICAL_FIELDS, PARTICLE_STATE and TASK
@@ -13,26 +38,34 @@ situation where it should be used
 
 2) Select a compiler by copying a file compiler_defaults.mk  into the 
    base directory (where this file is). compiler_defaults.mk
-   contains defaults compiler/link flags
+   contains defaults compiler/link flags, and auxillary software references
+   if you need to link up IBMlib with outher packages.
    There are a set of examples in the directory setups/compilers
-   
 
-3) Build the selected configuration by typing:
-     make 
-   at the command line 
-   
 
 If a standard setup is applied steps 1-2 above can be accelerated
 by running a standard script doing steps 1-2. 
 There are some examples in setups/combo_scripts.
 Run these in the base directory (where this file is) e.g. type:
    setups/combo_scripts/quick_ifort_minimal
-at the command line
+at the command line. You can then edit files config.mk and compiler_defaults.mk as needed
+
+
+-------------------------------------------------------
+  IBMlib compilation
+-------------------------------------------------------
+
+3) Build the selected configuration by typing:
+
+     make ibmrun
+     
+   at the command line (assuming you name the executable ibmrun in config.mk)
 
 
 
-
-Testing IBMlib: 
+-------------------------------------------------------
+  Testing IBMlib: 
+-------------------------------------------------------
 
    IBMlib comes with a self test suite. If testing is the first thing you do, 
    you can just put an empty file for config.mk by typing "touch config.mk" 
@@ -46,3 +79,15 @@ Testing IBMlib:
      ln -s setups/compilers/ifort/compiler_defaults.mk
      make test
 
+
+-------------------------------------------------------
+  Further reading
+-------------------------------------------------------
+
+  A user guide is available in directory doc. To build it type
+
+    latex IBMlib_manual.tex
+    dvipdf IBMlib_manual.dvi
+
+ to generate the user guide IBMlib_manual.pdf
+ 

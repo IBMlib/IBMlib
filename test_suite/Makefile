@@ -43,6 +43,6 @@ clean:
 
 variables:
 	@clear
-        @echo "(FULLTEST_SET = " $(FULLTEST_SET)
+	@echo "(FULLTEST_SET = " $(FULLTEST_SET)
 
 FORCE:

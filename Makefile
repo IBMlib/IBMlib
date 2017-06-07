@@ -225,7 +225,10 @@ libtime/Makefile:
 
 
 clean: FORCE
-	-/bin/rm -f *.o *.a *.mod $(IBMlib_package) dependences.mk $(EXECUTABLE)
+	-/bin/rm -f  $(IBMlib_package) dependences.mk $(EXECUTABLE)
+	-find . -type f -name '*.o' -exec rm {} +
+	-find . -type f -name '*.a' -exec rm {} +
+	-find . -type f -name '*.mod' -exec rm {} +
 	-make -C libtime cleanall
 	-make -C $(PHYSICAL_FIELDS_DIR) clean
 	-make -C $(PARTICLE_STATE_DIR) clean

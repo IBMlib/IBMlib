@@ -13,7 +13,7 @@
 
 # compiler settings   
 export FC        = ifort
-export FCFLAGS   =  -e90 -i4 -error_limit 3 -I$(IBMLIB_DIR)
+export FCFLAGS   = -i4 -error_limit 3 -I$(IBMLIB_DIR)   # add -e90 for stadard conformance check
 export FPPFLAGS  = -fpp 
 export CC        = icc
 export AR        = ar
@@ -25,7 +25,7 @@ FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 
 # linker settings
 LINKFLAGS = -i4
-LINKLIBS  += -L/usr/local/include 
+LINKLIBS  += -L/usr/local/lib     # 
 LINKLIBS  += -lnetcdff -lnetcdf  -lhdf5_hl -lhdf5 -lz  # netcdf
 
 export LITTLE_ENDIAN = -convert little_endian

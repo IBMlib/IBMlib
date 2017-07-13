@@ -180,8 +180,7 @@ c     --------------------------------------------------------------
          stop 653
       endif
 
-
-      v_active = sink_speed
+      
       end subroutine get_active_velocity
 
 

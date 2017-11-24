@@ -514,6 +514,7 @@ c     At close release unit to avoid another write opens it
 c     ------------------------------------------
       logical :: isopen
 c     ------------------------------------------
+      if (phys_file<0) return ! MinGW compiled code does not handle this
       inquire(unit=phys_file,opened=isopen)
       if (isopen) then
          close( phys_file )

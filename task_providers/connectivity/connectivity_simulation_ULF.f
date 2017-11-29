@@ -270,6 +270,7 @@ c
          if ( save_tracks .and. (mod(istep, nskip) == 0)) then
             call write_particle_frame()   ! corresponding to current_time
          endif
+         call write_progress_file(istep,ntim) ! text file for progress monitoring
       enddo
  372  format(25("*"), " main time loop step ",i5.5, " ", 25("*"))
 
@@ -350,6 +351,19 @@ c     -----------------------------------------------------
       end subroutine scan_topography
 
 
+      subroutine write_progress_file(inow, nsteps)
+c     ----- requested by FTH for progress monitoring -----
+      integer,intent(in) :: inow, nsteps
+      integer            :: iof
+      call find_free_IO_unit(iof)
+      open(iof, file="SIMSTAT.txt")
+      write(iof, 285) "completed steps",     inow
+      write(iof, 285) "steps in simulation", nsteps
+ 285  format(a20, "=",i10)
+      close(iof)
+      end subroutine write_progress_file
+
+      
       subroutine write_particle_frame()
 c     -----------------------------------------------------  
 c     reference variables in global scope

@@ -124,7 +124,7 @@ c     BC handler tags are used in add_constrained_step when checking a motion st
 c
 c     ---------------------------------------
       type spatial_attributes
-      private     ! hide internal implementation
+c      private     ! SRAAM public
         real              :: position(3)   ! current position as (lon,lat,depth)
         integer           :: mobility(3)   ! along lon,lat,depth
         logical           :: ashore, outofdomain, atbottom, atsurface ! motion state

@@ -23,7 +23,7 @@ export FPPFLAGS  = -fall-intrinsics                          # preprocessing aut
 export CC        = /usr/bin/x86_64-w64-mingw32-gcc
 export AR        = /usr/bin/x86_64-w64-mingw32-ar
 export RANLIB    = /usr/bin/x86_64-w64-mingw32-ranlib
-export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows/mingw_netcdf/working/NETCDF
+export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows_64bit/mingw_netcdf/NETCDF
 
 # FCFLAGS += fconvert=big-endian   # for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 

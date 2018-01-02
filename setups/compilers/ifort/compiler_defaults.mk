@@ -13,20 +13,21 @@
 
 # compiler settings   
 export FC        = ifort
-export FCFLAGS   = -i4 -error_limit 3 -I$(IBMLIB_DIR)   # add -e90 for stadard conformance check
+export FCFLAGS   =  -i4 -error_limit 3 -I$(IBMLIB_DIR)
 export FPPFLAGS  = -fpp 
+
 export CC        = icc
 export AR        = ar
 export RANLIB    = ranlib
 
-MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS)
+
+MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS) /usr/local_intel/include 
 FCFLAGS += $(addprefix -I,$(MODDIRS))  
-FCFLAGS += -I/usr/local/include   # should contain netcdf.mod
 
 # linker settings
 LINKFLAGS = -i4
-LINKLIBS  += -L/usr/local/lib     # 
-LINKLIBS  += -lnetcdff -lnetcdf  -lhdf5_hl -lhdf5 -lz  # netcdf
+LINKLIBS  += -L/usr/local_intel/lib 
+
 
 export LITTLE_ENDIAN = -convert little_endian
 export BIG_ENDIAN    = -convert big_endian

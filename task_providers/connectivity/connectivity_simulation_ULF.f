@@ -45,7 +45,8 @@ c     ------------ declarations ------------
       real    :: time_step, t, rdum6(6), dt_save
       real, allocatable :: topography(:,:), topolon(:), topolat(:)
       logical :: save_tracks, save_xy, save_xyz, topo_scan
-      character*256 :: filename, topofilename, sconn
+      logical :: save_tracer_stat
+      character*256 :: filename, topofilename, sconn, aword
       integer :: save_connectivity
       integer :: nsrc, ndest, nsrc_id, ndest_id, conmat_id
       integer :: nemax
@@ -170,6 +171,13 @@ c
          nskip = ntim                            ! save only last time frame
       endif
 
+      save_tracer_stat = .false. ! default
+      if (count_tags(simulation_file, "save_tracer_stat") > 0) then
+         call read_control_data(simulation_file, "save_tracer_stat",
+     +        aword)
+         if (trim(adjustl(aword)) == "yes") save_tracer_stat = .true.
+      endif
+         
 c     NF90_UNLIMITED binds to particle frames
 
       if (save_tracks) then
@@ -201,6 +209,7 @@ c        -------- define time --------
          call nfcheck( nf90_put_att(ncid, time_id, "unit", 
      +                            "year, month, day, second_in_day"))
       endif
+c     ----------------
       if (save_xyz) then
          call nfcheck( nf90_put_att(ncid, NF90_GLOBAL, 
      +                 "tracks_xyz", "yes") )
@@ -212,6 +221,26 @@ c        -------- define depth --------
          call nfcheck( nf90_put_att(ncid, depth_id, "unit", 
      +                              "meters below sea surface"))
       endif
+c     ---------- save track statistics / final state ----------      
+      if (save_tracer_stat) then
+         call nfcheck( nf90_def_var(ncid,"is_out_of_domain",NF90_BYTE, 
+     +        (/npart_id/), is_out_of_domain_id)
+         call nfcheck( nf90_def_var(ncid,"is_settled",      NF90_INT, 
+     +        (/npart_id/), is_settled_id)
+         call nfcheck( nf90_def_var(ncid,"age_at_settling", NF90_FLOAT,
+     +        (/npart_id/), age_at_settling_id)         
+         call nfcheck( nf90_def_var(ncid,"degree_days",     NF90_FLOAT,
+     +        (/npart_id/), degree_days_id)        
+         call nfcheck( nf90_def_var(ncid,"max_temp",        NF90_FLOAT,
+     +        (/npart_id/), max_temp_id)         
+         call nfcheck( nf90_def_var(ncid,"min_temp",        NF90_FLOAT,
+     +        (/npart_id/), min_temp_id)         
+         call nfcheck( nf90_def_var(ncid,"max_salt",        NF90_FLOAT,
+     +        (/npart_id/), max_salt_id)         
+         call nfcheck( nf90_def_var(ncid,"min_salt",        NF90_FLOAT,
+     +        (/npart_id/), min_salt_id)         
+      endif
+      
 c
 c.....prepare output: section 3 (connectivity)    
 c     
@@ -290,7 +319,10 @@ c     --------- generate and save final connectivity, if requested ---------
          call nfcheck( nf90_put_var(ncid, conmat_id, tmat) )
          write(*,*) "wrote connectivity matrix for last time step"
       endif
+c     --------- save track statistics / final state , if requested ---------
 
+      if (save_tracer_stat) call save_tracer_stat_to_netcdf()
+      
 c     ----------------- close down ---------------------------
      
       call nfcheck( nf90_close(ncid) )
@@ -394,4 +426,46 @@ c     -----------------------------------------------------
       endif
       end subroutine write_particle_frame
 
+      
+      subroutine save_tracer_stat_to_netcdf()
+c     -----------------------------------------------------  
+c     Assemble and write track statistics / final state 
+c     ----------------------------------------------------- 
+      integer             :: i, isout,sett
+c     -----------------------------------------------------
+      do i=1,par_ens%last
+c        ------------         
+         if (par_ens%space_stack(i)%outofdomain) then
+            isout = 1
+         else
+            isout = 0
+         endif
+         call nfcheck( nf90_put_var(ncid, is_out_of_domain_id,
+     +        isout, start=(/i/)) )
+c        ------------               
+         if     (par_ens%state_stack(i)%type == 0) then
+            sett = 0
+         elseif (par_ens%state_stack(i)%type == 1) then
+            sett = par_ens%state_stack(i)%settleBox
+         else
+            sett = -1           ! dead
+         endif   
+         call nfcheck( nf90_put_var(ncid, is_settled_id,
+     +        sett, start=(/i/)) )
+c        ------------
+         call nfcheck( nf90_put_var(ncid, age_at_settling_id,
+     +        par_ens%state_stack(i)%bio%age, start=(/i/)) )
+c        ------------
+         call nfcheck( nf90_put_var(ncid, min_temp_id,
+     +        par_ens%state_stack(i)%bio%degree_min_temp, start=(/i/)))
+c        ------------
+         call nfcheck( nf90_put_var(ncid, max_temp_id,
+     +        par_ens%state_stack(i)%bio%degree_max_temp, start=(/i/)))       
+c        ------------
+         call nfcheck( nf90_put_var(ncid, min_salt_id,
+     +        par_ens%state_stack(i)%bio%degree_min_salt, start=(/i/)))
+c        ------------
+         call nfcheck( nf90_put_var(ncid, max_salt_id,
+     +        par_ens%state_stack(i)%bio%degree_max_salt, start=(/i/)))                
+      enddo
       end program

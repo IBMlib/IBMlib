@@ -2,9 +2,9 @@
 #  ---------------------------------------------------
 #  Makefile
 #  ---------------------------------------------------
-#  $Rev$
-#  $LastChangedDate$
-#  $LastChangedBy$ 
+#  $Rev: 449 $
+#  $LastChangedDate: 2013-11-04 15:40:55 +0100 (Mon, 04 Nov 2013) $
+#  $LastChangedBy: asch $ 
 #
 #  This makefile builds IBMlib core part and delegates out the building 
 #  of modules PHYSICAL_FIELDS/PARTICLE_STATE/TASK to the designated directory
@@ -103,7 +103,7 @@ export COMMON_RULES = $(IBMLIB_DIR)/common_rules.mk   #implicit rules shared bet
 
 # currently define the output set statically
 OUTPUT_DIR         = output_writers
-OUTPUT_WRITERS     = #ascii_writer  netcdf_writer # here you select which writers to build
+OUTPUT_WRITERS     = # ascii_writer  netcdf_writer # here you select which writers to build
 OUTPUT_WRITER_DIRS = $(addprefix $(OUTPUT_DIR)/, $(OUTPUT_WRITERS))
 
 # load build configuration 
@@ -117,11 +117,13 @@ include  config.mk                            # mandatory include
 #Define Objects and their grouping
 EXT_LIBS     = libtime/libtime77.a
 BASELIBS     = grid_interpolations.o  runtime_tools.o  string_tools.o 
-BASEMODS     = time_tools.mod  run_context.mod  output.mod  polygons.mod  geometry.mod  random_numbers.mod  array_tools.mod spline.mod input_parser.mod constants.mod
-BASEOBJS     = $(patsubst %.mod,%.o,$(BASEMODS)) $(BASELIBS) $(EXT_LIBS) 
+BASEMODS     = constants.mod  input_parser.mod  random_numbers.mod  time_tools.mod\
+               run_context.mod  output.mod  geometry.mod  polygons.mod array_tools.mod  spline.mod
+BASEOBJS     = $(EXT_LIBS) $(BASELIBS) $(patsubst %.mod,%.o,$(BASEMODS))
 OUTPUT_MODS  = $(addsuffix .mod, $(OUTPUT_WRITERS))
 OUTPUT_ARCS  = $(addsuffix .a,   $(OUTPUT_WRITERS))
-IBMLIB_OBJS  = task.a  particle_tracking.o particles.o  particle_state.a  physical_fields.a  $(OUTPUT_ARCS) $(BASEOBJS) 
+IBMLIB_OBJS  = $(BASEOBJS)  physical_fields.a  particle_tracking.o particle_state.a\
+               particles.o $(OUTPUT_ARCS) task.a 
 
 #Variables relating to the packaging
 IBMLIB_SRCS    = $(shell svn list -R) #Srcs are anything in the repository (but the working copy there
@@ -156,12 +158,12 @@ help: FORCE
 #     providing functions AFTER the last object file it applies. This is 
 #     exactly opposite the make order. 
 #     Therefore hack: dublicate IBMLIB_OBJS to ensure a provider is also after using function ...
-#
+#     
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(IBMLIB_OBJS)
 	@echo ""
-	$(FC)  $(IBMLIB_OBJS) $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)
+	$(FC)  $(IBMLIB_OBJS) $(IBMLIB_OBJS)  $(LINKFLAGS) $(LINKLIBS) -o $(EXECUTABLE)   # remove dublicate IBMLIB_OBJS
 
 
 # 
@@ -221,14 +223,13 @@ libtime/libtime77.a: FORCE  libtime/Makefile
 libtime/Makefile:
 	@echo ""
 	cd libtime; tar xvfz libtime.tar.gz; rm -f Makefile; \
-        ln -s Makefile_common Makefile
+	ln -s Makefile_common Makefile
+	
+	
 
 
 clean: FORCE
-	-/bin/rm -f  $(IBMlib_package) dependences.mk $(EXECUTABLE)
-	-find . -type f -name '*.o' -exec rm {} +
-	-find . -type f -name '*.a' -exec rm {} +
-	-find . -type f -name '*.mod' -exec rm {} +
+	-/bin/rm -f *.o *.a *.mod $(IBMlib_package) dependences.mk $(EXECUTABLE)
 	-make -C libtime cleanall
 	-make -C $(PHYSICAL_FIELDS_DIR) clean
 	-make -C $(PARTICLE_STATE_DIR) clean

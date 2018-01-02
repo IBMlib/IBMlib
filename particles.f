@@ -53,7 +53,7 @@ c     particle components are declared as pointer to
 c     Allow spectator construction in particle_ensemble
 c     -----------------------------------------------
       type particle
-      private
+c      private    ! SRAAM: public
         type(spatial_attributes), pointer :: space 
         type(state_attributes), pointer   :: state 
       end type
@@ -67,7 +67,7 @@ c     i.e. link to space_stack/state_stack
 c     The spectator construction is rather economic memory wise
 c     -----------------------------------------------
       type particle_ensemble
-      private
+c      private    ! SRAAM: public
         type(particle), pointer          :: allpart(:) ! allocation may exceed active particles
         integer                          :: last       ! last active, last==0 for no active
         type(spatial_attributes),pointer :: space_stack(:) ! space data core

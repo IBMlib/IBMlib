@@ -42,6 +42,9 @@ c     ------------ declarations ------------
       integer :: ncid, nskip, topolon_id, topolat_id, npart_id
       integer :: lon_id, lat_id, depth_id, time_id, i4_id, nframes_id
       integer :: nxtop, nytop, nxtop_id, nytop_id, topography_id
+      integer :: is_out_of_domain_id, is_settled_id
+      integer :: age_at_settling_id, degree_days_id, max_temp_id
+      integer :: min_temp_id, max_salt_id, min_salt_id  
       real    :: time_step, t, rdum6(6), dt_save
       real, allocatable :: topography(:,:), topolon(:), topolat(:)
       logical :: save_tracks, save_xy, save_xyz, topo_scan
@@ -224,21 +227,21 @@ c        -------- define depth --------
 c     ---------- save track statistics / final state ----------      
       if (save_tracer_stat) then
          call nfcheck( nf90_def_var(ncid,"is_out_of_domain",NF90_BYTE, 
-     +        (/npart_id/), is_out_of_domain_id)
+     +        (/npart_id/), is_out_of_domain_id))
          call nfcheck( nf90_def_var(ncid,"is_settled",      NF90_INT, 
-     +        (/npart_id/), is_settled_id)
+     +        (/npart_id/), is_settled_id))
          call nfcheck( nf90_def_var(ncid,"age_at_settling", NF90_FLOAT,
-     +        (/npart_id/), age_at_settling_id)         
+     +        (/npart_id/), age_at_settling_id))        
          call nfcheck( nf90_def_var(ncid,"degree_days",     NF90_FLOAT,
-     +        (/npart_id/), degree_days_id)        
+     +        (/npart_id/), degree_days_id))        
          call nfcheck( nf90_def_var(ncid,"max_temp",        NF90_FLOAT,
-     +        (/npart_id/), max_temp_id)         
+     +        (/npart_id/), max_temp_id))        
          call nfcheck( nf90_def_var(ncid,"min_temp",        NF90_FLOAT,
-     +        (/npart_id/), min_temp_id)         
+     +        (/npart_id/), min_temp_id))         
          call nfcheck( nf90_def_var(ncid,"max_salt",        NF90_FLOAT,
-     +        (/npart_id/), max_salt_id)         
+     +        (/npart_id/), max_salt_id))         
          call nfcheck( nf90_def_var(ncid,"min_salt",        NF90_FLOAT,
-     +        (/npart_id/), min_salt_id)         
+     +        (/npart_id/), min_salt_id))         
       endif
       
 c
@@ -454,18 +457,23 @@ c        ------------
      +        sett, start=(/i/)) )
 c        ------------
          call nfcheck( nf90_put_var(ncid, age_at_settling_id,
-     +        par_ens%state_stack(i)%bio%age, start=(/i/)) )
+     +        par_ens%state_stack(i)%bio%age, start=(/i/)))
+c     ------------
+         call nfcheck( nf90_put_var(ncid, degree_days_id,
+     +        par_ens%state_stack(i)%bio%degree_days, start=(/i/)))
 c        ------------
          call nfcheck( nf90_put_var(ncid, min_temp_id,
-     +        par_ens%state_stack(i)%bio%degree_min_temp, start=(/i/)))
+     +        par_ens%state_stack(i)%bio%min_temp, start=(/i/)))
 c        ------------
          call nfcheck( nf90_put_var(ncid, max_temp_id,
-     +        par_ens%state_stack(i)%bio%degree_max_temp, start=(/i/)))       
+     +        par_ens%state_stack(i)%bio%max_temp, start=(/i/)))       
 c        ------------
          call nfcheck( nf90_put_var(ncid, min_salt_id,
-     +        par_ens%state_stack(i)%bio%degree_min_salt, start=(/i/)))
+     +        par_ens%state_stack(i)%bio%min_salt, start=(/i/)))
 c        ------------
          call nfcheck( nf90_put_var(ncid, max_salt_id,
-     +        par_ens%state_stack(i)%bio%degree_max_salt, start=(/i/)))                
+     +        par_ens%state_stack(i)%bio%max_salt, start=(/i/)))                
       enddo
+      end subroutine save_tracer_stat_to_netcdf
+      
       end program

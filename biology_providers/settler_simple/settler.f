@@ -54,7 +54,7 @@ c     related to the state of a particle beyond
 c     spatial aspects
 c     -----------------------------------------------
       type state_attributes
-      private
+c      private         ! make public in SRAAM
 
 c     --- attributes relating to settlement dynamics
       type(clock) :: release_time         

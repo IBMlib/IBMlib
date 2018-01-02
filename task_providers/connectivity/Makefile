@@ -5,7 +5,7 @@
 #      task_provider test (in file $(MAIN).f)          #
 ########################################################
 
-MAIN = calculate_connectivity_matrix
+MAIN = connectivity_simulation_ULF
 
 task.a: connectivity.o $(MAIN).o 
 	ar rcs task.a connectivity.o  $(MAIN).o

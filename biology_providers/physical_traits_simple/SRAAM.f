@@ -3,7 +3,7 @@ c     -------------------------------------------------------------------------
 c     Minimalistic biological module adapted for the SRAAM model from traits.f
 c
 c     This module addresses 3 major traits : 
-c           1) pelagic period length 
+c           1) pelagic period length (dynamic/fixed)
 c           2) bouyancy 
 c           3) start time of pelagic period (handled by calling modules)
 c
@@ -13,7 +13,8 @@ c             fixed object density (buoyancy = 1) in the latter case, the Stokes
 c             completely passive particle obtained by sink_speed = 0 and buoyancy = 0
 c
 c     Settlement: 
-c             1) settle_period_start < age < settle_period_end
+c             1a) settle_period_start < age < settle_period_end OR
+c             1b) dynamic PLD + fixed length settlement window
 c             2) reflective BC along shore
 c     -------------------------------------------------------------------------    
 c   
@@ -39,9 +40,17 @@ c     Generic aspects, like accumulated survival, origin etc
 c     are maintained by embedding type
 c     ---------------------------------------------
       type state_attributes
-      private
-        real    :: age         ! since instantiation [days]
-        real    :: devel       ! PLD completion (0 < devel < 1), for settlement_dynamics == 1
+c      private   ! SRAAM public
+        real    :: age          ! since instantiation [days]
+        real    :: time_looking ! since first devel > 1 [days]
+        real    :: devel        ! PLD completion (0 < devel < 1), for settlement_dynamics == 1
+c       ------- logging data -------
+        real    :: degree_days  ! Integrate(temperature, {t,0,now} [degreeC*days]
+        real    :: min_temp     ! Min temperature encountered [degreeC]
+        real    :: max_temp     ! Max temperature encountered [degreeC]
+        real    :: min_salt     ! Min salinity encountered [PSU]
+        real    :: max_salt     ! Max salinity encountered [PSU]
+        
       end type
       public :: state_attributes
 
@@ -64,10 +73,12 @@ c     ---- settlement_dynamics == 0 : fixed settlement window ----
       real       :: settle_period_start  ! since instantiation [days]
       real       :: settle_period_end    ! since instantiation [days]
 c     ---- settlement_dynamics == 1 : dynamic PLD (OConnors2007)----
-      real       :: beta0 ! correcponding to PLD being in unit days
-      real       :: beta1
-      real       :: beta2
-      real       :: temp_c ! [deg C]
+c          log(pld) = beta0 + beta1*log(temp/temp_c) + beta2*log(temp/temp_c)**2   
+      real       :: beta0  ! correcponding to PLD being in unit days and T in degC
+      real       :: beta1  ! correcponding to PLD being in unit days and T in degC
+      real       :: beta2  ! correcponding to PLD being in unit days and T in degC
+      real       :: temp_c       ! [deg C]
+      real       :: settlement_window !  fixed [days]
       
 c     buoyancy = 0: additive fixed sinking speed, in addition to turbulent velocity (default = 0.0)
 c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant object density (no default) 
@@ -75,7 +86,18 @@ c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant
       integer    :: buoyancy             ! buoyancy model, default = 0
       real       :: sink_speed           ! [m/s],    applies for buoyancy=0, positive down
       real       :: rho_particle         ! [kg/m**3] fixed particle density, applies for buoyancy=1
-      real       :: radius_particle      ! [m]       for Stokes law, applies for buoyancy=1
+      real       :: radius_particle ! [m]       for Stokes law, applies for buoyancy=1
+
+c     active = 0: no active swimming
+c     active = 1: keep within depth_min and depth_max by vertical swimming
+c     active = 2: diurnal motion (respecting depth_min and depth_max)
+c     active>1 leads to buoyancy = 0 with sinking speed = 0
+      integer    :: active           ! active model, default = 0
+      real       :: swim_depth_min   ! [m] upper confinement level > 0 (active>0)
+      real       :: swim_depth_max   ! [m] lower confinement level (or sea bed, if shallower) (active>0
+      real       :: swim_speed_light ! [m/s] swim speed when light, positive down (active=2)
+      real       :: swim_speed_dark  ! [m/s] swim speed when dark, positive down  (active=2)
+      real, parameter :: levelling_speed = 0.005 ! [m/s] swim speed > 0 to enforce swim_depth_min < z < swim_depth_min
 c     ===============================================================
                                   contains
 c     ===============================================================
@@ -101,39 +123,89 @@ c
          call read_control_data(ctrlfile,"beta1",  beta1)
          call read_control_data(ctrlfile,"beta2",  beta2)
          call read_control_data(ctrlfile,"temp_c", temp_c)
+         call read_control_data(ctrlfile,"settlement_window",
+     +                          settlement_window)
          write(*,*)   "Dynamics settlement window"
          write(*,388) "beta0",  beta0, ""
          write(*,388) "beta1",  beta1, ""
          write(*,388) "beta2",  beta2, ""
          write(*,388) "temp_c", beta2, "degC"
+         write(*,388) "settlement_window", settlement_window, "days"
       endif
 c
-c     Resolve buoyancy mode
+c     Resolve active mode
+c         active = 0 : no active behavior (default)
+c         active > 0 : enforce a confinement
+c         active = 2 : light-driven vertical swimming
+c
+      active           = 0      ! default
+      swim_depth_min   = 0      ! assign default (surface)
+      swim_depth_max   = 1.0e8  ! assign default (bottom)
+      swim_speed_light = 0.0    ! assign default (no swimming)
+      swim_speed_dark  = 0.0    ! assign default (no swimming)
+c      
+      if (count_tags(ctrlfile, "swim_depth_min")>0) then
+         call read_control_data(ctrlfile,"swim_depth_min",
+     +                                    swim_depth_min) 
+         active = 1             ! check confinement
+         write(*,370) "upper", swim_depth_min
+      endif
+      if (count_tags(ctrlfile, "swim_depth_max")>0) then
+         call read_control_data(ctrlfile,"swim_depth_max",
+     +                                    swim_depth_max) 
+         active = 1             ! check confinement
+         write(*,370) "lower", swim_depth_max
+      endif
+      if (count_tags(ctrlfile, "swim_speed_light")>0) then
+         call read_control_data(ctrlfile,"swim_speed_light",
+     +                                    swim_speed_light)
+         active = 2             
+         write(*,371) "light", swim_speed_light 
+      endif   
+      if (count_tags(ctrlfile, "swim_speed_dark")>0) then
+         call read_control_data(ctrlfile,"swim_speed_dark",
+     +                                    swim_speed_dark)
+         active = 2             
+         write(*,371) "dark", swim_speed_light 
+      endif
+      
+      if (swim_depth_min > swim_depth_max) then
+         write(*,*) "init_particle_state: inconsistent parameters"
+         write(*,277) swim_depth_min, swim_depth_max
+         stop 45
+      endif 
+c
+c     Resolve buoyancy mode, if active<2
 c
 c     fixed sinking speed takes precedence, if present (ignore rho_particle/radius_particle if present)
 c
-      if (count_tags(ctrlfile, "sink_speed")>0) then ! precedence, if provided
+      buoyancy   = 0    ! default
+      sink_speed = 0.0  ! default
+      if (active<2) then
+         if (count_tags(ctrlfile, "sink_speed")>0) then ! precedence, if provided
 
-         call read_control_data(ctrlfile,"sink_speed",sink_speed) 
-         buoyancy = 0
-         write(*,390)  sink_speed
+            call read_control_data(ctrlfile,"sink_speed",sink_speed) 
+            buoyancy = 0
+            write(*,390)  sink_speed
 
-      elseif (count_tags(ctrlfile, "rho_particle")>0) then 
+         elseif (count_tags(ctrlfile, "rho_particle")>0) then 
 
-         call read_control_data(ctrlfile,"rho_particle",rho_particle) 
-         call read_control_data(ctrlfile,"radius_particle",
-     +                                   radius_particle)  ! must be present, if rho_particle specified, no default
-         buoyancy = 1
-         write(*,391) rho_particle, radius_particle
+            call read_control_data(ctrlfile,"rho_particle",rho_particle) 
+            call read_control_data(ctrlfile,"radius_particle",
+     +                                       radius_particle) ! must be present, if rho_particle specified, no default
+            buoyancy = 1
+            write(*,391) rho_particle, radius_particle
 
-      else ! default passive particle
+         else                   ! default passive particle
 
-         sink_speed = 0.0
-         buoyancy   = 0 
-         write(*,392) "particles are neutrally buoyant"
+            write(*,392) "particles are neutrally buoyant"
 
-      endif
-
+         endif
+      endif ! active<2
+ 277  format("swim_depth_min =", f8.2, "> swim_depth_max =", f8.2)
+      
+ 370  format(a, " confinement level = ", f8.2, " m")
+ 371  format("Swim speed at ", a, " = ", f8.3, " m/s")     
  388  format(a20, " = ", f8.3, 1x, a)
  390  format("particles have constant additive sinking speed = ",
      +       f8.3, " m/s")
@@ -160,8 +232,14 @@ c     ---------------------------------------------------------
 c     ---------------------------------------------------------
 c     maintain reflective shore BC             ! FTH adaptation
 c     ---------------------------------------------------------
-      state%age    = 0.0
-      state%deve   = 0.0  ! only updated for settlement_dynamics == 1
+      state%age           = 0.0
+      state%time_looking  = 0.0
+      state%devel         = 0.0 ! only updated for settlement_dynamics == 1
+      state%degree_days   = 0.0
+      state%min_temp      =  1.0e20 
+      state%max_temp      = -1.0e20
+      state%min_salt      =  1.0e20 
+      state%max_salt      = -1.0e20
 c      call set_shore_BC(space, BC_sticky)     ! FTH adaptation
 
       end subroutine init_state_attributes
@@ -188,6 +266,7 @@ c     --------------------------------------------------------------
       real                                 :: xyz(3)
       integer                              :: istat
       real, external                       :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
+      type(clock),pointer                  :: now
 c     --------------------------------------------------------------
       v_active(1:2) = 0             ! no horizontal component
 
@@ -210,8 +289,35 @@ c     --------------------------------------------------------------
      +              buoyancy
          stop 653
       endif
-
-
+c
+c     ---- case of light-triggered swimming
+c
+      if (active == 2) then
+         now => get_master_clock()
+         call get_tracer_position(space, xyz)
+         if ( is_light(now,xyz) ) then ! apply default zenith
+            v_active(3) = swim_speed_light
+         else
+            v_active(3) = swim_speed_dark
+         endif
+      endif
+      
+c     ---- confinement enforcement has precedence:
+c      
+c     soft enforcement approach, so that a swimming speed
+c     will be added until vertical particle position z obeys
+c           swim_depth_min < z < swim_depth_min
+c     Notice the advection/diffusion components may lead to (small) violation of confinement
+c 
+      if (active > 0) then      ! check and enforce confinement
+         call get_tracer_position(space, xyz)
+         if     (xyz(3) < swim_depth_min) then  ! too high in water column
+            v_active(3) = levelling_speed       ! go down
+         elseif (xyz(3) > swim_depth_max) then  ! too deep in water column
+            v_active(3) = -levelling_speed      ! go up
+         endif
+      endif
+ 
       end subroutine get_active_velocity
 
 
@@ -244,13 +350,24 @@ c     --------------------------------------------------------------
       real,intent(in)                         :: dt ! in seconds
       real,intent(out)                        :: mortality_rate
       logical,intent(out)                     :: die, next 
-      real                                    :: xyz(3), pld, temp, y
-      integer                                 :: status                               
+      real                                    :: xyz(3), pld, y
+      real                                    :: salt, temp
+      integer                                 :: istat                               
 c     --------------------------------------------------------------
       state%age      = state%age + dt/86400.
       mortality_rate = 0.0
       call get_tracer_position(space,xyz)
-c     call interpolate_wdepth(xyz,cwd,status)
+c     call interpolate_wdepth(xyz,cwd,istat)
+c      
+c     ====== update log vars ======
+c  
+      call interpolate_temp(xyz,   temp,  istat)
+      call interpolate_salty(xyz,  salt,  istat)
+      state%degree_days = state%degree_days + temp*dt/86400.
+      state%min_temp    = min(state%min_temp, temp)
+      state%max_temp    = max(state%max_temp, temp)
+      state%min_salt    = min(state%min_salt, salt)
+      state%max_salt    = max(state%max_salt, salt)
 c      
 c     ====== update settlement ======
 c     
@@ -267,17 +384,25 @@ c     ------ Fixed settlement window ------
             die            = .true.   
             next           = .false.   
          endif
-      elseif (settlement_dynamics == 1) then Fixed settlement window
+      elseif (settlement_dynamics == 1) then 
 c     ------ dynamic settlement window --
-         call interpolate_temperature(xyz,temp,status)
-         y   = log(temp/temp_c)
-         pld = exp(beta0 + beta1*y + beta2*y**2)  ! unit days
-         state%devel += dt/86400/pld
+         y   = log(temp/temp_c) ! temp assessed under log var update
+         pld = exp(beta0 + beta1*y + beta2*y**2)  ! unit days, pld>0
+         state%devel = state%devel + dt/86400/pld
          if (state%devel > 1) then
-            die            = .false.
-            next           = .true. ! try settling
-            TOHERE
-      else
+            state%time_looking = state%time_looking + dt/86400.
+            if (state%time_looking<settlement_window) then
+               die            = .false.! try settling
+               next           = .true. ! try settling
+            else
+               die            = .true.  ! missed settlement
+               next           = .false. ! missed settlement
+            endif
+         else
+            die            = .false.   ! not ready to settle
+            next           = .false.   ! not ready to settle
+         endif
+      else ! we should not end here
          write(*,*) "unexpected settlement_dynamics:",
      +               settlement_dynamics
          stop 744

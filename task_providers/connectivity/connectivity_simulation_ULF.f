@@ -447,7 +447,15 @@ c     -----------------------------------------------------
       
       subroutine save_tracer_stat_to_netcdf()
 c     -----------------------------------------------------  
-c     Assemble and write track statistics / final state 
+c     Assemble and write track statistics / final state
+c     Variables:
+c         is_out_of_domain  =  0(inside) OR 1(outofdomain)
+c         is_settled        = -1(dead)  OR 0(free) OR int>0(settled in box number)
+c         degree_days       = degree-day integral for this particle
+c         min_temp          = min temperature encountered for this particle
+c         max_temp          = max temperature encountered for this particle
+c         min_salt          = min salinity encountered for this particle
+c         max_salt          = max salinity encountered for this particle
 c     ----------------------------------------------------- 
       integer             :: i, isout,sett
 c     -----------------------------------------------------

@@ -137,7 +137,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c.....  Tracer emitter class  ..................................
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       type emission_box 
-      private                                    ! hide internal implementation
+c      private                                   ! public for SRAAM
         integer           :: emission_boxID      ! unique ID stamp issued by create_emission_boxes
         type(time_period) :: emission_interval
         real              :: SW(3), NE(3)        ! grid coordinates of box corners
@@ -195,6 +195,7 @@ c     .... currently domainBC can only be sticky
       public :: is_ashore
 
       public :: create_emission_boxes
+      public :: merge_emission_boxes
       public :: activate_emission_box
       public :: write_emission_box
       public :: get_current_emissions
@@ -1514,9 +1515,40 @@ c
       end subroutine create_emission_boxes
 
 
+      
+      subroutine merge_emission_boxes(added_eboxes, ebox0, ebox1)
+c     -----------------------------------------------------------------
+c     implement added_eboxes = ebox0 + ebox1
+c     also works if either ebox0 or ebox1 contains zero elements
+c     -----------------------------------------------------------------     
+      type(emission_box), pointer :: added_eboxes(:), ebox0(:), ebox1(:)
+      integer :: n0, n1, nall, i, ifull
+c     ----
+      n0   = size(ebox0)
+      n1   = size(ebox1)
+      nall = n0+n1
+      if (nall > 0) then
+         allocate(added_eboxes(nall)) ! no check
+      else
+         nullify(added_eboxes)        ! signal no boxes defined
+         return 
+      endif
+c     ---- merge boxes, redef emission_boxID - loops OK, if either are empty ----
+      write(*,*) "merge_emission_boxes:merging", n0, "and", n1, "boxes"
+      do i = 1, n0
+         added_eboxes(i)  = ebox0(i)
+         added_eboxes(i)%emission_boxID = i
+      enddo
+      do i = 1, n1
+         ifull = i + n0
+         added_eboxes(ifull)  = ebox1(i)
+         added_eboxes(ifull)%emission_boxID = ifull
+      enddo
+      end subroutine merge_emission_boxes
+      
 
 
-
+      
       subroutine activate_emission_box(emit_box, 
      +                                 time_dir, parbuf, nstart, npar) 
 c-----------------------------------------------------------------

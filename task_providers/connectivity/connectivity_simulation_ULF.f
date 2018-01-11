@@ -461,12 +461,15 @@ c        ------------
          call nfcheck( nf90_put_var(ncid, is_out_of_domain_id,
      +        isout, start=(/i/)) )
 c        ------------               
-         if     (par_ens%state_stack(i)%type == 0) then
+         if     (par_ens%state_stack(i)%type == particle_free) then
             sett = 0
-         elseif (par_ens%state_stack(i)%type == 1) then
+         elseif (par_ens%state_stack(i)%type == particle_settled) then
             sett = par_ens%state_stack(i)%settleBox
+         elseif (par_ens%state_stack(i)%type == particle_dead) then
+            sett = -1
          else
-            sett = -1           ! dead
+            write(*,*) "save_tracer_stat_to_netcdf: unmapped state"
+            stop 21
          endif   
          call nfcheck( nf90_put_var(ncid, is_settled_id,
      +        sett, start=(/i/)) )

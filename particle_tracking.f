@@ -1650,14 +1650,14 @@ c             (otherwise it is likely undersampling)
 c
             if ((ip==nstart).and.
      +           (dry_emission_box_behavior==dry_ignore)) then
-               if (verbove>0) write(*,*) "emission box ",
+               if (verbose>0) write(*,*) "emission box ",
      +                 emit_box%emission_boxID, 
      +                 "appears dry - no particles emitted", 
      +                 "(dry_ignore was set)"
                npar = 0 
                exit             ! loop : ip = nstart, nend  
             else
-               if (verbove>0) write(*,*) "emission box ",
+               if (verbose>0) write(*,*) "emission box ",
      +               emit_box%emission_boxID, 
      +              "appears dry - no particles emitted"
                call write_emission_box(emit_box)

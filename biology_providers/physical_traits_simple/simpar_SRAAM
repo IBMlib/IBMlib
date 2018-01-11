@@ -1,0 +1,39 @@
+
+
+! ===============================================================
+!                settlement dynamics
+! ===============================================================
+
+! -- settlement_dynamics == 0 : fixed settlement window ----      
+settle_period_start  = 1    ! days since instantiation  (switch trigger)
+settle_period_end    = 55   ! days since instantiation
+
+! -- settlement_dynamics == 1 : dynamic PLD (OConnors2007)----
+beta0             = 0.5 ! correcponding to PLD being in unit days and T in degC
+beta0             = 1   ! correcponding to PLD being in unit days and T in degC
+beta1             = 2   ! correcponding to PLD being in unit days and T in degC
+temp_c            = 10  ! pivot temperature for OConnors paramaterization
+settlement_window = 10  !  fixed [days]
+
+
+! ===============================================================
+!                physical behavior
+! ===============================================================
+
+! -- buoyancy mode 0 (fixed sinking speed), precedence, default = 0
+sink_speed      = 0.1   ! [m/s], positive down
+
+! -- buoyancy mode 1 (fixed particle density)
+rho_particle    = 900   ! [kg/m**3] particle density [kg/m**3]
+radius_particle = 1e-5  ! [m]       for Stokes law, 
+
+!   active =  0: no active swimming
+!   active >= 1: keep within depth_min and depth_max by vertical swimming
+!   active =  2: diurnal motion (respeting depth_min and depth_max)
+!   active>1 leads to buoyancy = 0 with sinking speed = 0
+
+swim_depth_min   =  3      ! [m] upper confinement level > 0 (active>0)
+swim_depth_max   = 20      ! [m] lower confinement level (or sea bed, if shallower) (active>0)
+swim_speed_light = -0.001  ! [m/s] swim speed when light, positive down (active = 2) 
+swim_speed_dark  =  0.001  ! [m/s] swim speed when dark, positive down  (active = 2) 
+

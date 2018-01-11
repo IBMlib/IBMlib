@@ -101,9 +101,9 @@ c     =================================================
       integer               :: tracerID       ! module stamp counters
 
 c     --- offset must be 1, so generic offset appplies for type_meaning ---
-      integer, parameter    :: particle_free    = 1 
-      integer, parameter    :: particle_settled = 2
-      integer, parameter    :: particle_dead    = 3
+      integer, parameter, public    :: particle_free    = 1   ! SRAAM public
+      integer, parameter, public    :: particle_settled = 2   ! SRAAM public
+      integer, parameter, public    :: particle_dead    = 3   ! SRAAM public
       
       character(len=7), parameter :: type_meaning(3) = (/"free   ",
      +                                                   "settled",

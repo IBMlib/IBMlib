@@ -132,8 +132,12 @@ c.....inquire the length of the input file (nchars)
       
 c.....allocate and read character buffer for file content   
 c.....read format is repeated as needed
-      allocate(filehandler%rawdata(nlines))
-      read(iunit, FMT='(A)') filehandler%rawdata
+      if (nlines>0) then
+         allocate(filehandler%rawdata(nlines))
+         read(iunit, FMT='(A)') filehandler%rawdata
+      else
+         nullify(filehandler%rawdata) ! render pointer defined
+      endif
       close(iunit)
 
 c.....Set dialect

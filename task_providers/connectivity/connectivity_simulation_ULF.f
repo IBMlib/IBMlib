@@ -34,7 +34,7 @@ c     ------------ declarations ------------
       type(clock),target  :: start_time, end_time
       type(clock),pointer :: current_time
       type(particle_ensemble)     :: par_ens
-      type(emission_box), pointer :: emitboxes(:)                ! merged set
+      type(emission_box), pointer :: emitboxes(:)                
        
       type(state_attributes), pointer :: state_stack(:)
       integer :: year, month, day, julday
@@ -88,8 +88,6 @@ c
       call create_emission_boxes("emitbox",  emitboxes, np)   ! only activated in all time steps
  
       call setup_ensemble(par_ens, np)
-c      if (associated(emitboxes0)) deallocate(emitboxes0) ! avoid copies
-c      if (associated(emitboxes1)) deallocate(emitboxes1) ! avoid copies
       npart = get_ensemble_size(par_ens) ! at this point we know max number of particles
       
 c.....prepare output   

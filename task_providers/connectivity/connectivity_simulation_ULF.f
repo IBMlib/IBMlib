@@ -238,7 +238,7 @@ c
      +                 NF90_FLOAT, (/nsrc_id, ndest_id/), conmat_id) )
          call nfcheck( nf90_put_att(ncid, conmat_id, "meaning", 
      +                 "probability of particle transport")) 
-         call nfcheck( nf90_put_att(ncid, lon_id, "unit", 
+         call nfcheck( nf90_put_att(ncid, conmat_id, "unit", 
      +                 "0 < probability < 1")) 
       endif
 

@@ -61,7 +61,8 @@ c.....set clocks
 c     =====================  main time loop =====================
       istep   = 0
       open(44,file="trajectory1")
-      do while (compare_clocks(current_time, end_time) <= 0)
+      do while (compare_clocks(current_time, end_time)
+     +                         *nint(time_step) <= 0)             ! opposite for forward/backward simulation
          write(*,372) istep
          call update_physical_fields()
 c        -------- propagate tracers  --------        

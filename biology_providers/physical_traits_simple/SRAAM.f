@@ -97,7 +97,7 @@ c     active>1 leads to buoyancy = 0 with sinking speed = 0
       real       :: swim_depth_max   ! [m] lower confinement level (or sea bed, if shallower) (active>0
       real       :: swim_speed_light ! [m/s] swim speed when light, positive down (active=2)
       real       :: swim_speed_dark  ! [m/s] swim speed when dark, positive down  (active=2)
-      real, parameter :: levelling_speed = 0.005 ! [m/s] swim speed > 0 to enforce swim_depth_min < z < swim_depth_min
+      real, parameter :: levelling_speed = 0.001 ! [m/s] swim speed > 0 to enforce swim_depth_min < z < swim_depth_min
 c     ===============================================================
                                   contains
 c     ===============================================================

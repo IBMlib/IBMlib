@@ -382,6 +382,7 @@ c     ...................................................
       do ip = par_ens%last+1, par_ens%last+npar 
          call set_tracer_defaults(par_ens%space_stack(ip)) ! no position default
          call set_tracer_position(par_ens%space_stack(ip), pos)
+         call record_initial_position(par_ens%space_stack(ip))
          
          call init_state_attributes(par_ens%state_stack(ip), 
      +                              par_ens%space_stack(ip),

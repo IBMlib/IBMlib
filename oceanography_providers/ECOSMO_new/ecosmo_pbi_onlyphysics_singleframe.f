@@ -84,7 +84,11 @@ c     --- 1D grids ---
       real, allocatable :: layer_width(:)   ! width for undisturbed layers [m] dim=nz 
       real, allocatable :: layer_faces(:)   ! accumulated width for undisturbed layers above this [m] dim=nz+1 
       
+c     ------ runtime settings
+ 
+      logical :: dynamic_vdiffus        ! user can replace dynamic diffusivity in data set with provided value
 
+      
 c     ------ ECOSMO auxillary dimensions and grids
       integer               :: khor,ndrei,kasor
       integer               :: nbio ! NPZD boxes
@@ -139,9 +143,11 @@ c
      +                          "vertical_diffusivity",rdum)
          rdum = max(molecular_diffusivity, rdum) ! never exceed lover limit
          write(*,563) "vertical_diffusivity",rdum
+         dynamic_vdiffus = .false.  ! block loading of diffusivity from ECOSMO
       else
          rdum = molecular_diffusivity
          write(*,564) "vertical_diffusivity",rdum
+         dynamic_vdiffus = .true.   ! apply diffusivity from ECOSMO data
       endif
       vdiffus = rdum
 c
@@ -751,25 +757,26 @@ c     temp/salinity init value: rely on mesh_grid padval_
 
 c     ---- update vdiffus(:,:,:) vertical   diffusivity [m**2/s]     
 c          vdiffus is on upper cell face (horizontal mid cell)
-c          diffusion coefficient = schmid number (szmit)* viscosity (acmit) 
+c          diffusion coefficient = schmid number (szmit)* viscosity (acmit)
+c          dynamic_vdiffus is false, if user provided a vertical_diffusivity value in input
 c           
-      vdiffus = 0. ! ignore padval_vdiffus
-      i1 = 1
-      do j=1,nx ! replaced n-> nx
-        do i=1,ny
-           do k=1,nz 
-              if (iland(i,j,k)>0) then                
-                 ix = j         ! corresponding regular lonlat indices
-                 iy = ny+1-i    ! corresponding regular lonlat indices
-                 vdiffus(ix,iy,k) = scmit(i1)*acmit(i1)/10000. ! It still has to be re-scaled (Corinna Schrum August 04, 2011)
-                 i1 = i1+1
-              endif
-           enddo
-        enddo
-      enddo
-
-      vdiffus(:,:,1) = vdiffus(:,:,2)  ! apply surface BC
-                
+      if (dynamic_vdiffus) then
+         vdiffus = 0.           ! ignore padval_vdiffus
+         i1 = 1
+         do j=1,nx              ! replaced n-> nx
+            do i=1,ny
+               do k=1,nz 
+                  if (iland(i,j,k)>0) then                
+                     ix = j     ! corresponding regular lonlat indices
+                     iy = ny+1-i ! corresponding regular lonlat indices
+                     vdiffus(ix,iy,k) = scmit(i1)*acmit(i1)/10000. ! It still has to be re-scaled (Corinna Schrum August 04, 2011)
+                     i1 = i1+1
+                  endif
+               enddo
+            enddo
+         enddo
+         vdiffus(:,:,1) = vdiffus(:,:,2) ! apply surface BC
+      endif          
       
 c     ---- update hdiffus(:,:,:)    ! horizontal diffusivity [m**2/s]
 c     keep init value == molecular_diffusivity 

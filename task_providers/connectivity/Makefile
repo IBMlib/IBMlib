@@ -5,7 +5,7 @@
 #      task_provider test (in file $(MAIN).f)          #
 ########################################################
 
-MAIN = connectivity_simulation_ULF_NO_DUAL_EMISSION
+MAIN = connectivity_simulation_ULF
 
 task.a: connectivity.o $(MAIN).o 
 	ar rcs task.a connectivity.o  $(MAIN).o

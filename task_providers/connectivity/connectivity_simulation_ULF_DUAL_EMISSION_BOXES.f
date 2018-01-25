@@ -35,10 +35,11 @@ c     ------------ declarations ------------
       type(clock),pointer :: current_time
       type(particle_ensemble)     :: par_ens
       type(emission_box), pointer :: emitboxes(:)                ! merged set
-       
+      type(emission_box), pointer :: emitboxes0(:), emitboxes1(:)     
       type(state_attributes), pointer :: state_stack(:)
       integer :: year, month, day, julday
-      integer :: i,ix,iy,iz,dum(79),ilast,iunit, numsec, npart,np
+      integer :: num_start_emit, np0, np1
+      integer :: i,ix,iy,iz,dum(79),ilast,iunit, numsec, npart
       integer :: idum0(4), idum1(4), timeout, istep, ntracers, ntim
       integer :: ncid, nskip, topolon_id, topolat_id, npart_id
       integer :: lon_id, lat_id, depth_id, time_id, i4_id, nframes_id
@@ -84,13 +85,17 @@ c
       call init_particles()
       call update_physical_fields() ! need topology to verify emission boxes
 
-
-      call create_emission_boxes("emitbox",  emitboxes, np)   ! only activated in all time steps
- 
-      call setup_ensemble(par_ens, np)
-c      if (associated(emitboxes0)) deallocate(emitboxes0) ! avoid copies
-c      if (associated(emitboxes1)) deallocate(emitboxes1) ! avoid copies
+      call create_emission_boxes("emitbox0", emitboxes0, np0)   ! only activated at startup
+      call create_emission_boxes("emitbox",  emitboxes1, np1)   ! only activated in all time steps
+      write(*,*) "found ", np0, "emitbox0 (only activated before main)"
+      write(*,*) "found ", np1, "emitbox (activated in all time steps)"
+      call merge_emission_boxes(emitboxes, emitboxes0, emitboxes1)
+      num_start_emit = size(emitboxes0) ! number of emitboxes only activated at startup
+      call setup_ensemble(par_ens, np0+np1)
+      if (associated(emitboxes0)) deallocate(emitboxes0) ! avoid copies
+      if (associated(emitboxes1)) deallocate(emitboxes1) ! avoid copies
       npart = get_ensemble_size(par_ens) ! at this point we know max number of particles
+      
       
 c.....prepare output   
 c 
@@ -301,11 +306,14 @@ c     =====================  main time loop =====================
 c
       current_time => get_master_clock()
       t = 0.0
-      
+      if (num_start_emit>0) then
+         call generate_particles(par_ens, emitboxes(1:num_start_emit),
+     +     time_step)           ! only activated before main
+      endif
       do istep = 1, ntim
          write(*,372) istep
          call update_physical_fields()      
-         call generate_particles(par_ens, emitboxes,
+         call generate_particles(par_ens, emitboxes(num_start_emit+1:),
      +                           time_step) ! activated all time steps
          call update_particles(par_ens, time_step)
          t  = t + time_step

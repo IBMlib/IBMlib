@@ -126,7 +126,8 @@ c     ---------------------------------------
       type spatial_attributes
 c      private     ! SRAAM public
         real              :: position(3)   ! current position as (lon,lat,depth)
-        integer           :: mobility(3)   ! along lon,lat,depth
+        integer           :: mobility(3) ! along lon,lat,depth
+        real              :: init_position(3)   ! SRAAM addition (lon,lat,depth)
         logical           :: ashore, outofdomain, atbottom, atsurface ! motion state
         integer           :: shoreBC, domainBC, bottomBC, surfaceBC   ! BC handler tags
       end type
@@ -186,6 +187,7 @@ c.... Define public operator set  ..............................
       public :: set_tracer_mobility_stop
       public :: get_tracer_position
       public :: set_tracer_position
+      public :: record_initial_position
       public :: set_tracer_defaults
 c     .... currently domainBC can only be sticky
       public :: set_shore_BC  
@@ -1160,8 +1162,15 @@ c------------------------------------------------------------
       real, intent(in)                   :: xyz(:)
       tracattr%position(1:3) = xyz(1:3)
       end subroutine set_tracer_position
-      
 
+      
+      subroutine record_initial_position(tracattr)
+c------------------------------------------------------------ 
+      type(spatial_attributes),intent(inout) :: tracattr
+      tracattr%init_position = tracattr%position
+      end subroutine record_initial_position
+
+      
       subroutine set_tracer_defaults(tracattr)
 c------------------------------------------------------------ 
 c     No defaults for position
@@ -1692,7 +1701,7 @@ c........set tracer state
          
          call set_tracer_position(parbuf(ip), newpos) ! assign validated position
          call set_tracer_defaults(parbuf(ip))         ! initialize other spatial attributes          
-
+         call record_initial_position(parbuf(ip))
       enddo
 
       emit_box%current_emissions = emit_box%current_emissions+npar

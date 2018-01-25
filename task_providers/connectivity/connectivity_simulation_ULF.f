@@ -42,6 +42,7 @@ c     ------------ declarations ------------
       integer :: idum0(4), idum1(4), timeout, istep, ntracers, ntim
       integer :: ncid, nskip, topolon_id, topolat_id, npart_id
       integer :: lon_id, lat_id, depth_id, time_id, i4_id, nframes_id
+      integer :: lon0_id, lat0_id, depth0_id
       integer :: nxtop, nytop, nxtop_id, nytop_id, topography_id
       integer :: is_out_of_domain_id, is_settled_id
       integer :: age_at_settling_id, degree_days_id, max_temp_id
@@ -201,14 +202,30 @@ c        -------- define lon --------
          call nfcheck( nf90_put_att(ncid, lon_id, "meaning", 
      +                 "particles zonal position")) 
          call nfcheck( nf90_put_att(ncid, lon_id, "unit", 
-     +                 "degrees East")) 
+     +        "degrees East"))
+         
+         call nfcheck( nf90_def_var(ncid, "lon0", NF90_FLOAT, 
+     +                 (/npart_id/), lon0_id))
+         call nfcheck( nf90_put_att(ncid, lon0_id, "meaning", 
+     +                 "particles zonal initial position")) 
+         call nfcheck( nf90_put_att(ncid, lon0_id, "unit", 
+     +        "degrees East"))
+         
 c        -------- define lat --------
          call nfcheck( nf90_def_var(ncid, "lat", NF90_FLOAT, 
      +                 (/npart_id, nframes_id/), lat_id))
          call nfcheck( nf90_put_att(ncid, lat_id, "meaning", 
      +                 "particles meridional position")) 
          call nfcheck( nf90_put_att(ncid, lat_id, "unit", 
-     +                 "degrees North")) 
+     +        "degrees North"))
+         
+         call nfcheck( nf90_def_var(ncid, "lat0", NF90_FLOAT, 
+     +                 (/npart_id/), lat0_id))
+         call nfcheck( nf90_put_att(ncid, lat0_id, "meaning", 
+     +                 "particles meridional initial position")) 
+         call nfcheck( nf90_put_att(ncid, lat0_id, "unit", 
+     +        "degrees North"))
+         
 c        -------- define time --------
          call nfcheck( nf90_def_var(ncid, "time", NF90_INT, 
      +                 (/i4_id, nframes_id/), time_id))
@@ -227,7 +244,14 @@ c        -------- define depth --------
          call nfcheck( nf90_put_att(ncid, depth_id, "meaning", 
      +                 "particles vertical position")) 
          call nfcheck( nf90_put_att(ncid, depth_id, "unit", 
-     +                              "meters below sea surface"))
+     +        "meters below sea surface"))
+         call nfcheck( nf90_def_var(ncid, "depth0", NF90_FLOAT, 
+     +        (/npart_id/), depth0_id))   
+         call nfcheck( nf90_put_att(ncid, depth0_id, "meaning", 
+     +                 "particles vertical position")) 
+         call nfcheck( nf90_put_att(ncid, depth0_id, "unit", 
+     +        "meters below sea surface"))
+         
       endif
 c     ---------- save track statistics / final state ----------      
       if (save_tracer_stat) then
@@ -276,7 +300,7 @@ c
      +                 NF90_FLOAT, (/nsrc_id, ndest_id/), conmat_id) )
          call nfcheck( nf90_put_att(ncid, conmat_id, "meaning", 
      +                 "probability of particle transport")) 
-         call nfcheck( nf90_put_att(ncid, lon_id, "unit", 
+         call nfcheck( nf90_put_att(ncid, conmat_id, "unit", 
      +                 "0 < probability < 1")) 
       endif
 
@@ -306,6 +330,11 @@ c
          call generate_particles(par_ens, emitboxes,
      +                           time_step) ! activated all time steps
          call update_particles(par_ens, time_step)
+         
+         if (par_ens%last >= 7) then                           ! DEBUG
+            write(43,*) t/86400., par_ens%space_stack(7)%position(3)     ! DEBUG
+         endif                                                 ! DEBUG
+         
          t  = t + time_step
          call add_seconds_to_clock(current_time, nint(time_step))
          if ( save_tracks .and. (mod(istep, nskip) == 0)) then
@@ -334,6 +363,8 @@ c     --------- generate and save final connectivity, if requested ---------
 c     --------- save track statistics / final state , if requested ---------
 
       if (save_tracer_stat) call save_tracer_stat_to_netcdf()
+      if ( save_tracks )    call write_particle_initial_pos()
+      
       
 c     ----------------- close down ---------------------------
      
@@ -437,6 +468,31 @@ c     -----------------------------------------------------
      +                 xyz(3,:), start=(/1, 1+ifr/)) )
       endif
       end subroutine write_particle_frame
+
+
+
+      
+      subroutine write_particle_initial_pos()
+c     -----------------------------------------------------  
+c     dump initial positions
+c     ----------------------------------------------------- 
+      integer             :: i, last, now(4), ifr, dimid
+      real                :: xyz(3, npart)
+      real, parameter     :: posfill = -1.0
+      character*256       :: name
+c     ----------------------------------------------------- 
+      xyz = posfill
+      call get_last_particle_number(par_ens, last) 
+      do i=1,last
+         xyz(:,i) = par_ens%space_stack(i)%init_position
+      enddo
+      call nfcheck( nf90_put_var(ncid, lon0_id,  xyz(1,:)))
+      call nfcheck( nf90_put_var(ncid, lat0_id,  xyz(2,:)))
+      if (save_xyz) then
+         call nfcheck( nf90_put_var(ncid, depth0_id, xyz(3,:)))
+      endif
+      end subroutine write_particle_initial_pos
+      
 
       
       subroutine save_tracer_stat_to_netcdf()

@@ -1,0 +1,18 @@
+! ----------------------------------------------------
+!   Hydrodynamics
+!
+!   Mount hydrodynamic database:
+!      sudo mount -t nfs 10.128.22.171:/volume1/OPEC_20yr_hindcast  /mnt
+! ----------------------------------------------------
+hydroDBpath        = /mnt
+cmod_data_set      = coarse    !  "coarse" or "fine"
+include_biogeochem = T         ! T/F, optional, default T
+
+! ----------------------------------------------------
+!   Task definition
+! ----------------------------------------------------
+stations          = station_list.dat  
+output            = hydrography_at_station_list.dat               
+samplings_per_day = 24
+wet_point_file    = wetpoints_*.lonlat
+

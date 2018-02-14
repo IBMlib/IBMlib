@@ -74,9 +74,10 @@ c      real           :: unsetlim : loaded from read_cmod_ergom
 c
 c     ------ data frame handler ------
    
-      character*999      :: hydroDBpath      ! path for hydrographic data sets     
-      integer            :: data_set_handler ! which cmod data map will be used
-      logical            :: include_bio      = .true. ! handle to control whether biodata is read (physics is always read)
+      character*999        :: hydroDBpath      ! path for hydrographic data sets     
+      integer              :: data_set_handler ! which cmod data map will be used
+      character*99,public  :: data_set_id      ! special export for FishHab
+      logical              :: include_bio      = .true. ! handle to control whether biodata is read (physics is always read)
 c     --- 3D grids ---
                 
       real,allocatable,target :: ccdepth0(:,:,:)   ! reference cell center depth water below surface [m] (dslm=0)
@@ -168,7 +169,6 @@ c       grid coordinate map:        lambda1, dlambda; phi1, dphi (passed to hori
 c
 c       grid point (ix,iy) = (1,1) is at (lambda1,phi1)
 c     ---------------------------------------------------
-      character*99         :: data_set_id
       integer              :: ix,iy,iz,idx1d,j,ibot
       
       real                 :: lambda1, dlambda, phi1, dphi ! LOCAL DUMMIES
@@ -186,7 +186,8 @@ c
       call init_read_cmod_ergom(hydroDBpath, include_bio) ! defined in module read_cmod
 
       call read_control_data(simulation_file,"cmod_data_set",
-     +                       data_set_id)
+     +     data_set_id)
+      data_set_id = adjustl(data_set_id)
       write(*,*) "Using cmod data set: ", trim(adjustl(data_set_id))
 
 c.....set grid scale/dimensions (held globally in module regular_lonlat_grid)

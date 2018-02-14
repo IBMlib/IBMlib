@@ -30,7 +30,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       implicit none
 c     ------------ declarations ------------ 
       type(clock),target  :: time
-      integer       :: idum4(4),istat,idum3(3)
+      integer       :: idum4(4),istat,idum3(3),i
       integer       :: npt, ipt, statnum
       real          :: geo(3),uvw(3),wdepth, geo_ask(2),dt
       real          :: tbott, sbott, obott, ubott
@@ -64,7 +64,16 @@ c
       call init_physical_fields()
 
       call read_control_data(simulation_file,"wet_point_file", 
-     +                       wetptname)
+     +     wetptname)
+      wetptname = adjustl(wetptname)
+      i = index(wetptname,"*")
+      if (i<1) then
+         write(*,*) "input @ wet_point_file: name should contain *"
+         stop 63
+      endif
+c     ----- replace "*" with grid selection      
+      wetptname = wetptname(1:i-1)//trim(data_set_id)//wetptname(i+1:) ! data_set_id exported from PBI for FishHab
+      
       call load_wetpt(wetptname)
 
 c

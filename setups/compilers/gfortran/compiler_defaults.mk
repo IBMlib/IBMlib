@@ -30,7 +30,7 @@ FCFLAGS += $(addprefix -I,$(MODDIRS))
 # usual installation location for linux systems
 NETCDF  = /usr
 FCFLAGS += -I$(NETCDF)/include
-
+FCFLAGS += -fconvert=big-endian
 
 # linker settings
 LINKFLAGS  = -fall-intrinsics   # -i4 is standard

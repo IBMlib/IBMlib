@@ -5,7 +5,7 @@
 #      task_provider test (in file $(MAIN).f)          #
 ########################################################
 
-MAIN = data_dump
+MAIN = scan_stations_only_wetpt
 
 task.a: $(MAIN).o
 	ar rcs task.a $(MAIN).o

@@ -4,7 +4,7 @@
 !   Mount hydrodynamic database:
 !      sudo mount -t nfs 10.128.22.171:/volume1/OPEC_20yr_hindcast  /mnt
 ! ----------------------------------------------------
-hydroDBpath        = /mnt
+hydroDBpath        = /mnt/hydro
 cmod_data_set      = coarse    !  "coarse" or "fine"
 include_biogeochem = T         ! T/F, optional, default T
 

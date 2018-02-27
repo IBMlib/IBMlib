@@ -169,6 +169,7 @@ c.... Define public operator set  ..............................
       public :: set_verbose_particle_tracking ! for debugging
 
       public :: update_tracer_position
+      public :: apply_vertical_bounds
       public :: add_advection_step
       public :: add_diffusion_step
       public :: add_constrained_step
@@ -354,6 +355,29 @@ c
       end subroutine update_tracer_position
 
 
+      subroutine apply_vertical_bounds(tracattr,domin,domax,zmin,zmax)
+c-------------------------------------------------------------
+c     Enforce vertical limited strictly, if domin and/or domax
+c     Assume zmin < zmax if both applied
+c     tracattr%position(3) < wd is enforced dynamically in normal BC
+c-------------------------------------------------------------
+      type(spatial_attributes), intent(inout) :: tracattr
+      logical, intent(in)                     :: domin,domax
+      real, intent(in)                        :: zmin,zmax
+      real                                    :: wd, zmin_legal
+      integer                                 :: istat
+c-------------------------------------------------------------      
+      if (domin) then
+         call interpolate_wdepth(tracattr%position,wd,istat)
+         zmin_legal = min(wd, zmin)
+         tracattr%position(3) = max(tracattr%position(3),zmin_legal) ! may push z to sea floor
+      endif
+      if (domax) then 
+         tracattr%position(3) = min(tracattr%position(3),zmax) ! will never push z below sea floor
+      endif
+      end subroutine apply_vertical_bounds
+
+      
       subroutine renormalize_vertical_position(tracattr)
 c-------------------------------------------------------------
 c     For hydrodynamic data with a free surface,

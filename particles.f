@@ -72,6 +72,8 @@ c      private    ! SRAAM: public
         integer                          :: last       ! last active, last==0 for no active
         type(spatial_attributes),pointer :: space_stack(:) ! space data core
         type(state_attributes),pointer   :: state_stack(:) ! state data core
+        real                             :: min_depth ! SRAAM specific optional minimal depth enforced
+        real                             :: max_depth ! SRAAM specific optional maximal depth enforced
       end type
       public :: particle_ensemble
 
@@ -219,6 +221,9 @@ c
          par_ens%allpart(i)%state => par_ens%state_stack(i)
       enddo
 
+      par_ens%min_depth = -1   ! deactivate as default
+      par_ens%max_depth = -1    ! deactivate as default
+      
       end subroutine setup_ensemble
       
 
@@ -600,12 +605,19 @@ c
       type(particle), pointer   :: this
       integer                   :: ip,last
       real                      :: v_active(3)
+      logical                   :: vert_bounds, domin, domax
 c     ---------------------------------------------------
+      domin = par_ens%min_depth >= 0 
+      domax = par_ens%max_depth >= 0
+      vert_bounds = domin.or.domax
       do ip = 1, par_ens%last
          this => par_ens%allpart(ip)
          call get_active_velocity(this%state, this%space, v_active)
          call update_tracer_position(this%space, time_step, v_active) 
          call update_particle_state(this%state, this%space, time_step)
+         if (vert_bounds) call apply_vertical_bounds(this%space,
+     +        domin, domax,
+     +        par_ens%min_depth, par_ens%max_depth)
       enddo   
       end subroutine update_particles
 

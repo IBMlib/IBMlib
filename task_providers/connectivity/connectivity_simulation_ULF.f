@@ -46,7 +46,8 @@ c     ------------ declarations ------------
       integer :: nxtop, nytop, nxtop_id, nytop_id, topography_id
       integer :: is_out_of_domain_id, is_settled_id
       integer :: age_at_settling_id, degree_days_id, max_temp_id
-      integer :: min_temp_id, max_salt_id, min_salt_id  
+      integer :: min_temp_id, max_salt_id, min_salt_id
+      integer :: idum2(2)
       real    :: time_step, t, rdum6(6), dt_save
       real, allocatable :: topography(:,:), topolon(:), topolat(:)
       logical :: save_tracks, save_xy, save_xyz, topo_scan
@@ -90,6 +91,21 @@ c
  
       call setup_ensemble(par_ens, np)
       npart = get_ensemble_size(par_ens) ! at this point we know max number of particles
+      if (npart<1) then
+         write(*,*) "WARNING: you have no particles in your simulation"
+      endif
+c
+c.....check whether vertical hard limits apply
+c
+      if (count_tags(simulation_file, "hard_vertical_limits") > 0) then
+         call read_control_data(simulation_file,
+     +        "hard_vertical_limits", idum2)
+         par_ens%min_depth = idum2(1)
+         par_ens%max_depth = idum2(2)
+         write(*,*) "imposing hard_vertical_limits =", idum2
+      else
+         write(*,*) "no hard_vertical_limits imposed"
+      endif
       
 c.....prepare output   
 c 
@@ -191,10 +207,11 @@ c     NF90_UNLIMITED binds to particle frames
 
       if (save_tracks) then
          call nfcheck( nf90_put_att(ncid, NF90_GLOBAL, 
-     +                 "tracks_xy", "yes") )
+     +        "tracks_xy", "yes") )
          call nfcheck( nf90_def_dim(ncid, "nframes", NF90_UNLIMITED, 
-     +                              nframes_id))     
-         call nfcheck( nf90_def_dim(ncid, "nparticles",npart, npart_id))
+     +        nframes_id))
+         call nfcheck( nf90_def_dim(ncid, "nparticles",
+     +        max(1,npart), npart_id))   ! max(1,npart): have at least one slot to avoid clash with NF90_UNLIMITED
          call nfcheck( nf90_def_dim(ncid, "i4",        4,     i4_id))
 c        -------- define lon --------
          call nfcheck( nf90_def_var(ncid, "lon", NF90_FLOAT, 
@@ -293,7 +310,7 @@ c
          nsrc  = size(emitboxes)  ! emitboxes has been initialized
          ndest = size(get_settlement_habitats()) ! particular particle_state method
          call nfcheck( nf90_put_att(ncid, NF90_GLOBAL, 
-     +                 "connectivity_final", "yes")) 
+     +        "connectivity_final", "yes"))
          call nfcheck( nf90_def_dim(ncid, "nsource", nsrc, nsrc_id))
          call nfcheck( nf90_def_dim(ncid, "ndest", ndest, ndest_id))
          call nfcheck( nf90_def_var(ncid, "connectivity_matrix", 
@@ -330,11 +347,6 @@ c
          call generate_particles(par_ens, emitboxes,
      +                           time_step) ! activated all time steps
          call update_particles(par_ens, time_step)
-         
-         if (par_ens%last >= 7) then                           ! DEBUG
-            write(43,*) t/86400., par_ens%space_stack(7)%position(3)     ! DEBUG
-         endif                                                 ! DEBUG
-         
          t  = t + time_step
          call add_seconds_to_clock(current_time, nint(time_step))
          if ( save_tracks .and. (mod(istep, nskip) == 0)) then

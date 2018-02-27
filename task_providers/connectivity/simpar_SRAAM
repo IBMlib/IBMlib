@@ -11,6 +11,8 @@ particle_time_step = 1800     ! seconds
 emitbox = 2005 03 02 0     2005 03 02 3600  2 54 0   3 55 1  10   par1 5.6  whatever
 emitbox = 2005 03 02 3600  2005 03 02 7200  4 54 0   5 56 1  10   par1 par2 par3
 
+hard_vertical_limits = 5 6    ! (optional handle) strictly confine particles to this depth range
+
 outputfile  = result.nc
  
 !

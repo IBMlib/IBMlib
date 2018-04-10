@@ -87,6 +87,11 @@ c        -------- loop control       --------
             call get_particle_position(get_particle(par_ens,1),xyz)
             write(44,*) istep, xyz
          endif
+c        ---- quick way to dump e.g. vertical position of particles 1-10 for file fort.71        
+c         if (last>9) then                ! only write, if particles 1-10 are actually emitted 
+c            write(71,*) istep*time_step/60.0,
+c     +                  par_ens%space_stack(1:10)%position(3)
+c         endif
       enddo
       write(*,*) last
 c     -------- dump final simulation output --------   

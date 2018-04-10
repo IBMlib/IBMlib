@@ -133,7 +133,8 @@ c     ---------------------------------------------------------
       state%age      = 0.0
       call set_shore_BC(space, BC_sticky) 
 
-c      call set_bottom_BC(space, BC_sticky)
+      call set_bottom_BC(space, BC_sticky)   ! uncomment to apply sticky BC at seabed
+      
       end subroutine init_state_attributes
 
 

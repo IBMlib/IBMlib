@@ -53,7 +53,7 @@ c     particle components are declared as pointer to
 c     Allow spectator construction in particle_ensemble
 c     -----------------------------------------------
       type particle
-      private
+c      private
         type(spatial_attributes), pointer :: space 
         type(state_attributes), pointer   :: state 
       end type
@@ -67,7 +67,7 @@ c     i.e. link to space_stack/state_stack
 c     The spectator construction is rather economic memory wise
 c     -----------------------------------------------
       type particle_ensemble
-      private
+c      private
         type(particle), pointer          :: allpart(:) ! allocation may exceed active particles
         integer                          :: last       ! last active, last==0 for no active
         type(spatial_attributes),pointer :: space_stack(:) ! space data core
@@ -308,9 +308,9 @@ c     loop over new particle and init state attributes (possibly also space attr
 c     like boundary conditions and mobility)
 c 
       do ip = par_ens%last+1, par_ens%last+npar 
-         call init_state_attributes(par_ens%state_stack(ip), 
+         call init_state_attributes(par_ens%state_stack(ip),
      +                              par_ens%space_stack(ip),
-     +                              time_dir, strdat, boxID) 
+     +                              time_dir, strdat, boxID)
       enddo
       par_ens%last =  par_ens%last + npar
 

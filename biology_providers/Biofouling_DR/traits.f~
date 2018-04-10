@@ -29,7 +29,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
      
       implicit none
-      private    
+      private
       
 c     ---------------------------------------------
 c     This type contains only specific biological attributes
@@ -37,9 +37,12 @@ c     Generic aspects, like accumulated survival, origin etc
 c     are maintained by embedding type
 c     ---------------------------------------------
       type state_attributes
-      private
+c      private
           real    :: age            ! since instantiation [days]
-      end type
+          real    :: density        ! Density will  increase due to biofouling
+          real    :: biofouling_mass ! Biofouling starts from 0 and grows exponentially until reaching carrying capacity?
+          integer :: fragments
+          end type
       public :: state_attributes
 
 c     ---- export generic particle_state interface ----
@@ -58,6 +61,8 @@ c     =================================================
 
       real       :: settle_period_start  ! since instantiation [days]
       real       :: settle_period_end    ! since instantiation [days]
+
+c      real       :: growth_biofouling = 1./20000
 
 c     buoyancy = 0: additive fixed sinking speed, in addition to turbulent velocity (default = 0.0)
 c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant object density (no default) 
@@ -131,9 +136,10 @@ c     ---------------------------------------------------------
       integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------
       state%age      = 0.0
+      state%biofouling_mass= 0.0
+      state%density  = rho_particle !kg/m**3
+      state%fragments = 1
       call set_shore_BC(space, BC_sticky) 
-
-c      call set_bottom_BC(space, BC_sticky)
       end subroutine init_state_attributes
 
 
@@ -158,9 +164,9 @@ c     --------------------------------------------------------------
       real                                 :: xyz(3)
       integer                              :: istat
       real, external                       :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
+c     real, parameter                      :: rho_actual = state%density
 c     --------------------------------------------------------------
       v_active(1:2) = 0             ! no horizontal component
-
       if      (buoyancy == 0) then  ! fixed sinking speed,
 
          v_active(3) = sink_speed   ! positive down
@@ -172,7 +178,8 @@ c     --------------------------------------------------------------
          call interpolate_salty(xyz,  salt,  istat)
          pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
          rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
-         v_active(3) = 2*(rho_particle-rho)*g*radius_particle**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down)
+         v_active(3) = 2*(state%density-rho)*g*
+     +                 radius_particle**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down)
 
       else
 
@@ -190,7 +197,11 @@ c     --------------------------------------------------------------
 c     --------------------------------------------------------------
       type(state_attributes), intent(in)   :: state
 c     --------------------------------------------------------------
-      write(*,*) "age since init = ", state%age  
+      write(78,*)  state%age,  state%biofouling_mass,
+    +             state%density, state%fragments
+c     write(78,*) "Biofouling mass = ", state%biofouling_mass
+c      write(78,*) "Density  = ", state%density
+c      write(78,*) "nb fragments  = ", state%fragments
 c
       end subroutine write_state_attributes
 
@@ -216,9 +227,19 @@ c     --------------------------------------------------------------
       logical,intent(out)                     :: die, next 
       real                                    :: xyz(3)
       integer                                 :: status
+      real                                    :: Mp   ! Particule mass
+      real                                    :: Vp !Particule volume
+c      real                                    :: growth_biofouling = 1/5 !Growth rate of biofilm on plastic mg/sec
+
 c     --------------------------------------------------------------
       state%age      = state%age + dt/86400.
       mortality_rate = 0.0
+      state%fragments=2**floor(dt/604800)
+      state%biofouling_mass=state%biofouling_mass + dt/20000
+      Vp = (4*3.14*radius_particle**3)/(3*state%fragments)
+      Mp = state%density*Vp + (state%biofouling_mass/state%fragments)
+      state%density=Mp/Vp
+      write(*,*) state%density,Mp,Vp 
 c      call get_tracer_position(space,xyz)
 c      call interpolate_wdepth(xyz,cwd,status)
       

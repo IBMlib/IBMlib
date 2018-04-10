@@ -124,7 +124,7 @@ c     BC handler tags are used in add_constrained_step when checking a motion st
 c
 c     ---------------------------------------
       type spatial_attributes
-      private     ! hide internal implementation
+c      private     ! hide internal implementation
         real              :: position(3)   ! current position as (lon,lat,depth)
         integer           :: mobility(3)   ! along lon,lat,depth
         logical           :: ashore, outofdomain, atbottom, atsurface ! motion state
@@ -137,7 +137,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c.....  Tracer emitter class  ..................................
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       type emission_box 
-      private                                    ! hide internal implementation
+c      private                                    ! hide internal implementation
         integer           :: emission_boxID      ! unique ID stamp issued by create_emission_boxes
         type(time_period) :: emission_interval
         real              :: SW(3), NE(3)        ! grid coordinates of box corners
@@ -872,7 +872,7 @@ c.....check for and handle bottom crossing
 
          botenc  = .TRUE.
          if     (tracattr%bottomBC == BC_sticky) then
-            virpos(3)         = depth    ! place tracer at bottom
+            virpos(3)         = depth    ! place tracer at bottom --> but will fix particle since beginning of simulation
             tracattr%mobility = 0 ! freeze tracer to bottom
             tracattr%atbottom = .TRUE.
          elseif (tracattr%bottomBC == BC_reflect) then

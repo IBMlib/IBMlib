@@ -154,6 +154,7 @@ c     parse initdata string (currently no options)
       call set_state_released(state, space, emitboxID)
       call init_state_attributes_bio(state%bio, space, time_dir,             
      +                                 initdata, emitboxID)
+
 c     ----------------------------------------------------
       end subroutine init_state_attributes
 
@@ -280,7 +281,7 @@ c     -----------------------------------------------
       type(spatial_attributes), intent(inout) :: space
 c     -----------------------------------------------
       call set_tracer_mobility_stop(space) 
-      state%type      = particle_dead   
+      state%type      = particle_dead
       state%survival  = 0.0 ! death signal
       end subroutine set_state_dead
 

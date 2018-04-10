@@ -25,7 +25,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use run_context
       use physical_fields
       use particles
-     
+      use particle_state
       implicit none
 c     ------------ declarations ------------      
       integer      :: idum4(4)
@@ -61,6 +61,8 @@ c.....set clocks
 c     =====================  main time loop =====================
       istep   = 0
       open(44,file="trajectory1")
+      open(78,file="Particules_properties")
+      write(78,*) "age, Biofouling_mass, density, volume, nb cells"
       do while (compare_clocks(current_time, end_time)
      +                         *nint(time_step) <= 0)             ! opposite for forward/backward simulation
          write(*,372) istep
@@ -68,18 +70,25 @@ c     =====================  main time loop =====================
 c        -------- propagate tracers  --------        
          call generate_particles(par_ens, emitboxes, time_step)
          call update_particles(par_ens, time_step)
-         
+c        do i = 1, 10, 1
+c         write(78,*) istep, par_ens%state_stack(:)
+c         write(78,*) istep, par_ens%state_stack
+c            end do
 c        -------- write tracer state -------- 
 c        -------- loop control       --------
          call add_seconds_to_clock(current_time, nint(time_step))
          istep = istep + 1
-
-         call get_last_particle_number(par_ens, last) 
+         call get_last_particle_number(par_ens, last)
+        do i=1,last
+         write(78,*) istep, i
+         call write_state_attributes(par_ens%state_stack(i))
+        end do
          if (last>0) then
             call get_particle_position(get_particle(par_ens,1),xyz)
-            write(44,*) xyz
+            write(44,*) istep, xyz
          endif
       enddo
+      write(*,*) last
 c     -------- dump final simulation output --------   
 c      call write_ensemble(par_ens)
       open(45,file="finalpos")

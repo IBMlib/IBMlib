@@ -3,31 +3,28 @@
 !        Main simulation control file 
 !--------------------------------------------
 
-start_time  = 2005 01 01 0    !  year  month  day  second_of_day
-end_time    = 2005 09 018 0    !  year  month  day  second_of_day
+start_time  = 2005 03 01 0    !  year  month  day  second_of_day
+end_time    = 2005 03 2 0    !  year  month  day  second_of_day
 
 advec_intg_method  = euler    !  euler/rk2
-particle_time_step = 100     ! seconds
- 
+particle_time_step = 10    ! seconds
+!sink_speed      = 0.001   ! [m/s], positive down
+
 !emitbox= |start_date (year month day seconds) |end_date | southwestern_corner (long lat depth)| northeastern_corner|
-emitbox = 2005 03 01 0  2005 03 01 0  4.98492813 55.2481346 -1   4.98492813 55.2481346 -1  10  
+!emitbox = 2005 03 01 0  2005 03 02 0  4.98492813 55.2481346 -1   4.98492813 55.2481346 -1  10  
+emitbox = 2005 03 01 0  2005 03 01 0  4.98492813 55.2481346 0.5   4.98492813 55.2481346 0.5  10 
 ! ---------------   biological dynamics     ---------------
 
 ! -- buoyancy mode 1 (fixed particle density) 
 
 settle_period_start  = 1    ! days since instantiation
 settle_period_end    = 365   ! days since instantiation
-
-rho_particle    = 930   ! [kg/m**3] particle density [kg/m**3]
-!rho_particle    = 1200   ! [kg/m**3] particle density [kg/m**3]
-
-radius_particle = 1E-5  ! [m]       for Dietrich law,
+rho_particle    = 1020   ! [kg/m**3] particle density [kg/m**3]
+radius_particle = 3E-4  ! [m]       for Dietrich law,
 length_particle = 0.57 ![m] 
+vertical_diffusivity=  0.0015
 fixed_hydro_file = ECOSMO_tl5_physics_testframe.dat
 grid_desc         = oceanography_providers/ECOSMO_new/grid_desc_ecosmo
 topography       = oceanography_providers/ECOSMO_new/postinfo.for
-
-!vertical_diffusivity = 0.0   ! set a fixed vertical diffusivity [m2/sec]
-!horizontal_diffusivity = 0.0   ! set a fixed horizontal diffusivity [m2/sec]
 
 

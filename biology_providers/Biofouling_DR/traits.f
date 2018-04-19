@@ -40,11 +40,12 @@ c     ---------------------------------------------
 c      private
           real    :: age            ! since instantiation [days]
           real    :: density        ! Density will  increase due to biofouling
-          real    :: biofouling_r   ! Biofouling starts from 0 and grows exponentially until reaching carrying capacity?
+          real    :: biofouling_m   ! Biofouling starts from 0 and grows exponentially until reaching carrying capacity?
           real    :: biofouling_v   !Biofouling volume
           real    :: P_volume
           real    :: nb_algae       ! number of algae on the surface
           real    :: ESD            ! Equivalent spherical diameter
+          real    :: P_mass            ! Particle mass
 
           end type
       public :: state_attributes
@@ -80,6 +81,7 @@ c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant
       real       :: PIV                  ! particle initial volume
       real       :: PIM                  ! Particle initial mass
 
+
 c     ===============================================================
                                   contains
 c     ===============================================================
@@ -112,7 +114,7 @@ c
          call read_control_data(ctrlfile,"length_particle",
      +                                   length_particle)
          buoyancy = 1
-         PIV      = 3.14*length_particle*radius_particle**2    !Particle initial volume
+         PIV      = 3.14*length_particle*(radius_particle**2)    !Particle initial volume
          PIM      =  PIV*rho_particle  !Particle initial mass
          write(*,391) rho_particle, radius_particle,
      +                            length_particle
@@ -150,16 +152,18 @@ c     ---------------------------------------------------------
       integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------
       state%age           = 0.0
-      state%biofouling_r  = 0.0
+      state%biofouling_m  = 0.0
       state%biofouling_v  = 0.0
       state%density       = rho_particle !kg/m**3
       state%P_volume      =PIV
       state%nb_algae      = 0
-      state%ESD           = 2*(PIV*3/(4*3.1416))**(1/3)! Equivalent spherical diameter
+      !state%ESD     =(6*PIV/3.14)**(1/3)! Equivalent spherical diameter
+      state%ESD     =0! Equivalent spherical diameter
+      state%P_mass =PIM
 
 
       call set_shore_BC(space, BC_sticky)
-      call set_bottom_BC(space, BC_reflect)
+      call set_bottom_BC(space, BC_sticky)
       end subroutine init_state_attributes
 
 
@@ -184,11 +188,10 @@ c     --------------------------------------------------------------
       real                                 :: xyz(3)
       integer                              :: istat
       real, external                       :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
-      real                                 :: V_kin                ! kinematic viscosity of seawater
-      real                                 ::W_star                ! dimentionmess settling velocity
-      real                                 ::D_star                ! dimentionmess particle diameter
-c      real                                 :: A ,B ,Ur ,Uw, U                  ! All variables to get the kinematik viscosity
-
+      real                                 :: V_kin,  V_set_c,V_set_d                ! kinematic viscosity of seawater
+      real                                 ::W_star =0               ! dimentionmess settling velocity
+      real                                 ::D_star  =0              ! dimentionmess particle diameter
+      real                                 :: V_set, V_set_b,V_stokes                ! All variables to get the kinematik viscosity
 c     --------------------------------------------------------------
       v_active(1:2) = 0             ! no horizontal component
       if      (buoyancy == 0) then  ! fixed sinking speed,
@@ -202,26 +205,31 @@ c     --------------------------------------------------------------
          call interpolate_salty(xyz,  salt,  istat)
          pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
          rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
-c         v_active(3) = 2*(state%density-rho)*g*
-c     +                 state%R_equivalent**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
+         v_stokes = 2*(state%density-rho)*g*
+     +                 (state%ESD/2)**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
         V_kin       =  mydyn/rho
-        D_star      = (state%density-rho)*9.81*
-     +                state%ESD**3/(rho*V_kin**2)
-
+c         write(*,*) salt, temp, pressure ,V_kin
+        D_star      = (state%density-rho)*g*
+     +                (state%ESD**3)/(rho*(V_kin**2))
              if (D_star  <  0.05) then
               W_star=1.74E-4 * D_star**2
-
+              V_set=1.74E-4**0.33333 *state%ESD**3 *(state%density-rho)
+     +                                      *9.81/(rho*V_kin)  ! V_set works but the other give a value of 1 (strangely...)
+c              write(*,*) "small d star", D_star, state%ESD
              elseif (D_star<= 5E9) then
-              W_star=exp(-3.76715 + 192944 * log(D_star)
+              W_star=exp(-3.76715 + 1.92944 * log(D_star)
      +                -0.09815*log(D_star)**2 - 0.00575*log(D_star)**3+
      +                 0.00056*log(D_star)**4)
+
+              v_set=((state%density-rho)*9.81*W_star*V_kin/rho)**0.3333
+c             write(*,*) "execute dstar big too",W_star, D_star
              else
              write(*,*) "D_star out of range", D_star
              end if
-
-
-        v_active(3)= ((state%density-rho)*9.81*W_star*V_kin/rho)**(1/3)   ! Dietrich
-
+c        V_set= ((state%density-rho)*9.81*W_star*V_kin/rho)**(1/3)
+           ! Dietrich
+         v_active(3)=V_set
+        write(*,*) v_active(3), V_set, V_stokes
       else
 
          write(*,*) "get_active_velocity: unsupported buoyancy=",
@@ -238,9 +246,9 @@ c     +                 state%R_equivalent**2/9/mydyn  ! [m/s], Stokes terminal 
 c     --------------------------------------------------------------
       type(state_attributes), intent(in)   :: state
 c     --------------------------------------------------------------
-      write(78,*)  state%age,  state%biofouling_r,
+      write(78,*)  state%age,  state%biofouling_m,
      +             state%density,
-     +             state%P_volume,  state%nb_algae
+     +             state%P_volume,  state%nb_algae, state%ESD
       end subroutine write_state_attributes
 
 
@@ -259,6 +267,7 @@ c          1) settle_period_start < age < settle_period_end
 c     --------------------------------------------------------------
       type(state_attributes), intent(inout)   :: state
       type(spatial_attributes), intent(inout) :: space
+      real                                    :: velocity=0.1
       real,intent(in)                         :: dt ! in seconds
       real,intent(out)                        :: mortality_rate
       logical,intent(out)                     :: die, next 
@@ -266,32 +275,36 @@ c     --------------------------------------------------------------
       integer                                 :: status
       real                                    :: Mp   ! Particule mass
       real                                    :: Vp !Particule volume
-      real                                    :: biofilm_p
-      real                                    :: biofouling_m
+      real                                    :: biofilm_p=1200 !kg/m3
       real                                    :: rnd(5)
       integer, parameter                      :: nmax = 4
       real                                    :: size(2**nmax)
       integer                                 :: icut, n, i
       real                                    :: l1,l2
-      real                                    :: Alg_v=0.000000001  !!! what units??? what range???
+      real                                    :: Alg_v  !!! [m3]
+      real                                    :: Alg_m=1.61e-6  !!! [kg]
+      real                                    :: alg_death=0.04   ! death rate of algaes [1/s]
+      real                                    :: phyto =120 ! [mgC/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
+      real, parameter                         :: mydyn      = 1.002e-3   ! [kg/m/s] dynamic viscosity of water (at 20 oC)
+      real                                    :: temp !, pressure, rho, salt
+      real                                    :: K_boltz =1.38064E-23   ! Boltzmann constant [m2 kg/s2 K]
+      real                                    :: diff_P, diff_A ! diffusivity of plastic particle and algae [m2/s]
+      real                                    ::shear =2 ! [1/s]
+      real                                    ::encounter
+      real                                    ::growth
+      real                                    ::grazing
+      real                                    ::respiration
+      real                                    ::r_a = 50E-6! phytoplancton radius (took an average of 50 [um]
+      real                                    :: B_A! encouter kernel rate
+      real                                    :: r_tot !!! radius of particle [m]
+      real                                    :: P_surf ! surface of particle
+      real                                    :: PP=40e-6  ! daily mean Primary production [kgC/m3/day] (data from copernicus)
+      integer                                 :: istat
+
 
 c     --------------------------------------------------------------
       state%age      = state%age + dt/86400.
-      biofouling_density(1)=1040
-      biofouling_density(2)=1100
-      biofouling_density(3)=1300
-      mortality_rate = 0.0
-c      if (state%age < settle_period_start) then
-c     die            = .false.
-c      next           = .false.
-c      elseif ((state%age > settle_period_start).and.
-c     +        (state%age < settle_period_end)) then
-c      die            = .false.
-c      next           = .true.   ! try settling
-c      else ! missed settlement
-c      die            = .true.
-c      next           = .false.
-c      endif
+      mortality_rate = 0.0! for the particle. not the biofouling organisms
 
       if (state%age < settle_period_start) then
       die            = .false.
@@ -304,21 +317,31 @@ c      endif
       die            = .true.
       next           = .false.
       endif
-      if (state%age <=1209600) then
-        biofilm_p=biofouling_density(1)
-      else if (state%age <= 3628800) then
-        biofilm_p =biofouling_density(2)
-      else
-        biofilm_p=biofouling_density(3)
-      endif
-      state%nb_algae=state%nb_algae + dt/86400
+c-------------------calculate the biofilm growth ------------
+      P_surf=2*3.14*radius_particle*length_particle
+      call interpolate_temp(xyz,   temp,  istat)
+      r_tot=state%ESD /2
+      diff_P = K_boltz*(temp + 273.16)/(6* 3.14*mydyn*(r_tot)) ! diffusivity of plastic particle
+      diff_A = K_boltz*(temp + 273.16)/(6* 3.14*mydyn*r_a) ! diffusivity of Algae m2/s
+      B_A= 4 * 3.14 * (diff_P + diff_A) * (r_tot + r_a) +
+     +     3.14 * r_tot**2 * velocity /2 +
+     +     1.3 * shear * (r_tot + r_a)**3 !kernel encounter rate= brownian + settling + shear
+      encounter  = B_A*phyto/P_surf
+      growth     = PP/(86400*Alg_m*1000000)! growth on the plastic is proportional to the ambiant primary production
+      grazing    = alg_death *state%nb_algae
+c      respiration=
+      state%nb_algae = state%nb_algae + encounter
+     +                  - grazing! - respiration (don't want ton implement it now)! da/dt
+c ----------------- biofouling general ----------------------
+c      state%nb_algae=state%nb_algae + dt/86400
+      Alg_v= 4*3.14*r_a**3 /3
       state%biofouling_v=state%nb_algae*Alg_v
-      biofouling_m=state%biofouling_v*biofilm_p
-      state%P_volume =PIV+state%biofouling_v
-      Mp =PIM+biofouling_m
-      state%density=Mp/state%P_volume
-
-      write(*,*) state%density,Mp,state%P_volume
+      state%biofouling_m=state%nb_algae*Alg_v*biofilm_p
+      state%P_volume=PIV+state%biofouling_v
+      state%P_mass  =PIM+state%biofouling_m
+      state%density =state%P_mass/state%P_volume
+      state%ESD     =(6*state%P_volume/3.14)**0.333
+c      write(*,*) state%density,Mp,state%P_volume, state%ESD
 c      call get_tracer_position(space,xyz)
 c      call interpolate_wdepth(xyz,cwd,status)
       

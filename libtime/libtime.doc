@@ -1,0 +1,907 @@
+$Id: README,v 1.1 2000/08/05 20:32:22 thof Exp $
+
+  libtime (C) by Thomas Forbriger (IfG Stuttgart) 1997
+
+  A FORTRAN library to manipulate absolute and relative data times
+  with a large dynamic range.
+ 
+---------------------------------------------------------------------
+
+time format declaration
+ 
+  the absolute time value is stored in an integer array:
+ 
+  integer date(7)
+  date(1)=year
+  date(2)=day of year
+  date(3)=hour
+  date(4)=minute
+  date(5)=second
+  date(6)=millisecond
+  date(7)=microsecond
+
+A year of value 0 will indicate that this is a relative time. This
+affects the routines time_norm and time_getdate and time_sprint.
+Notice that the routine time_fullyear will NOT be affected by this
+declaration and will set a year of value 0 to 2000.
+ 
+The best way to be aware of absolute/relative time confusion is
+to finish every manual setting of absolute times by a call to
+time_finish and to keep the year value fo relative times zero 
+in any case.
+ 
+Absolute times are only accepted from year 100 on. Users must expect
+some routines to set year values below 100 to the range of 1970 to 2069.
+
+Only positive time values will be accepted. Therefore routines like
+time_sub will return only the absolute value of the difference.
+ 
+---------------------------------------------------------------------
+
+subroutines and what they do
+ 
+time_libversion        returns library version                V1.0
+time_isleapyear        returns leapyear flag                  V1.0
+time_fullyear          returns full year value                V1.0
+time_setdoy            returns day of year                    V1.0
+time_getdate           get date from doy                      V1.0
+time_sprint            print time to character array          V1.0
+time_clear             clears a time record to zero           V1.0
+time_norm              set all field to correct value range   V1.0
+time_add               add two time records                   V1.0
+time_sub               calculate difference                   V1.0
+time_copy              copy a time record                     V1.0
+time_finish            finish setting of absolute time value  V1.0
+time_compare           compare two time values                V1.0
+time_mul               multiply relative time by integer n    V1.0
+time_div               divide relative time by integer n      V1.0
+time_nfit              find number of samples fiitng in time  V1.0
+time_read              extra time from a timestring           V1.03
+ 
+ 
+ 
+DOCUMENTATION OF THE FORTRAN LIBRARAY KERNEL 
+============================================
+
+
+  c
+  c -----------------------------------------
+  c
+        subroutine time_add(date1, date2, date3)
+  c
+  c date3=date1+date2
+  c
+  c One of both should be a relative time: 
+  c   relative + absolute -> absolute
+  c   relative + relative -> relative
+  c   absolute + absolute -> senseless
+  c
+  c NOTICE: This version of time_add disregards leap-seconds!
+  c
+  c input:
+  c   date1:  primary time record
+  c   date2:  time record to be added
+  c output:
+  c   date3:  date1+date2       the sum of the input record
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7), date3(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_clear(date)
+  c
+  c clear a time record (i.e. set all values to zero)
+  c
+  c input/output:
+  c   date:   time record to be cleared
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date(7)
+  c
+  c -----------------------------------------
+  c
+        integer function time_compare(date1, date2)
+  c
+  c Compare values of date1 and date2. 
+  c Both must be absolute or both must be relative.
+  c
+  c result = 0   for   date1 = date2
+  c result = -1  for   date1 < date2
+  c result = 1   for   date1 > date2
+  c
+  c input:
+  c   date1:  primary time record
+  c   date2:  secondary time record
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_copy(date1, date2)
+  c
+  c copy: date1 --> date2
+  c
+  c input:
+  c   date1:  any time record
+  c output:
+  c   date2:  copy of date1
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_div(date1, date2, n, rest)
+  c
+  c Divide relative time 'date1' by integer 'n' and store result in 'date2'.
+  c 'rest' gives the none dividable rest in microseconds.
+  c
+  c input:
+  c   date1:  relative time value to be divided
+  c   n:      divisor
+  c output:
+  c   date2:  date1/n           regularized relative time value
+  c   rest:   date1-(n*date2)   integer number of microseconds
+  c 
+  c always: date1 >= (n*date2)
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7), n, rest
+  c
+  c -----------------------------------------
+  c
+        subroutine time_finish(date)
+  c
+  c Finish setting of absolute time value. This routine is senseless
+  c in combination with relative time values (year=0). This routine just calls
+  c time_fullyear on the year value and than time_norm for the whole record.
+  c
+  c input/output:
+  c   date:   absolute time record to be regularized
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_fullyear(year)
+  c
+  c Makes year to be a full 4 digit year value. This is used to set
+  c the year to a meanigfull value. Notice that this routine does not
+  c make sense in combination with relative times.
+  c
+  c year < 70         ---> year := year+2000
+  c 69 < year < 100   ---> year := year+1900
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer year
+  c
+  c -----------------------------------------
+  c
+        subroutine time_getdate(day, month, date)
+  c
+  c get day and month index for given doy (day of year) in date
+  c
+  c input: 
+  c   date:   absolute date record
+  c output:
+  c   day:    day index within month
+  c   month:  month index within year
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date(7), day, month
+  c
+  c -----------------------------------------
+  c
+        logical function time_isleapyear(year)
+  c
+  c is true if year is a leap-year (else false ;-))
+  c
+  c input:
+  c   year:   full qualified year value to be checked for being a leap-year
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer year
+  c
+  c -----------------------------------------
+  c
+        real function time_libversion()
+  c
+  c returns the current version of the FORTRAN library kernel
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+  c
+  c -----------------------------------------
+  c
+        subroutine time_mul(date1, date2, n)
+  c
+  c Multiply relative time date1 by n and store result in date2.
+  c
+  c input:
+  c   date1:  relative time record
+  c   n:      integer factor
+  c output:
+  c   date2:  date1*n     (regularized relative time value)
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7), n
+  c
+  c -----------------------------------------
+  c
+        subroutine time_nfit(date1, date2, n, full)
+  c
+  c Evaluate how many (n) samples of length date2 fit into the
+  c time span date1 at best. 
+  c 
+  c full=n*date2
+  c
+  c The difference abs(date1-full) will be less or equal
+  c the half of date2.
+  c
+  c input:
+  c   date1:  given time span (relative time record)
+  c   date2:  given sampling interval (relative time record)
+  c output:
+  c   n:      number of intervals date2 that fit at best in date1
+  c   full:   the full time span that would be covered by n intervals
+  c           of length date2 (regularized relative time record)
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7), n, full(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_norm(date)
+  c
+  c Regularize any time record (relative or absolute)
+  c (i.e. set all fields to correct value range)
+  c
+  c input/output:
+  c   date:   date record to be regularized
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_setdoy(day, month, date)
+  c 
+  c Set doy in date from day and month (january first is doy 1).
+  c This routine will call time_fullyear first!
+  c 
+  c This routine is senseless in combination with relative times!
+  c
+  c input:
+  c   day:    day index within month
+  c   month:  month index within year (contained in date)
+  c input/output:
+  c   date:   doy index in time record is changed according to given day and
+  c           month index and year value in date
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer day, month, date(7)
+  c
+  c -----------------------------------------
+  c
+        subroutine time_sub(date1, date2, date3)
+  c
+  c date3=abs(date1-date2)
+  c 
+  c This routine will only return the absolute value of the result.
+  c We do not handle signs. Therefore in any case the smaller time
+  c value will be subtracted from the larger one.
+  c
+  c relative - relative -> relative   case 1
+  c absolute - relative -> absolute   case 2
+  c absolute - absolute -> relative   case 3
+  c
+  c NOTICE: This version of time_sub disregards leap-seconds!
+  c
+  c input:
+  c   date1:  date record
+  c   date2:  date record
+  c output:
+  c   date3:  fully qualified and regularized absolute difference between
+  c           input date values (maybe rælative or absolute - see above)
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date1(7), date2(7), date3(7)
+ 
+ 
+DOCUMENTATION OF THE FORTRAN SPECIFIC CODE 
+==========================================
+
+  c
+  c -----------------------------------------
+  c
+        subroutine time_sprint(date, string)
+  c 
+  c Print date to string (string must be 35 characters long at least)
+  c
+  c input:
+  c   date:   date record to be printed
+  c output:
+  c   string: text representation of date value
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        integer date(7)
+        character*(*) string
+  c
+  c -----------------------------------------
+  c
+        subroutine time_read(string,date)
+  c
+  c Reads date value from string.
+  c
+  c The timestring has to provide time information in the order
+  c 
+  c   year month day hours minutes seconds
+  c 
+  c where seconds may be given as a floating point number. All items must be
+  c separated by non-numerical characters. 
+  c
+  c input:
+  c   string: character string specifying date value
+  c output:
+  c   date:   fully qualified and regularized time record
+  c
+  c last change: V2.00 (05/08/2000)
+  c
+        character*(*) string
+        integer date(7)
+  c 
+ 
+ 
+DOCUMENTATION OF THE C WRAPPER CODE 
+===================================
+
+  /*
+   * some macro constants
+   * ====================
+   */
+  
+  /* value returned by time_isleapyear in case year IS a leap-year */
+  #define TIME_ISLEAP (1)
+  /* value returned by time_isleapyear in case year IS NOT a leap-year */
+  #define TIME_ISNOTLEAP (0)
+  
+  /* length of static string buffer in time_sprint */
+  #define TIME_SLEN (35)
+  
+  /* 
+   * time data structure
+   * ===================
+   */
+  
+  /* standard structure to hold date record */
+  typedef struct {
+    long int year;    /* year  (=0 for relative times)                */
+    long int doy;     /* day within yaer (may be 0 for relative times */
+    long int hour;    /* hour within day                              */
+    long int minute;  /* minute within hour                           */
+    long int second;  /* second within minute                         */
+    long int milsec;  /* millisecond within second                    */
+    long int micsec;  /* microsecond within millisecond               */
+  } time_Ts;
+  
+  /*
+   * wrapper function prototypes
+   * ===========================
+   */
+  
+  /* void time_add(time_Ts date1, time_Ts date2, time_Ts *date3)
+   *
+   * date1:   input: any date record
+   * date2:   input: date record (may be absolute if date1 is relative)
+   * date3:   output: sum of date1 and date2
+   */
+  void time_add(time_Ts, time_Ts, time_Ts *);
+  
+  /* void time_clear(time_Ts *date)
+   *
+   * date:    input: any date record
+   *          output: zero relative time
+   */
+  void time_clear(time_Ts *);
+  
+  /* long int time_compare(time_Ts date1, time_Ts date2)
+   *
+   * date1:   input: any date record
+   * date2:   input: any date record (must be relative is date1 is relative,
+   *                 must be absolute if date1 is absolute)
+   * returns: 1  if date1 >  date2
+   *          0  if date1 == date2
+   *          -1 if date1 <  date2
+   *          -2 when mixing relative and absolute date records
+   */
+  long int time_compare(time_Ts, time_Ts);
+  
+  /* void time_copy(time_Ts date1, time_Ts *date2)
+   *
+   * date1:   input: any date record
+   * date2:   output: copy of date1
+   */
+  void time_copy(time_Ts, time_Ts *);
+  
+  /* void time_div(time_Ts date1, time_Ts *date2, long int n, long int *rest)
+   *
+   * date1:   input: any relative time
+   * date2:   output: n-th fraction of date1
+   * n:       input: divisor for date1
+   * rest:    output: rest of division in mircoseconds
+   *                  always: date1 >= (n*date2)
+   */
+  void time_div(time_Ts, time_Ts *, long int, long int *);
+  
+  /* void time_finish(time_Ts *date)
+   *
+   * date:    input: any date record
+   *          output: fully qualified and regularized date record
+   */
+  void time_finish(time_Ts *);
+  
+  /* void time_fullyear(long int *year)
+   *
+   * year:    ainput: ny year value (may be a 2-digit abbreviation)
+   *          output: a full qualified year value 
+   */
+  void time_fullyear(long int *);
+  
+  /* void time_getdate(long int *day, long int *month, time_Ts date)
+   *
+   * day:     output: day within month index of date
+   * month:   output: month wihtin year index of date
+   * date:    input: any absolute date record
+   */
+  void time_getdate(long int*, long int*, time_Ts);
+  
+  /* long int time_isleapyear(long int year)
+   *
+   * year:    input: full qualified year value to be checked
+   * returns: TIME_ISLEAP       if argument is a leap-year
+   *          TIME_ISNOLEAP     if argument is not a leap-year
+   */
+  long int time_isleapyear(long int);
+  
+  /* double time_libversion
+   *
+   * returns: version number of library kernel
+   */
+  double time_libversion();
+  
+  /* void time_mul(time_Ts date1, time_Ts *date2, long int n)
+   *
+   * date1:   input: any relative date record
+   * date2:   output: n times date1
+   * n:       input: factor to multiply date1 with
+   */
+  void time_mul(time_Ts, time_Ts *, long int);
+  
+  /* void time_nfit(time_Ts date1, time_Ts date2, long int *n, time_Ts *full)
+   *
+   * date1:   input: any relative time record
+   * date2:   input: any relative time record
+   * n:       output: number os date2 intervals the fit best into date1
+   *                  so that abs((n*date2)-date1) <= date2/2
+   * full:    output: full time span defined by n and date2 (full=n*date2)
+   */
+  void time_nfit(time_Ts, time_Ts, long int *, time_Ts *);
+  
+  /* void time_norm(time_Ts *date)
+   *
+   * date:    input: any date record
+   *          output: regularized date record
+   */
+  void time_norm(time_Ts *);
+  
+  /* void time_setdoy(long int day, long int month, time_Ts *date)
+   *
+   * day:     input: day index within month
+   * month:   input: month index within year
+   * date:    input: any date record with year set
+   *          output: has correct doy set from day and month 
+   */
+  void time_setdoy(long int, long int, time_Ts *);
+  
+  /* void time_sub(time_Ts date1, time_Ts date2, time_Ts date3)
+   *
+   * date1:   input: any date record
+   * date2:   input: any date record
+   * date3:   output: absolute (positive) difference between date1 and date2
+   */
+  void time_sub(time_Ts, time_Ts, time_Ts *);
+  
+  /*
+   * prototypes of pure C functions
+   * ==============================
+   */
+  
+  /* int time_read(time_Ts *date, char *string)
+   *
+   * string:  input: character representation of a time with the fields in the
+   *                 following order:
+   *                    year month day hour minute seconds
+   *                 - the fields must be separated by non-numeric characters
+   *                 - all fields except the field 'seconds' must be integer
+   *                 - you may omit any number of trailing fields
+   *                 - year AND month must be zero to specify a relative time
+   * date:    output: full qualified and regularized date record specified by
+   *                  string
+   * returns: EXIT_SUCCESS on success
+   *          EXIT_FAILURE on FAILURE
+   *
+   * NOTICE: time_read is not the direct inverse operation of time_sprint
+   */
+  int time_read(time_Ts *, char *);
+  
+  /* char *time_sprint(time_Ts date)
+   *
+   * date:    input: any date record
+   * returns: a pointer to a static character string of at most TIME_SLEN
+   *          characters length containing the ASCII text representation
+   *          of date (NOTICE: the next call to time_sprint will overwrite
+   *          the static character string)
+   */
+  char *time_sprint(time_Ts);
+  
+ 
+ 
+DOCUMENTATION OF THE TIMEUTIL C++ CLASSES 
+=========================================
+
+  // member functions common to both flavours of time
+    public:
+      std::string timestring() const;
+      long int hour() const;
+      long int minute() const;
+      long int second() const;
+      long int milsec() const;
+      long int micsec() const;
+      double float_second() const;
+  
+      operator time_kernel::time_Ts() const;
+      operator std::string() const;
+    
+  //! class to contain absolute times
+  class TAbsoluteTime: public TBaseClassTime {
+    friend class TRelativeTime;
+    public:
+      TAbsoluteTime(const std::string &Itimestring);
+      TAbsoluteTime(char *Itimestring);
+      TAbsoluteTime(const time_kernel::time_Ts &Itime_Ts);
+      TAbsoluteTime(const long int &year=2000, const long int &month=1,
+                    const long int &day=1, const long int &hour=0,
+                    const long int &minute=0, const long int &second=0,
+                    const long int &milsec=0, const long int &micsec=0);
+  
+      void setdoy(const long int &doy);
+      void setdoy(const long int &day, const long int &month);
+      void setdate(const long int &day, const long int &month);
+      void getdate(long int &day, long int &month) const;
+      bool isleapyear() const;
+  
+      long int year() const;
+      long int doy() const;
+      long int month() const;
+      long int day() const;
+  
+      bool operator==(const TAbsoluteTime &A) const;
+      bool operator!=(const TAbsoluteTime &A) const;
+      bool operator<=(const TAbsoluteTime &A) const;
+      bool operator>=(const TAbsoluteTime &A) const;
+      bool operator< (const TAbsoluteTime &A) const;
+      bool operator> (const TAbsoluteTime &A) const;
+  
+      TAbsoluteTime &operator+=(const TRelativeTime &A);
+      TAbsoluteTime &operator-=(const TRelativeTime &A);
+      TAbsoluteTime  operator+ (const TRelativeTime &A) const;
+      TAbsoluteTime  operator- (const TRelativeTime &A) const;
+      TRelativeTime  operator- (const TAbsoluteTime &A) const;
+  
+      TAbsoluteTime &operator= (const time_kernel::time_Ts &A);
+      TAbsoluteTime &operator= (const std::string &timestring);
+      TAbsoluteTime &operator= (char *timestring);
+  };
+  
+  //! class to contain relative times
+  class TRelativeTime: public TBaseClassTime {
+    friend class TAbsoluteTime;
+    public:
+      TRelativeTime(const std::string &Itimestring);
+      TRelativeTime(char *Itimestring);
+      TRelativeTime(const time_kernel::time_Ts &Itime_Ts);
+      TRelativeTime(const int &days=0, const int &hour=0,
+                    const int &minute=0, const int &second=0,
+                    const int &milsec=0, const int &micsec=0);
+  
+      long int days() const;
+      void nfit(const TRelativeTime &delta, long int &n, TRelativeTime &full)
+        const;
+      void div(const long int &n, TRelativeTime &frac, long int &rest)
+        const;
+  
+      bool operator==(const TRelativeTime &A) const;
+      bool operator!=(const TRelativeTime &A) const;
+      bool operator<=(const TRelativeTime &A) const;
+      bool operator>=(const TRelativeTime &A) const;
+      bool operator< (const TRelativeTime &A) const;
+      bool operator> (const TRelativeTime &A) const;
+  
+      TRelativeTime &operator+=(const TRelativeTime &A);
+      TRelativeTime &operator-=(const TRelativeTime &A);
+      TRelativeTime  operator+ (const TRelativeTime &A) const;
+      TRelativeTime  operator- (const TRelativeTime &A) const;
+  
+      TAbsoluteTime  operator+ (TAbsoluteTime A) const;
+      TAbsoluteTime  operator- (TAbsoluteTime A) const;
+  
+      TRelativeTime &operator*=(const long int &n);
+      TRelativeTime &operator/=(const long int &n);
+      TRelativeTime &operator%=(const long int &n);
+  
+      TRelativeTime  operator* (const long int &n) const;
+      TRelativeTime  operator/ (const long int &n) const;
+      TRelativeTime  operator% (const long int &n) const;
+  
+      long int       operator/ (const TRelativeTime &A) const;
+      TRelativeTime  operator% (const TRelativeTime &A) const;
+  
+      TRelativeTime &operator= (const time_kernel::time_Ts &A);
+      TRelativeTime &operator= (const std::string &timestring);
+      TRelativeTime &operator= (char *timestring);
+  };
+  
+  TRelativeTime operator* (const long int &n, const TRelativeTime &A);
+  
+  
+    //! time range
+    class TRange {
+      public:
+        TRange(const TAbsoluteTime& begin,
+               const TAbsoluteTime& end);
+        TAbsoluteTime begin() const { return(Mbegin); }
+        TAbsoluteTime end() const { return(Mend); }
+        TRelativeTime size() const { return(Mend-Mbegin); }
+        bool includes(const TAbsoluteTime&) const;
+        bool includes(const TRange&) const;
+        bool overlaps(const TRange&) const;
+        TRange largestcommon(const TRange&) const;
+        TRange smallestcommon(const TRange&) const;
+        TRange& delay(const TRelativeTime&);
+        TRange& advance(const TRelativeTime&);
+        TRange delayedby(const TRelativeTime&) const;
+        TRange advancedby(const TRelativeTime&) const;
+      private:
+        TAbsoluteTime Mbegin;
+        TAbsoluteTime Mend;
+    }; // class TRange
+  
+    struct Warning {
+      public:
+        static bool suppress_normal;
+        static bool suppress_year;
+        static bool suppress_any;
+    }; // class Warning
+  
+    class Exception 
+    {
+      public:
+        //! Creates exception with no explaining comments
+        Exception();
+        //! Creates an exception with an explanation message
+        Exception(const char* message);
+        //! Creates an exception with message and failed assertion
+        Exception(const char* message, 
+                  const char* condition);
+        //! Create with message, failed assertion, and code position
+        Exception(const char* message, 
+                  const char* file,
+                  const int& line,
+                  const char* condition);
+        //! Create with message and code position
+        Exception(const char* message, 
+                  const char* file,
+                  const int& line);
+        //! Screen report
+        virtual void report() const;
+        //! Issue a screen report on construction of exception
+        static void report_on_construct();
+        //! Issue NO screen report on construction of exception
+        static void dont_report_on_construct();
+      protected:
+        //! Screen report
+        void base_report() const;
+      private:
+        //! Shall we print to cerr at construction time?
+        static bool Mreport_on_construct;
+        //! pointer to message string
+        const char* Mmessage;
+        //! pointer to file name string
+        const char* Mfile;
+        //! pointer to line number in source file
+        const int& Mline;
+        //! pointer to assertion condition text string
+        const char* Mcondition;
+    }; // class Exception
+  
+  /*======================================================================*/
+  //
+  // preprocessor macros
+  // ===================
+  
+  /*! \brief Check an assertion and report by throwing an exception
+   *
+   * \ingroup group_error
+   * \param C assert condition
+   * \param M message of type char*
+   * \param E exception class to throw
+   */
+  #define libtime_Xassert(C,M,E) \
+    if (!(C)) { throw( E ( M , __FILE__, __LINE__, #C )); }
+  
+  /*! \brief Check an assertion and report by throwing an exception
+   *
+   * \ingroup group_error
+   * \param C assert condition
+   * \param M message of type char*
+   */
+  #define libtime_assert(C,M) libtime_Xassert( C , M , libtime::Exception )
+  
+  /*! \brief Abort and give a message
+   *
+   * \ingroup group_error
+   * \param M message of type char*
+   * \param E exception class to throw
+   */
+  #define libtime_abort(M) \
+    throw( libtime::Exception ( M , __FILE__, __LINE__ )) 
+  
+  /*
+   * some functions
+   * --------------
+   */
+  //! return system time
+  TAbsoluteTime now();
+  //! convert relative time to seconds
+  double time2double(const TRelativeTime&);
+  //! convert seconds to relative time
+  TRelativeTime double2time(const double& seconds);
+  
+  /*
+   * some string constants
+   * --------------
+   */
+  //! print information on time format
+  extern const char usage_time_format_string[];
+ 
+ 
+DOCUMENTATION OF THE OLD TIMEUTIL C CODE 
+========================================
+
+  
+  /*
+   * define data structures
+   * ======================
+   */
+  
+  /* time data structure */
+  typedef struct {
+    long int year, month, day, doy;
+    long int hour, min, sec, msec, usec;
+  } timeutil_Ttime;
+  
+  /*
+   * prototypes
+   * ==========
+   */
+  
+  /* clear a time record */
+  void timeutil_clear(timeutil_Ttime *);
+  
+  /* type out a time record */
+  char *timeutil_print(timeutil_Ttime);
+  
+  /* finish a preset time record */
+  void timeutil_finish(timeutil_Ttime *);
+  
+  /* calculate doy */
+  long int timeutil_doy(timeutil_Ttime);
+  
+  /* check for leap year */
+  int timeutil_is_leap(long int);
+  
+  /* set date from doy */
+  void timeutil_date(timeutil_Ttime *, long int);
+  
+  /* set elements to correct value range */
+  void timeutil_norm(timeutil_Ttime *);
+  
+  /* add two time records */
+  void timeutil_add(timeutil_Ttime *, timeutil_Ttime, timeutil_Ttime);
+  
+  /* compare two time records */
+  int timeutil_compare(timeutil_Ttime, timeutil_Ttime);
+  
+ 
+ 
+CVS REVISIONS 
+=============
+
+ $Id:                         $                                         
+ $Id:                Makefile,v   2.20   2005/07/11   17:49:00    tforb Exp
+ $Id:                Makefile,v   2.21   2005/07/15   15:36:54    tforb Exp
+ $Id:                  README,v    1.1   2000/08/05   20:32:22     thof Exp
+ $Id:          README.changes,v    1.1   2000/08/05   20:32:22     thof Exp
+ $Id:          README.unsplit,v    1.1   2000/08/05   20:32:22     thof Exp
+ $Id:          base_constr.cc,v   1.10   2004/02/02   09:28:45    tforb Exp
+ $Id:          base_constr.cc,v   1.12   2004/02/07   17:38:15    tforb Exp
+ $Id:              convert.cc,v    1.1   2004/02/07   17:38:15    tforb Exp
+ $Id:             ctime_add.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:           ctime_clear.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:         ctime_compare.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:            ctime_copy.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:             ctime_div.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:          ctime_finish.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:        ctime_fullyear.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:         ctime_getdate.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:      ctime_isleapyear.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:      ctime_libversion.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:             ctime_mul.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:            ctime_nfit.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:            ctime_norm.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:            ctime_read.c,v    2.2   2000/08/09   21:02:51     thof Exp
+ $Id:          ctime_setdoy.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:          ctime_sprint.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:             ctime_sub.c,v    2.0   2000/08/06   12:49:10     thof Stab
+ $Id:      ctime_util_fatal.c,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:    ctime_util_warning.c,v    2.3   2004/02/07   17:38:17    tforb Exp
+ $Id:   cxxtime_util_fatal.cc,v    1.1   2004/02/07   17:38:15    tforb Exp
+ $Id: cxxtime_util_warning.cc,v    1.1   2004/02/07   17:38:16    tforb Exp
+ $Id:                error.cc,v    1.1   2004/02/07   17:38:16    tforb Exp
+ $Id:            example++.cc,v    1.3   2002/11/14   14:24:01  forbrig Exp
+ $Id:             libtime++.h,v   2.15   2004/02/07   17:38:14    tforb Exp
+ $Id:             libtime++.h,v   2.16   2005/07/15   15:36:54    tforb Exp
+ $Id:               libtime.h,v    2.4   2000/08/09   21:02:51     thof Exp
+ $Id:                  now.cc,v    1.1   2004/02/07   17:38:17    tforb Exp
+ $Id:               ranges.cc,v    1.1   2004/02/07   17:38:17    tforb Exp
+ $Id:           testtime++.cc,v    1.7   2004/02/02   09:31:40    tforb Exp
+ $Id:              time_add.f,v    2.1   2000/08/06   12:00:39     thof Exp
+ $Id:            time_clear.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:          time_compare.f,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:             time_copy.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:              time_div.f,v    2.1   2000/08/06   19:55:19     thof Exp
+ $Id:           time_finish.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:         time_fullyear.f,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:          time_getdate.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:       time_isleapyear.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:       time_libversion.f,v    2.1   2000/08/06   15:25:57     thof Exp
+ $Id:              time_mul.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:             time_nfit.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:             time_norm.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:             time_read.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:           time_setdoy.f,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:           time_sprint.f,v    2.0   2000/08/05   21:58:30     thof Stab
+ $Id:              time_sub.f,v    2.1   2000/08/06   12:00:39     thof Exp
+ $Id:       time_util_fatal.f,v    2.1   2000/08/06   12:47:50     thof Exp
+ $Id:     time_util_warning.f,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:              timeutil.c,v    2.1   2000/08/06   14:08:47     thof Exp
+ $Id:              timeutil.h,v    2.2   2000/08/06   15:25:57     thof Exp
+ $Id:                usage.cc,v    1.1   2005/07/15   15:36:54    tforb Exp

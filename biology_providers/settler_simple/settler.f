@@ -296,23 +296,24 @@ c     -----------------------------------------------
       subroutine write_state_attributes(state)
 c     -----------------------------------------------------  
       type(state_attributes), intent(in) :: state 
-c     -----------------------------------------------------   
-      write(*,*)
-      write(*,*) "state_attributes instance:"
-      write(*,*) "particle type = ", type_meaning(state%type)
-      write(*,*) "survival      = ", state%survival
-      write(*,*) "release_time  = "
-      call write_clock(state%release_time)
-      write(*,*) "tracerID      = ", state%tracerID
-      write(*,*) "sourceBox     = ", state%sourceBox
+
+c     -----------------------------------------------------
+c      write(*,*)
+c      write(*,*) "state_attributes instance:"
+c      write(*,*) "particle type = ", type_meaning(state%type)
+c      write(*,*) "survival      = ", state%survival
+c      write(*,*) "release_time  = "
+c      call write_clock(state%release_time)
+c      write(*,*) "tracerID      = ", state%tracerID
+c      write(*,*) "sourceBox     = ", state%sourceBox
 c     --- only set, if particle_settled ---
-      if (state%type == particle_settled) then
-         write(*,*) "settleBox     = ", state%settleBox
-         write(*,*) "settle_time   = "
-         call write_clock(state%settle_time)
-      endif
+c      if (state%type == particle_settled) then
+c         write(*,*) "settleBox     = ", state%settleBox
+c         write(*,*) "settle_time   = "
+c         call write_clock(state%settle_time)
+c      endif
 c     --- pass request on to embedded particle_state ---
-      write(*,*) "embedded particle_state = "
+c      write(*,*) "embedded particle_state = "
       call write_state_attributes_bio(state%bio)
 c
       end subroutine 

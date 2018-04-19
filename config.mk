@@ -14,7 +14,7 @@ PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/ECOSMO_new
 #PHYSICAL_FIELDS_DIR = oceanography_providers/POLCOMS+ERSEM
 #PHYSICAL_FIELDS_DIR = oceanography_providers/SUNFISH
 #
-PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/physical_traits_simple
+PARTICLE_STATE_DIR  = $(IBMLIB_DIR)/biology_providers/Biofouling_DR
 #PARTICLE_STATE_DIR  = biology_providers/sandeel_simple
 # 
 #TASK_DIR            = task_providers/test

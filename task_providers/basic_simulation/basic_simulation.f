@@ -62,7 +62,9 @@ c     =====================  main time loop =====================
       istep   = 0
       open(44,file="trajectory1")
       open(78,file="Particules_properties")
-      write(78,*) "age, Biofouling_mass, density, volume, nb cells"
+      open(72,file="Depth_particles")
+
+c      write(78,*) "age, Biofouling_mass, density, volume, nb cells"
       do while (compare_clocks(current_time, end_time)
      +                         *nint(time_step) <= 0)             ! opposite for forward/backward simulation
          write(*,372) istep
@@ -80,8 +82,10 @@ c        -------- loop control       --------
          istep = istep + 1
          call get_last_particle_number(par_ens, last)
         do i=1,last
-         write(78,*) istep, i
+         write(78,*) istep, i, i, i, i
          call write_state_attributes(par_ens%state_stack(i))
+         call get_particle_position(get_particle(par_ens,i),xyz)
+         write(72,*) istep, i, xyz
         end do
          if (last>0) then
             call get_particle_position(get_particle(par_ens,1),xyz)

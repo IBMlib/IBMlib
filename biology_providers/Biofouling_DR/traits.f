@@ -328,6 +328,7 @@ c-------------------calculate the biofilm growth ------------
       K_cap=P_surf * 1E-3 /Alg_v
       call get_tracer_position(space, xyz)
       call interpolate_temp(xyz,   temp,  istat)
+c call get active velocity
       r_tot=state%ESD / 2
       diff_P = K_boltz*(temp + 273.16)/(6 * 3.14 * mydyn *
      +         (r_tot)) ! diffusivity of plastic particle

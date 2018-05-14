@@ -80,6 +80,7 @@ c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant
       real       :: PIV                  ! particle initial volume
       real       :: PIM                  ! Particle initial mass
 
+      real       :: set_law                 !law used for calculating active vertical velocity. 0 = stokes, 1 = Dietrich
 
 c     ===============================================================
                                   contains
@@ -112,11 +113,13 @@ c
      +                                   radius_particle)  ! must be present, if rho_particle specified, no default
          call read_control_data(ctrlfile,"length_particle",
      +                                   length_particle)
+        call read_control_data(ctrlfile,"settling_law",
+     +                                   set_law)
          buoyancy = 1
          PIV      = 3.14 * length_particle* radius_particle**2   !Particle initial volume
          PIM      =  PIV * rho_particle  !Particle initial mass
          write(*,391) rho_particle, radius_particle,
-     +                            length_particle
+     +                            length_particle, set_law
 
       else ! default passive particle
 
@@ -206,33 +209,16 @@ c     --------------------------------------------------------------
          call interpolate_salty(xyz,  salt,  istat)
          pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
          rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
-         v_stokes = 2*(state%density-rho)*g*
-     +                 (state%ESD/2)**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
-        V_kin       =  mydyn/rho
-c         write(*,*) salt, temp, pressure ,V_kin
-        D_star      = (state%density-rho)*g*
-     +                (state%ESD**3)/(rho*(V_kin**2))
-             if (D_star  <  0.05) then
-              W_star=1.74E-4 * D_star**2
-              V_set=1.74E-4**0.33333 *state%ESD**3 *(state%density-rho)
-     +                                      *9.81/(rho*V_kin)  ! V_set works but the other give a value of 1 (strangely...)
-c              write(*,*) "small d star", D_star, state%ESD
-             elseif (D_star<= 5E9) then
-              W_star=exp(-3.76715 + 1.92944 * log(D_star)
-     +                -0.09815*log(D_star)**2 - 0.00575*log(D_star)**3+
-     +                 0.00056*log(D_star)**4)
-
-              v_set=((state%density-rho)*9.81*W_star*V_kin/rho)**0.3333
-c             write(*,*) "execute dstar big too",W_star, D_star
-             else
-             write(*,*) "D_star out of range", D_star
-             end if
-c        V_set= ((state%density-rho)*9.81*W_star*V_kin/rho)**(1/3)
-           ! Dietrich
-         v_active(3)=V_set
+            if (set_law ==0) then
+            v_active(3)=stokes(state%ESD,rho,state%density,mydyn)   !! compile stokes velocity using: ESD,rho_tot,mydyn
+            elseif (set_law ==1) then
+            v_active(3)=Dietrich(state%ESD,rho, state%density,mydyn)!Dietrich(ESD,rho,rho_tot,mydyn)
        ! write(*,*) v_active(3), V_set, V_stokes
-      else
+            else
+            write(*,*) "Settling law, not entered in Simpar"
+            endif
 
+      else
          write(*,*) "get_active_velocity: unsupported buoyancy=",
      +              buoyancy
          stop 653
@@ -241,7 +227,55 @@ c        V_set= ((state%density-rho)*9.81*W_star*V_kin/rho)**(1/3)
       
       end subroutine get_active_velocity
 
+      function stokes(ESD,rho,rho_tot,mydyn)
+c     --------------------------------------------------------------
+c     Implement simple stokes
+c     --------------------------------------------------------------
+       real:: stokes
+       real:: ESD
+       real:: rho_tot
+       real:: rho
+       real:: g=9.81
+       real:: mydyn
+      stokes = 2*(rho_tot-rho)*g*
+     +                 (ESD/2)**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
+        return
+      end function stokes
 
+
+      function Dietrich(ESD,rho,rho_tot,mydyn)
+c     --------------------------------------------------------------
+c     Implement simple Dietrich
+c     --------------------------------------------------------------
+      real:: Dietrich
+      real:: ESD
+      real:: rho_tot
+      real:: rho
+      real:: g=9.81
+      real:: mydyn
+      real:: V_kin, W_star,  D_star, V_set
+
+      V_kin       =  mydyn/rho
+      D_star      = (rho_tot-rho)*g*
+     +                (ESD**3)/(rho*(V_kin**2))
+       if (D_star  <  0.05) then
+      W_star=1.74E-4 * D_star**2
+      V_set=-1.74E-4**0.33333 *ESD**3 *(rho_tot-rho)
+     +                                      *9.81/(rho*V_kin)  ! V_set works but the other give a value of 1 (strangely...)
+c              write(*,*) "small d star", D_star, state%ESD
+      elseif (D_star<= 5E9) then
+        W_star=exp(-3.76715 + 1.92944 * log(D_star)
+     +                -0.09815*log(D_star)**2 - 0.00575*log(D_star)**3+
+     +                 0.00056*log(D_star)**4)
+
+       V_set=-((rho_tot-rho)*9.81*W_star*V_kin/rho)**0.3333
+c             write(*,*) "execute dstar big too",W_star, D_star
+      else
+        write(*,*) "D_star out of range", D_star
+      end if
+      Dietrich=V_set
+      return
+      end function Dietrich
 
       subroutine write_state_attributes(state)
 c     --------------------------------------------------------------
@@ -276,16 +310,16 @@ c     --------------------------------------------------------------
       integer                                 :: status
       real                                    :: Mp   ! Particule mass
       real                                    :: Vp !Particule volume
-      real                                    :: biofilm_p=3000 !kg/m3
+      real                                    :: biofilm_p=1388 !kg/m3
       real                                    :: rnd(5)
       integer, parameter                      :: nmax = 4
       real                                    :: size(2**nmax)
       integer                                 :: icut, n, i
       real                                    :: l1,l2
-      real                                    :: Alg_v  !!! [m3]
+      real                                    :: Alg_v=2E-16  !!! [m3]
       real                                    :: Alg_m  !!! [kg]
-      real                                    :: alg_death=4E-7   ! death rate of algaes [1/s]
-      real                                    :: phyto =305E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
+      real                                    :: alg_death=4.5139E-6   ! death rate of algaes [1/s]
+      real                                    :: phyto ! [Algae nb/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
       real, parameter                         :: mydyn      = 1.002e-3   ! [kg/m/s] dynamic viscosity of water (at 20 oC)
       real                                    :: temp !, pressure, rho, salt
       real                                    :: K_boltz =1.38064E-23   ! Boltzmann constant [m2 kg/s2 K]
@@ -295,21 +329,26 @@ c     --------------------------------------------------------------
       real                                    :: growth
       real                                    :: grazing
       real                                    :: respiration
-      real                                    :: r_a = 75E-6! phytoplancton radius (took an average of 50 [um]
+      real                                    :: r_a! phytoplancton radius  [m]
       real                                    :: B_A! encouter kernel rate
       real                                    :: r_tot !!! radius of particle [m]
       real                                    :: P_surf ! surface of particle
-      real                                    :: PP  ! daily mean Primary production [kgC/m3/day] (data from copernicus)
+c      real                                    :: PP  ! daily mean Primary production [kgC/m3/day] (data from copernicus)
       integer                                 :: istat
       real                                    :: K_cap !! carrying capacity on the plastic
+      real                                    :: Chl_a =5E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
+      real                                    :: v_active(3)
+      real                                    :: f_CA=2726E-15! [kg carbon/ cell] carbon/cell ration
 
 
-
+      call get_active_velocity(state, space, v_active)
 c     --------------------------------------------------------------
-      state%age      = state%age + dt/86400.
-      PP             =150E-6 / 86400 ! daily mean Primary production [kgC/m3/sec] !!! need to change into kg and seconds
+      r_a= (Alg_v*3/(4*3.14))**0.333
+      state%age      = state%age + dt/86400
+c      PP             =150E-6 / 86400 ! daily mean Primary production [kgC/m3/sec] !!! need to change into kg and seconds
       mortality_rate = 0.0! for the particle. not the biofouling organisms
-
+      phyto = Chl_a/f_CA ![cell/m3]
+c      write(*,*) "phyto", phyto
       if (state%age < settle_period_start) then
       die            = .false.
       next           = .false.
@@ -323,23 +362,24 @@ c     --------------------------------------------------------------
       endif
 c-------------------calculate the biofilm growth ------------
       P_surf=2*3.14*radius_particle*length_particle
-      Alg_v= 4*3.14*r_a**3 /3
       Alg_m=Alg_v*biofilm_p
-      K_cap=P_surf * 1E-3 /Alg_v
+      K_cap=P_surf /(3.14*r_a**2) ! maximum nb of algae per plastic
       call get_tracer_position(space, xyz)
       call interpolate_temp(xyz,   temp,  istat)
 c call get active velocity
       r_tot=state%ESD / 2
+c ---------------- encounter -------------------------------
       diff_P = K_boltz*(temp + 273.16)/(6 * 3.14 * mydyn *
      +         (r_tot)) ! diffusivity of plastic particle
       diff_A = K_boltz*(temp + 273.16)/(6 * 3.14 * mydyn * r_a) ! diffusivity of Algae m2/s
       B_A = 4 * 3.14 * (diff_P + diff_A) * (r_tot + r_a)
-     +     + 3.14 * r_tot**2 * velocity /2 +
+     +     + 3.14 * r_tot**2 * v_active(3) /2 +
      +     1.3 * shear * (r_tot + r_a)**3          !kernel encounter rate= brownian + settling + shear
 c      write(*,*) "diff_p, B_A", diff_p, B_A, mydyn, r_tot
-      encounter  = B_A*phyto/(P_surf*Alg_m)
-      growth     = state%nb_algae * (1-state%nb_algae/K_cap)*
-     +              (PP / Alg_m) * state%P_volume / P_surf! growth on the plastic is proportional to the ambiant primary production
+      encounter  = B_A*phyto/(P_surf)
+c------------------growth ----------------
+
+      growth     = state%nb_algae * (1-state%nb_algae/K_cap)!* G_max! growth on the plastic is proportional to the ambiant primary production
       grazing    = alg_death * state%nb_algae
 c      respiration=
       state%nb_algae = state%nb_algae + encounter + growth

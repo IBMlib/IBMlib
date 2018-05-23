@@ -224,11 +224,13 @@ c
       subroutine init_state_attributes(state, space, time_dir,             
      +                                 initdata, emitboxID)
 c     ---------------------------------------------------------
+c     ---------------------------------------------------------      
       type(state_attributes),intent(out)     :: state
       type(spatial_attributes),intent(inout) :: space
       real,intent(in)                        :: time_dir            
       character*(*),intent(in)               :: initdata
       integer,intent(in)                     :: emitboxID
+      integer                                :: ix,mobx,moby,mobz
 c     ---------------------------------------------------------
 c     maintain reflective shore BC             ! FTH adaptation
 c     ---------------------------------------------------------
@@ -241,7 +243,17 @@ c     ---------------------------------------------------------
       state%min_salt      =  1.0e20 
       state%max_salt      = -1.0e20
 c      call set_shore_BC(space, BC_sticky)     ! FTH adaptation
-
+c     ---------------------------------------------------------
+c     parse initdata 
+c     ---------------------------------------------------------
+c     1) look for tag "mobility=xyz"  (no spaces ... overwrite prior space settings)
+      ix = index(initdata, "mobility=")
+      if (ix>0) then
+         read(initdata(ix+9:),'(i1,i1,i1)') mobx,moby,mobz  ! +9 = end of tag "mobility="
+         write(*,*) mobx,moby,mobz
+         call set_tracer_mobility(space,mobx,moby,mobz)
+      endif
+      
       end subroutine init_state_attributes
 
 

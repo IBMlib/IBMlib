@@ -40,4 +40,5 @@ LINKLIBS  += -L$(NETCDF)/lib -lnetcdff -lnetcdf    # netcdf3
 export LITTLE_ENDIAN = -fconvert=little-endian
 export BIG_ENDIAN    = -fconvert=big-endian
 
-FCFLAGS +=$(LITTLE_ENDIAN) #tyepe of bynaries source data
+#FCFLAGS +=$(BIG_ENDIAN) #tyepe of bynaries source data
+FCFLAGS += -fconvert=big-endian

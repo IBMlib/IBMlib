@@ -233,7 +233,7 @@ c         write(*,*)  rho_tot
          stop 653
       endif
       !   write(*,*) v_active(3)
-      
+c      call interpolate_wind_stress(geo, r2, status)
       end subroutine get_active_velocity
 
       function stokes(ESD,rho,rho_tot,mydyn)
@@ -321,7 +321,8 @@ c     --------------------------------------------------------------
       real,intent(out)                        :: mortality_rate
       logical,intent(out)                     :: die, next 
       real                                    :: xyz(3)
-      integer                                 :: status
+      integer                                 :: status,stat,statu
+      integer                                 :: statud
       real                                    :: Mp   ! Particule mass
       real                                    :: Vp !Particule volume
       real                                    :: rho_b=1388 !kg/m3
@@ -348,7 +349,7 @@ c     --------------------------------------------------------------
       real                                    :: r_tot !!! radius of particle [m]
       integer                                 :: istat
       real                                    :: K_cap !! carrying capacity on the plastic
-      real                                    :: Chl_a =5E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
+      real                                    :: Chl_a! =5E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from
       real                                    :: v_active(3)
       real                                    :: f_CA=2726E-15! [kg carbon/ cell] carbon/cell ration
       real                                    :: pi=3.1415
@@ -360,12 +361,21 @@ c     --------------------------------------------------------------
       real                                    :: Mu_tot,Mu_opt, day ! growth rate (total and optimal) (depend on the light and temperature [per day]
       real                                    :: depth
       real                                    :: B_Aa, B_Ab
-      real                                    ::carbon_tot
-      real                                    ::f_Chla_C  =0.03!ratio of the total organic carbon during exponential growth
+      real                                    :: carbon_tot, wind_z(2)
+      real                                    :: f_Chla_C  =0.03!ratio of the total organic carbon during exponential growth
+      real                                    :: r, r2(2)
+      real                                    :: geo(3)
+      real                                    :: diatom,diatom_mol
 
-
-
+      call get_tracer_position(space, xyz)
+c      call interpolate_diatoms(geo, diatom, statud)
+      call interpolate_chlorophyl(geo, Chl_a, stat)
+      call interpolate_wind_stress(geo, r2, statu)
+      call interpolate_temp(xyz,   temp,  istat)
       call get_active_velocity(state, space, v_active)
+      depth            = xyz(3)
+      wind_z=r2*0.05
+c      write(*,*)  diatom, Chl_a, diatom_mol
 c     --------------------------------------------------------------
 
       state%age      = state%age + dt/86400
@@ -373,9 +383,9 @@ c     --------------------------------------------------------------
 c     --------------- algae concentration parameters ---------------
       r_a            = (Alg_v*3/(4*3.14))**0.333
       Alg_m          = Alg_v*rho_b
-      carbon_tot     = Chl_a/f_Chla_C! total organic carbon (carbon during exponential growth)
+      carbon_tot     = Chl_a*1e-6/f_Chla_C! total organic carbon (carbon during exponential growth)
       phyto          = carbon_tot/f_CA ![cell/m3]
-c        write(*,*) Chl_a,carbon_tot,phyto
+c        write(*,*)   carbon_tot,phyto
 c     --------------- if settlement of particles     ---------------
       if (state%age < settle_period_start) then
       die            = .false.
@@ -390,12 +400,9 @@ c     --------------- if settlement of particles     ---------------
       endif
 c     ---------------- calculate the biofilm growth ------------
 
-      K_cap         = P_surf*15 /(pi*r_a**2) ! maximum nb of algae per plastic
-      call get_tracer_position(space, xyz)
-      call interpolate_temp(xyz,   temp,  istat)
-      call get_active_velocity(state, space, v_active)
+       K_cap         = P_surf*15 /(pi*r_a**2) ! maximum nb of algae per plastic
        V_settling   = v_active(3)
-       depth            = xyz(3)
+
 c ---------------- encounter -------------------------------
        P_volume=state%nb_algae*Alg_v+PIV
       r_tot=(3*P_volume/(4*pi))**0.333

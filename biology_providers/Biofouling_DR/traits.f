@@ -192,7 +192,7 @@ c     --------------------------------------------------------------
       real                                 :: P_volume, P_mass, rho_tot
       real                                 :: Alg_v=2E-16  !!! [m3]
       real                                 :: rho_b=1388 !kg/m3
-      real                                 :: ESD
+      real                                 :: ESD,r2(2)
 
 c     --------------------------------------------------------------
       v_active(1:2) = 0             ! no horizontal component
@@ -212,7 +212,10 @@ c         write(*,*)  rho_tot
 
          call get_tracer_position(space, xyz)
          call interpolate_temp(xyz,   temp,  istat)
-
+c-------- introduce wind drift -------
+c         call interpolate_wind_stress(geo, r2, statu)
+c         v_active(1)=
+c         v_active(2)=
          call interpolate_salty(xyz,  salt,  istat)
          pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
          rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
@@ -347,7 +350,7 @@ c     --------------------------------------------------------------
       real                                    :: r_a! phytoplancton radius  [m]
       real                                    :: B_A! encouter kernel rate
       real                                    :: r_tot !!! radius of particle [m]
-      integer                                 :: istat
+      integer                                 :: istat, julday
       real                                    :: K_cap !! carrying capacity on the plastic
       real                                    :: Chl_a! =5E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from
       real                                    :: v_active(3)
@@ -366,11 +369,10 @@ c     --------------------------------------------------------------
       real                                    :: r, r2(2)
       real                                    :: geo(3)
       real                                    :: diatom,diatom_mol
-
+      type(clock),pointer                     :: current_time
       call get_tracer_position(space, xyz)
 c      call interpolate_diatoms(geo, diatom, statud)
       call interpolate_chlorophyl(geo, Chl_a, stat)
-      call interpolate_wind_stress(geo, r2, statu)
       call interpolate_temp(xyz,   temp,  istat)
       call get_active_velocity(state, space, v_active)
       depth            = xyz(3)
@@ -383,7 +385,7 @@ c     --------------------------------------------------------------
 c     --------------- algae concentration parameters ---------------
       r_a            = (Alg_v*3/(4*3.14))**0.333
       Alg_m          = Alg_v*rho_b
-      carbon_tot     = Chl_a*1e-6/f_Chla_C! total organic carbon (carbon during exponential growth)
+      carbon_tot     = Chl_a*1.0e-6/f_Chla_C! total organic carbon (carbon during exponential growth)
       phyto          = carbon_tot/f_CA ![cell/m3]
 c        write(*,*)   carbon_tot,phyto
 c     --------------- if settlement of particles     ---------------
@@ -412,8 +414,14 @@ c ---------------- encounter -------------------------------
 c      write(*,*) "diff_p, B_A", diff_p, B_A, mydyn, r_tot
       encounter  = B_A * phyto
 c       write(*,*) state%nb_algae,P_volume,r_tot, B_Aa, B_Ab, B_A
+
+c ----------------- Growth ---------------------------------
+c   ----- temp ---
       teta       = 1.5**((temp-20)/10)
-      day        = 2*pi*state%age/365+pi/2
+c   ----- light ---
+      current_time => get_master_clock()
+       call get_julian_day(current_time, julday)
+      day        = 2*pi*julday/365+pi/2
       I_o        = 2*(sin(day)+1)*375+ 100
       I_z        = I_o*exp(k*depth)
       Mu_opt     = mu_max*I_z* alpha/(alpha*I_z+mu_max)

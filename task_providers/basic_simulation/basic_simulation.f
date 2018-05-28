@@ -33,13 +33,14 @@ c     ------------ declarations ------------
       type(clock),pointer :: current_time
       type(particle_ensemble)     :: par_ens
       type(emission_box), pointer :: emitboxes(:)
-      integer :: year, month, day, julday,last
-      integer :: i,ix,iy,iz,dum(79),ilast,iunit
+      integer :: year, month, day, julday,last,second_of_day
+      integer :: i,ix,iy,iz,dum(79),ilast,iunit, isec
       integer :: idum(4), timeout, istep, ntracers
       real    :: time_step, now,xyz(3)
       real    :: amp,xcen,ycen,vdiff,hdiff
       character*256 :: filename
-      
+      type(clock) :: aclock
+
 c     ------------   show time starts  ------------
       call init_run_context()
 
@@ -61,10 +62,12 @@ c.....set clocks
 c     =====================  main time loop =====================
       istep   = 0
       open(44,file="trajectory1")
-      open(78,file="Particules_properties")
+
       open(72,file="Depth_particles")
 
-c      write(78,*) "age, Biofouling_mass, density, volume, nb cells"
+      open(78,file="Particules_properties")
+      write(78,*) "age, nb alage"
+
       do while (compare_clocks(current_time, end_time)
      +                         *nint(time_step) <= 0)             ! opposite for forward/backward simulation
          write(*,372) istep
@@ -75,18 +78,23 @@ c        -------- propagate tracers  --------
 c        do i = 1, 10, 1
 c         write(78,*) istep, par_ens%state_stack(:)
 c         write(78,*) istep, par_ens%state_stack
-c            end do
-c        -------- write tracer state -------- 
+c        end do
+c        -------- write tracer state --------
 c        -------- loop control       --------
          call add_seconds_to_clock(current_time, nint(time_step))
          istep = istep + 1
          call get_last_particle_number(par_ens, last)
-        do i=1,last
-         write(78,*) istep, i, i, i, i
-         call write_state_attributes(par_ens%state_stack(i))
-         call get_particle_position(get_particle(par_ens,i),xyz)
-         write(72,*) istep, i, xyz
-        end do
+c         call set_clock_4i(aclock, year, month, day, second_of_day)
+         call get_julian_day(current_time, julday)
+         call get_second_in_day(current_time, isec)
+         if (mod(julday,7)==0 .and. isec == 1) then
+           do i=1,last
+            write(78,*) istep, julday, i, i, i
+            call write_state_attributes(par_ens%state_stack(i))
+            call get_particle_position(get_particle(par_ens,i),xyz)
+            write(72,*) istep,julday, i, xyz
+           end do
+         end if
          if (last>0) then
             call get_particle_position(get_particle(par_ens,1),xyz)
             write(44,*) istep, xyz

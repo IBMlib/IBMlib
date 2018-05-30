@@ -469,6 +469,12 @@ c     ---------------------------------------------------
       call get_tracer_position(part%space, xyz)
       end subroutine get_particle_position
 
+c      subroutine get_particle_attributes(part, att)
+c     ---------------------------------------------------
+c       type(particle), intent(in) :: part
+c       real, intent(out)          :: att(:)
+c       att=get_active_particle_states(part)
+c       end subroutine get_particle_attributes
 
       subroutine set_particle_position(part, xyz)
 c     ---------------------------------------------------

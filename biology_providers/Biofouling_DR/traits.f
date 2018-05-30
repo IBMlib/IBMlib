@@ -29,7 +29,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use input_parser
      
       implicit none
-      private
+c      private
       
 c     ---------------------------------------------
 c     This type contains only specific biological attributes
@@ -51,7 +51,8 @@ c     ---- export generic particle_state interface ----
       public :: get_active_velocity
       public :: write_state_attributes
       public :: update_particle_state_ ! extended argument list
-      
+      public :: write_state_attributes_tofile
+
 
 c     =================================================
 c     ========       module data section       ========
@@ -74,7 +75,7 @@ c     buoyancy = 1: additive terminal Stokes velocity, corresponding to constant
       real       :: PIV                  ! particle initial volume
       real       :: PIM                  ! Particle initial mass
       real       :: P_surf               ! Particle surface
-
+      integer    :: file =79
       real       :: set_law                 !law used for calculating active vertical velocity. 0 = stokes, 1 = Dietrich
 
 c     ===============================================================
@@ -180,8 +181,8 @@ c     --------------------------------------------------------------
       real, parameter                      :: g          = 9.81       ! [m/s2] gravitational constant
       real, parameter                      :: mydyn      = 1.002e-3   ! [kg/m/s] dynamic viscosity of water (at 20 oC)
       real                                 :: pressure, rho, salt, temp
-      real                                 :: xyz(3)
-      integer                              :: istat
+      real                                 :: xyz(3),wind(2),hor(2)
+      integer                              :: istat, status
       real, external                       :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
       real                                 :: V_kin,  V_set_c,V_set_d                ! kinematic viscosity of seawater
       real                                 :: W_star =0               ! dimentionmess settling velocity
@@ -193,6 +194,9 @@ c     --------------------------------------------------------------
       real                                 :: Alg_v=2E-16  !!! [m3]
       real                                 :: rho_b=1388 !kg/m3
       real                                 :: ESD,r2(2)
+      real                                 :: depth, V_ekman(2)
+      real                                 :: sign_of(2)
+
 
 c     --------------------------------------------------------------
       v_active(1:2) = 0             ! no horizontal component
@@ -209,16 +213,15 @@ c ---------- find density parapeters ----
          rho_tot        =P_mass/P_volume
          ESD            =(6*P_volume/pi)**0.333
 c         write(*,*)  rho_tot
-
          call get_tracer_position(space, xyz)
          call interpolate_temp(xyz,   temp,  istat)
-c-------- introduce wind drift -------
-c         call interpolate_wind_stress(geo, r2, statu)
-c         v_active(1)=
-c         v_active(2)=
          call interpolate_salty(xyz,  salt,  istat)
          pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
          rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
+         V_ekman=Ekman_transport(xyz,rho)
+         v_active(1)=V_ekman(1)
+         v_active(2)=V_ekman(2)
+         write(*,*) V_ekman
         !  write(*,*) "settling velocity", set_law
             if (set_law == 0) then
           !   write(*,*) "settling velocitystokes"
@@ -259,13 +262,7 @@ c     --------------------------------------------------------------
 c     --------------------------------------------------------------
 c     Implement simple Dietrich
 c     --------------------------------------------------------------
-c      type(state_attributes), intent(in)   :: state
-c type(state_attributes), intent(inout)   :: state
-c type(spatial_attributes), intent(inout) :: space
-c type(state_attributes), intent(in)   :: state
-c type(spatial_attributes), intent(in) :: space
-c      real, intent(out)                    :: Dietrich
-c    type(v_active)
+
       real:: Dietrich
       real:: ESD
       real:: rho_tot
@@ -296,12 +293,50 @@ c             write(*,*) "execute dstar big too",W_star, D_star
       return
       end function Dietrich
 
+      function Ekman_transport(xyz,rho)
+c     --------------------------------------------------------------
+c     Compile Ekmann transport from  wind stress
+c     --------------------------------------------------------------
+        real      :: xyz(3), hor(2), V_ekman(2),rho
+        real      ::  wind(2), depth,Ekman_transport(2)
+        real      :: Eddy_v =20 ![m2/day]
+        real      :: f_cor ![m2/day]
+        real      :: coef !decrease with depth
+        real      :: pi=3.14
+
+        integer   :: status
+        hor(1)=xyz(1)
+        hor(2)=xyz(2)
+        f_cor=2* 7.292e-5*sin(xyz(2))
+        coef=sqrt(f_cor/(2.*Eddy_v))
+        call interpolate_wind_stress(hor, wind, status)
+        depth            = xyz(3)
+        V_ekman(1)=sign(1.,wind(1))*sqrt(abs(wind(1))/rho)
+     +              *exp(-coef*depth)*cos(pi/4+coef*depth)
+        V_ekman(2)=sign(1.,wind(2))*sqrt(abs(wind(2))/rho)
+     +              *exp(-coef*depth)*sin(pi/4+coef*depth)
+
+        Ekman_transport=V_ekman
+c          wind_10(1)=sign(1.,wind(1))*sqrt(abs(wind(1))/0.0158)
+c          wind_10(2)=sign(1.,wind(2))*sqrt(abs(wind(2))/0.0158)
+      return
+      end function Ekman_transport
+
       subroutine write_state_attributes(state)
 c     --------------------------------------------------------------
       type(state_attributes), intent(in)   :: state
 c     --------------------------------------------------------------
       write(78,*)  state%age,  state%nb_algae
       end subroutine write_state_attributes
+
+      subroutine write_state_attributes_tofile(state)
+c     --------------------------------------------------------------
+      type(state_attributes), intent(in)   :: state
+c      integer                              :: file
+c     --------------------------------------------------------------
+
+      write(79,*)  state%age,  state%nb_algae
+      end subroutine write_state_attributes_tofile
 
 
       subroutine update_particle_state_(state, space, dt, 
@@ -324,7 +359,7 @@ c     --------------------------------------------------------------
       real,intent(out)                        :: mortality_rate
       logical,intent(out)                     :: die, next 
       real                                    :: xyz(3)
-      integer                                 :: status,stat,statu
+      integer                                 :: stat
       integer                                 :: statud
       real                                    :: Mp   ! Particule mass
       real                                    :: Vp !Particule volume
@@ -364,20 +399,15 @@ c     --------------------------------------------------------------
       real                                    :: Mu_tot,Mu_opt, day ! growth rate (total and optimal) (depend on the light and temperature [per day]
       real                                    :: depth
       real                                    :: B_Aa, B_Ab
-      real                                    :: carbon_tot, wind_z(2)
+      real                                    :: carbon_tot
       real                                    :: f_Chla_C  =0.03!ratio of the total organic carbon during exponential growth
-      real                                    :: r, r2(2)
       real                                    :: geo(3)
-      real                                    :: diatom,diatom_mol
       type(clock),pointer                     :: current_time
       call get_tracer_position(space, xyz)
-c      call interpolate_diatoms(geo, diatom, statud)
-      call interpolate_chlorophyl(geo, Chl_a, stat)
+      call interpolate_chlorophyl(xyz, Chl_a, stat)
       call interpolate_temp(xyz,   temp,  istat)
       call get_active_velocity(state, space, v_active)
       depth            = xyz(3)
-      wind_z=r2*0.05
-c      write(*,*)  diatom, Chl_a, diatom_mol
 c     --------------------------------------------------------------
 
       state%age      = state%age + dt/86400
@@ -387,7 +417,7 @@ c     --------------- algae concentration parameters ---------------
       Alg_m          = Alg_v*rho_b
       carbon_tot     = Chl_a*1.0e-6/f_Chla_C! total organic carbon (carbon during exponential growth)
       phyto          = carbon_tot/f_CA ![cell/m3]
-c        write(*,*)   carbon_tot,phyto
+c        write(*,*)   Chl_a,phyto
 c     --------------- if settlement of particles     ---------------
       if (state%age < settle_period_start) then
       die            = .false.

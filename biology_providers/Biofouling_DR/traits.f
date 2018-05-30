@@ -221,7 +221,7 @@ c         write(*,*)  rho_tot
          V_ekman=Ekman_transport(xyz,rho)
          v_active(1)=V_ekman(1)
          v_active(2)=V_ekman(2)
-         write(*,*) V_ekman
+c         write(*,*) V_ekman
         !  write(*,*) "settling velocity", set_law
             if (set_law == 0) then
           !   write(*,*) "settling velocitystokes"

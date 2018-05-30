@@ -40,6 +40,8 @@ c     ------------ declarations ------------
       real    :: amp,xcen,ycen,vdiff,hdiff
       character*256 :: filename
       type(clock) :: aclock
+      integer :: file=79
+      type(particle), pointer              :: this
 
 c     ------------   show time starts  ------------
       call init_run_context()
@@ -61,12 +63,8 @@ c.....set clocks
       current_time => get_master_clock()
 c     =====================  main time loop =====================
       istep   = 0
-      open(44,file="trajectory1")
-
-      open(72,file="Depth_particles")
-
-      open(78,file="Particules_properties")
-      write(78,*) "age, nb alage"
+      open(44,file="1_particle_all")
+      open(72,file="Weekly")
 
       do while (compare_clocks(current_time, end_time)
      +                         *nint(time_step) <= 0)             ! opposite for forward/backward simulation
@@ -87,17 +85,22 @@ c        -------- loop control       --------
 c         call set_clock_4i(aclock, year, month, day, second_of_day)
          call get_julian_day(current_time, julday)
          call get_second_in_day(current_time, isec)
-         if (mod(julday,7)==0 .and. isec == 1) then
+         if (mod(julday,7)==0 .and. isec == 30) then
            do i=1,last
-            write(78,*) istep, julday, i, i, i
-            call write_state_attributes(par_ens%state_stack(i))
+c            write(78,*) istep, julday, i, this%state%bio%nb_algae
+c            call write_state_attributes(par_ens%state_stack(i))
             call get_particle_position(get_particle(par_ens,i),xyz)
-            write(72,*) istep,julday, i, xyz
+            write(72,*) istep,julday, i,
+     +          xyz,par_ens%state_stack(i)%bio%age,
+     +          par_ens%state_stack(i)%bio%nb_algae
            end do
          end if
          if (last>0) then
             call get_particle_position(get_particle(par_ens,1),xyz)
-            write(44,*) istep, xyz
+             this => get_particle(par_ens, 1)
+c            call write_state_attributes_tofile(par_ens%state_stack(1))
+            write(44,*) istep, julday, xyz, this%state%bio%age,
+     +          this%state%bio%nb_algae
          endif
 c        ---- quick way to dump e.g. vertical position of particles 1-10 for file fort.71        
 c         if (last>9) then                ! only write, if particles 1-10 are actually emitted 

@@ -158,7 +158,7 @@ c     +              /4)**(0.3333)! Equivalent spherical diameter
 c      state%P_mass =PIM
 
 
-      call set_shore_BC(space, BC_sticky)
+      call set_shore_BC(space, BC_reflect)
       call set_bottom_BC(space, BC_sticky)
       end subroutine init_state_attributes
 

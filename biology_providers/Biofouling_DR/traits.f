@@ -299,7 +299,7 @@ c     Compile Ekmann transport from  wind stress
 c     --------------------------------------------------------------
         real      :: xyz(3), hor(2), V_ekman(2),rho
         real      ::  wind(2), depth,Ekman_transport(2)
-        real      :: Eddy_v =20 ![m2/day]
+        real      :: Eddy_v  ![m2/day]
         real      :: f_cor ![m2/day]
         real      :: coef !decrease with depth
         real      :: pi=3.14
@@ -307,16 +307,17 @@ c     --------------------------------------------------------------
         integer   :: status
         hor(1)=xyz(1)
         hor(2)=xyz(2)
-        f_cor=2* 7.292e-5*sin(xyz(2))
+        f_cor=2* 7.292e-5
+        Eddy_v=20./(24.*60.*60.)
         coef=sqrt(f_cor/(2.*Eddy_v))
         call interpolate_wind_stress(hor, wind, status)
-        depth            = xyz(3)
+        depth = xyz(3)
         V_ekman(1)=sign(1.,wind(1))*sqrt(abs(wind(1))/rho)
      +              *exp(-coef*depth)*cos(pi/4+coef*depth)
         V_ekman(2)=sign(1.,wind(2))*sqrt(abs(wind(2))/rho)
-     +              *exp(-coef*depth)*sin(pi/4+coef*depth)
-
+     +              *exp(-coef*depth)*sin((pi/4)+(coef*depth))
         Ekman_transport=V_ekman
+c        write(*,*) wind, coef, Eddy_v, f_cor, Ekman_transport
 c          wind_10(1)=sign(1.,wind(1))*sqrt(abs(wind(1))/0.0158)
 c          wind_10(2)=sign(1.,wind(2))*sqrt(abs(wind(2))/0.0158)
       return

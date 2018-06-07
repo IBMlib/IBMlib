@@ -36,11 +36,11 @@ c     ------------ declarations ------------
       integer :: year, month, day, julday,last,second_of_day
       integer :: i,ix,iy,iz,dum(79),ilast,iunit, isec
       integer :: idum(4), timeout, istep, ntracers
-      real    :: time_step, now,xyz(3)
+      real    :: time_step, now,xyz(3),w_depth
       real    :: amp,xcen,ycen,vdiff,hdiff
       character*256 :: filename
       type(clock) :: aclock
-      integer :: file=79
+      integer :: istat
       type(particle), pointer              :: this
 
 c     ------------   show time starts  ------------
@@ -90,6 +90,7 @@ c         call set_clock_4i(aclock, year, month, day, second_of_day)
 c            write(78,*) istep, julday, i, this%state%bio%nb_algae
 c            call write_state_attributes(par_ens%state_stack(i))
             call get_particle_position(get_particle(par_ens,i),xyz)
+            call interpolate_wdepth(xyz,w_depth, istat)
             write(72,*) istep,julday, i,
      +          xyz,par_ens%state_stack(i)%bio%age,
      +          par_ens%state_stack(i)%bio%nb_algae

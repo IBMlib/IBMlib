@@ -185,7 +185,7 @@ c     --------------------------------------------------------------
       integer                              :: istat, status
       real, external                       :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
       real                                 :: V_kin,  V_set_c,V_set_d                ! kinematic viscosity of seawater
-      real                                 :: W_star =0               ! dimentionmess settling velocity
+      real                                 :: W_star =0, correction               ! dimentionmess settling velocity
       real                                 :: D_star  =0              ! dimentionmess particle diameter
       real                                 :: V_set, V_set_b,V_stokes                ! All variables to get the kinematik viscosity
       real                                 :: pi=3.1415
@@ -193,9 +193,9 @@ c     --------------------------------------------------------------
       real                                 :: P_volume, P_mass, rho_tot
       real                                 :: Alg_v=2E-16  !!! [m3]
       real                                 :: rho_b=1388 !kg/m3
-      real                                 :: ESD,r2(2)
+      real                                 :: ESD,r2(2), g_prim
       real                                 :: depth, V_ekman(2)
-      real                                 :: sign_of(2)
+      real                                 :: sign_of(2),ws_khat
 
 
 c     --------------------------------------------------------------
@@ -209,7 +209,7 @@ c ---------- find density parapeters ----
          biofouling_v   =state%nb_algae*Alg_v
          biofouling_m   =biofouling_v*rho_b
          P_volume       =PIV+biofouling_v
-         P_mass         = PIM+biofouling_m
+         P_mass         =PIM+biofouling_m
          rho_tot        =P_mass/P_volume
          ESD            =(6*P_volume/pi)**0.333
 c         write(*,*)  rho_tot
@@ -229,6 +229,25 @@ c         write(*,*) V_ekman
             elseif (set_law == 1) then
          !    write(*,*) "settling velocity Dietrich"
             v_active(3)=Dietrich(ESD,rho, rho_tot,mydyn)!Dietrich(ESD,rho,rho_tot,mydyn)
+
+            elseif (set_law == 2) then
+                V_kin       =  mydyn/rho
+c            correction=2.*radius_particle*1000.*length_particle*1000./
+c     +                 (52.749*length_particle*1000.+12.691)
+c                v_active_mm=pi*g*(rho_tot-rho)*correction/
+c     +                      (1000.*rho*2.*V_kin)
+             g_prim=g*(rho_tot-rho)/(rho*1000.0);
+             correction=2*radius_particle*1000.0*length_particle*1000.0/
+     +       ((52.749*length_particle*1000.0)+11.442)
+             ws_khat=pi*g_prim*correction/(2*V_kin)
+
+
+c                g_prim=g*(rho_tot-rho)/(rho*1000.0)
+c                correction=2.0*3.e-4*1000.0*0.1*1000.0/
+c     +              ((52.749*0.1*1000.0)+11.442)
+c                ws_khat=pi*g_prim*correction/(2.0*V_kin)
+             v_active(3)=ws_khat/1000
+c            write(*,*) g_prim, V_kin, correction, ws_khat
             else
             write(*,*) "Settling law, not entered in Simpar"
             endif
@@ -268,26 +287,33 @@ c     --------------------------------------------------------------
       real:: rho_tot
       real:: rho
       real:: g=9.81
-      real:: mydyn
+      real:: mydyn, diff
       real:: V_kin, W_star,  D_star, V_set
-
+      diff=rho_tot-rho
       V_kin       =  mydyn/rho
       D_star      = (rho_tot-rho)*g*
-     +                (ESD**3)/(rho*(V_kin**2))
-       if (D_star  <  0.05) then
-      W_star=1.74E-4 * D_star**2
-      V_set=1.74E-4**0.3333 *ESD**2 *(rho_tot-rho)
-     +                                      *g/(rho*V_kin)  ! V_set works but the other give a value of 1 (strangely...)
-c              write(*,*) "small d star", D_star, state%ESD
-      elseif (D_star<= 5E9) then
-        W_star=exp(-3.76715 + 1.92944 * log(D_star)
-     +                -0.09815*log(D_star)**2 - 0.00575*log(D_star)**3+
-     +                 0.00056*log(D_star)**4)
+     +                (ESD**3.0)/(rho*(V_kin**2.0))
+       if (D_star  <  0.05) then ! use Stokes for Da <= 0.05, from Dietrich, 1982 paper
+        W_star=D_star**2.0 /5832.
+c      V_set=((rho_tot-rho)*9.81*W_star*V_kin/rho)**0.3333
+        V_set=sign(1.0,diff)*(abs(rho_tot-rho)*9.81*W_star*
+     +        V_kin/rho)**0.3333
 
-       V_set=((rho_tot-rho)*9.81*W_star*V_kin/rho)**0.3333
+c      V_set=1.74E-4**0.3333 *ESD**2.0 *(rho_tot-rho)
+c     +                                      *g/(rho*V_kin)  ! V_set works but the other give a value of 1 (strangely...)
+c              write(*,*) "small d star", D_star, state%ESD
+      elseif (D_star<= 5.0E9) then
+        W_star=exp(-3.76715 + 1.92944 * log(D_star)
+     +                -0.09815*log(D_star)**2.0 - 0.00575*log(D_star)**3.0+
+     +                 0.00056*log(D_star)**4.0)
+
+c       V_set=((rho_tot-rho)*9.81*W_star*V_kin/rho)**0.3333
+        V_set=sign(1.0,diff)*(abs(rho_tot-rho)*9.81*W_star*
+     +        V_kin/rho)**0.3333
+
 c             write(*,*) "execute dstar big too",W_star, D_star
       else
-        V_set=0
+        V_set=0.0
       end if
       Dietrich=V_set
       return

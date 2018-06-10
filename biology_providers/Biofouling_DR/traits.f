@@ -38,7 +38,7 @@ c     are maintained by embedding type
 c     ---------------------------------------------
       type state_attributes
 c      private
-          real    :: age            ! since instantiation [days]
+          real    :: age,distance            ! since instantiation [days]
           real    :: nb_algae       ! number of algae on the surface
 
           end type
@@ -151,7 +151,8 @@ c     ---------------------------------------------------------
       integer,intent(in)                     :: emitboxID
 c     ---------------------------------------------------------
       state%age           = 0.0
-      state%nb_algae      = 0
+      state%nb_algae      = 0.0
+      state%distance     =0.0
 c      state%ESD     =(3 * length_particle* radius_particle**2
 c     +              /4)**(0.3333)! Equivalent spherical diameter
       !state%ESD     =0! Equivalent spherical diameter
@@ -206,7 +207,7 @@ c     --------------------------------------------------------------
 
       elseif  (buoyancy == 1) then  ! fixed particle density
 c ---------- find density parapeters ----
-         biofouling_v   =state%nb_algae*Alg_v
+         biofouling_v   =state%nb_algae*Alg_v*P_surf
          biofouling_m   =biofouling_v*rho_b
          P_volume       =PIV+biofouling_v
          P_mass         =PIM+biofouling_m
@@ -247,7 +248,7 @@ c                correction=2.0*3.e-4*1000.0*0.1*1000.0/
 c     +              ((52.749*0.1*1000.0)+11.442)
 c                ws_khat=pi*g_prim*correction/(2.0*V_kin)
              v_active(3)=ws_khat/1000
-c            write(*,*) g_prim, V_kin, correction, ws_khat
+c            write(*,*) ws_khat
             else
             write(*,*) "Settling law, not entered in Simpar"
             endif
@@ -271,8 +272,8 @@ c     --------------------------------------------------------------
        real:: rho
        real:: g=9.81
        real:: mydyn
-      stokes = 2*(rho_tot-rho)*g*
-     +                 (ESD/2)**2/9/mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
+      stokes = 2.*(rho_tot-rho)*g*
+     +                 (ESD/2.)**2./9./mydyn  ! [m/s], Stokes terminal velocity law  (positive down) //// we dont want stokes
         return
       end function stokes
 
@@ -333,7 +334,7 @@ c     --------------------------------------------------------------
         integer   :: status
         hor(1)=xyz(1)
         hor(2)=xyz(2)
-        f_cor=2* 7.292e-5
+        f_cor=2.* 7.292e-5
         Eddy_v=20./(24.*60.*60.)
         coef=sqrt(f_cor/(2.*Eddy_v))
         call interpolate_wind_stress(hor, wind, status)
@@ -353,7 +354,8 @@ c          wind_10(2)=sign(1.,wind(2))*sqrt(abs(wind(2))/0.0158)
 c     --------------------------------------------------------------
       type(state_attributes), intent(in)   :: state
 c     --------------------------------------------------------------
-      write(78,*)  state%age,  state%nb_algae
+      write(78,*)  state%age,  state%nb_algae,
+     +  state%distance
       end subroutine write_state_attributes
 
       subroutine write_state_attributes_tofile(state)
@@ -362,7 +364,8 @@ c     --------------------------------------------------------------
 c      integer                              :: file
 c     --------------------------------------------------------------
 
-      write(79,*)  state%age,  state%nb_algae
+      write(79,*)  state%age,  state%nb_algae,
+     +   state%distance
       end subroutine write_state_attributes_tofile
 
 
@@ -386,17 +389,17 @@ c     --------------------------------------------------------------
       real,intent(out)                        :: mortality_rate
       logical,intent(out)                     :: die, next 
       real                                    :: xyz(3)
-      integer                                 :: stat
+      integer                                 :: stat,istat2
       integer                                 :: statud
       real                                    :: Mp   ! Particule mass
       real                                    :: Vp !Particule volume
-      real                                    :: rho_b=1388 !kg/m3
+      real                                    :: rho_b=1388. !kg/m3
       real                                    :: rnd(5)
       integer, parameter                      :: nmax = 4
       real                                    :: size(2**nmax)
       integer                                 :: icut, n, i
       real                                    :: l1,l2
-      real                                    :: Alg_v=2E-16  !!! [m3]
+      real                                    :: Alg_v=2.E-16  !!! [m3]
       real                                    :: Alg_m  !!! [kg]
       real                                    :: alg_death=4.5139E-6   ! death rate of algaes [1/s]
       real                                    :: phyto ! [Algae nb/m3] phytoplankton concentration that will be replaced by the actual concentration from copernicus
@@ -410,41 +413,72 @@ c     --------------------------------------------------------------
       real                                    :: grazing, P_volume
       real                                    :: respiration
       real                                    :: r_a! phytoplancton radius  [m]
-      real                                    :: B_A! encouter kernel rate
+      real                                    :: B_A! encouter kernel rate = collision frequency [m3/s]
       real                                    :: r_tot !!! radius of particle [m]
       integer                                 :: istat, julday
       real                                    :: K_cap !! carrying capacity on the plastic
-      real                                    :: Chl_a! =5E-6 ! [kgC/m3] phytoplankton concentration that will be replaced by the actual concentration from
+      real                                    :: Chl_a! =5E-6 ! [mg/m3] phytoplankton concentration that will be replaced by the actual concentration from
       real                                    :: v_active(3)
-      real                                    :: f_CA=2726E-15! [kg carbon/ cell] carbon/cell ration
+      real                                    :: f_CA=2726E-9! [kg carbon/ cell] carbon/cell ration
       real                                    :: pi=3.1415
-      real                                    :: Z ! depth
+      real                                    :: Z,t,p ! depth
       real                                    :: k=0.2 ! exctinction coeff of water
       real                                    :: teta, I_o , I_z ! depth
       real                                    :: alpha=0.12 ! intitial slope
       real                                    :: mu_max =1.85 ! maximal growth rate of algae [per day]
       real                                    :: Mu_tot,Mu_opt, day ! growth rate (total and optimal) (depend on the light and temperature [per day]
-      real                                    :: depth
-      real                                    :: B_Aa, B_Ab
-      real                                    :: carbon_tot
-      real                                    :: f_Chla_C  =0.03!ratio of the total organic carbon during exponential growth
-      real                                    :: geo(3)
+      real                                    :: depth,dist,I_max
+      real                                    :: B_Aa, B_Ab, resp
+      real                                    :: carbon_tot,k1(3)
+      real                                    :: f_Chla_C ! =0.03!ratio of the total organic carbon during exponential growth
+      real                                    :: geo(3),xy2(2),xy1(2)
+c      real                                    :: chla_m= 893.51e-6![kg_chla/mmol]
+      real                                    :: phyto_C,v(3)
+      real                                    :: I_opt=1.8e13
       type(clock),pointer                     :: current_time
+      integer                                  :: isec
+
+c ------------    get traveled distance --------------------------
+
+c       xy2(1)=xyz(1)
+c       xy2(2)=xyz(2)
       call get_tracer_position(space, xyz)
+c       xy1(1)=xyz(1)
+c       xy1(2)=xyz(2)
+c      call get_horizontal_distance(xy1, xy2, dist)
+c      state%distance=state%distance+dist
       call interpolate_chlorophyl(xyz, Chl_a, stat)
       call interpolate_temp(xyz,   temp,  istat)
       call get_active_velocity(state, space, v_active)
       depth            = xyz(3)
-c     --------------------------------------------------------------
-
-      state%age      = state%age + dt/86400
+      state%age      = state%age + dt/86400.
+c   ----- light ---
+      current_time => get_master_clock()
+      call get_julian_day(current_time, julday)
+      day            = 2.*pi*julday/365.-pi/2.
+      I_max          = 4.6*60.*60.*24.*((sin(day)+1.)*375.+ 100.)
+      p=(sin(day)+1.)*3./24.+ 9/24.
+      call get_second_in_day(current_time,isec)
+      t              = isec/(24.*60.*60.)
+      if (t<=p) then
+       I_o=I_max*sin(pi*t/p)
+      else
+       I_o=0
+      endif
+      I_z            = I_o*exp(k*depth)
       mortality_rate = 0.0! for the particle. not the biofouling organisms
 c     --------------- algae concentration parameters ---------------
       r_a            = (Alg_v*3/(4*3.14))**0.333
       Alg_m          = Alg_v*rho_b
-      carbon_tot     = Chl_a*1.0e-6/f_Chla_C! total organic carbon (carbon during exponential growth)
+c      phyto_C        = Chl_a*1.e-6*117.*12./(2.*14.)! use of chl because chla is declared as (diatoms+flagelates+cyanobacteria )*2
+c      carbon_tot     = Chl_a*chla_m/f_Chla_C! total organic carbon (carbon during exponential growth)
+      f_Chla_C       =0.003+1.0154*exp(0.050*temp)*
+     +                exp(-0.059*I_z*1.0e-6)
+c      write(*,*)  I_z,temp,f_Chla_C
+      carbon_tot     = Chl_a/f_Chla_C! total organic carbon (kg/m^3)
       phyto          = carbon_tot/f_CA ![cell/m3]
-c        write(*,*)   Chl_a,phyto
+c       phyto2          =phyto_C/f_CA
+c        write(*,*)  I_o
 c     --------------- if settlement of particles     ---------------
       if (state%age < settle_period_start) then
       die            = .false.
@@ -459,48 +493,43 @@ c     --------------- if settlement of particles     ---------------
       endif
 c     ---------------- calculate the biofilm growth ------------
 
-       K_cap         = P_surf*15 /(pi*r_a**2) ! maximum nb of algae per plastic
+       K_cap         = 15./(pi*r_a**2.) ! maximum nb of algae per m^2
        V_settling   = v_active(3)
-
 c ---------------- encounter -------------------------------
-       P_volume=state%nb_algae*Alg_v+PIV
-      r_tot=(3*P_volume/(4*pi))**0.333
-      B_Aa  = 3.14 * r_tot**2 *abs(V_settling) /2!settling collision frequency
-      B_Ab  =1.3 * shear * (r_tot + r_a)**3
+       P_volume=state%nb_algae*Alg_v*P_surf+PIV
+      r_tot=(3.*P_volume/(4.*pi))**0.333
+      B_Aa  = 3.14 * r_tot**2. *abs(V_settling) /2.!settling collision frequency
+      B_Ab  =1.3 * shear * (r_tot + r_a)**3.
       B_A   =B_Aa+B_Ab !kernel encounter rate= brownian + settling + shear
 c      write(*,*) "diff_p, B_A", diff_p, B_A, mydyn, r_tot
       encounter  = B_A * phyto
-c       write(*,*) state%nb_algae,P_volume,r_tot, B_Aa, B_Ab, B_A
-
+c       write(*,*) encounter
+c        write(*,*)   Chl_a,carbon_tot, phyto_C, phyto1, phyto2,
+c     +encounter
 c ----------------- Growth ---------------------------------
 c   ----- temp ---
-      teta       = 1.5**((temp-20)/10)
-c   ----- light ---
-      current_time => get_master_clock()
-       call get_julian_day(current_time, julday)
-      day        = 2*pi*julday/365+pi/2
-      I_o        = 2*(sin(day)+1)*375+ 100
-      I_z        = I_o*exp(k*depth)
-      Mu_opt     = mu_max*I_z* alpha/(alpha*I_z+mu_max)
-      Mu_tot     = Mu_opt*teta/(24*60*60)
+      teta       = 1.5**((temp-20.)/10.)
+      Mu_opt     = mu_max*I_z* alpha/(alpha*I_z+mu_max*
+     +              ((I_z/I_opt)-1.)**2.)
+      Mu_tot     = Mu_opt*teta/(24.*60.*60.)
       growth     = state%nb_algae * Mu_tot * (1-state%nb_algae/K_cap)!* G_max! growth on the plastic is proportional to the ambiant primary production
       grazing    = alg_death * state%nb_algae
-      state%nb_algae = state%nb_algae + encounter + growth
-     +                  - grazing! - respiration (don't want ton implement it now, primary production account for it already....)! da/dt [no/m2]
-c      write(*,*) encounter, growth, grazing
-c ----------------- biofouling general ----------------------
-c      state%nb_algae=state%nb_algae + dt/86400
-
-c      write(*,*) encounter, growth, grazing,state%nb_algae,
-c     +       state%biofouling_v , state%density
-c      write(*,*) state%density,Mp,state%P_volume, state%ESD
-c      call get_tracer_position(space,xyz)
-c      call interpolate_wdepth(xyz,cwd,status)
-      
-
+      resp       =(0.1*state%nb_algae* 2.**((temp-20.)/10.))
+     +          /(24.*60.*60.)
+      state%nb_algae = state%nb_algae + (encounter/P_surf + growth
+     +                  - grazing-resp)*dt!
+c       write(*,*)  encounter, growth, grazing, resp,
+c     +          state%nb_algae
+c -------------get distance traveled -----------------------
+c      call interpolate_currents(xyz,k1,istat2) ! real(3) in physical units
+c      v=k1+v_active
+c      Dist_h=sqrt(v(1)**2.0+v(2)**2.0)*dt
+c      Dist_v=v(3)*dt
+c      state%distance=state%distance+Dist_h
+c      write(*,*) v_active,k1, v,dt, Dist_h, state%distance
 c     ----------------------------------------
       end subroutine update_particle_state_
 
-
-
       end module
+
+

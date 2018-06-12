@@ -238,8 +238,8 @@ c     +                 (52.749*length_particle*1000.+12.691)
 c                v_active_mm=pi*g*(rho_tot-rho)*correction/
 c     +                      (1000.*rho*2.*V_kin)
              g_prim=g*(rho_tot-rho)/(rho*1000.0);
-             correction=2*radius_particle*1000.0*length_particle*1000.0/
-     +       ((52.749*length_particle*1000.0)+11.442)
+             correction=2*radius_particle*1000.0*length_particle*
+     +            1000.0/((52.749*length_particle*1000.0)+11.442)
              ws_khat=pi*g_prim*correction/(2*V_kin)
 
 
@@ -247,7 +247,7 @@ c                g_prim=g*(rho_tot-rho)/(rho*1000.0)
 c                correction=2.0*3.e-4*1000.0*0.1*1000.0/
 c     +              ((52.749*0.1*1000.0)+11.442)
 c                ws_khat=pi*g_prim*correction/(2.0*V_kin)
-             v_active(3)=ws_khat/1000
+             v_active(3)=ws_khat/1000.0
 c            write(*,*) ws_khat
             else
             write(*,*) "Settling law, not entered in Simpar"

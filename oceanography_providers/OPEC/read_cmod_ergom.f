@@ -41,7 +41,7 @@ c          alk(im,jm,km)  alkalinity                 unit == mmol/m3 (more preci
 c 
 c         ERGOM Derived variables:
 c          din(im,jm,km)  dissolved inorganic nitrogen unit == mmol/m3 (more precisely umol/kg)
-c          chl(im,jm,km)  chlorophyl                   unit == mmol/m3 (more precisely umol/kg) 
+c          chl(im,jm,km)  chlorophyl                   unit == mg-chl/m3. (apply conventional unit)
 c
 c         Unpacking of ERGOM buffers: 
 c            nh4(i,j,k)=eco(1,id3d(jm+1-j,i,k))/scale                
@@ -59,7 +59,8 @@ c            dic(i,j,k)=eco(12,id3d(jm+1-j,i,k))/scale
 c            alk(i,j,k)=eco(13,id3d(jm+1-j,i,k))/scale
 cc           --- set derived variables 
 c            din(i,j,k)=no3(i,j,k) + nh4(i,j,k)  
-c            chl(i,j,k)=2.0*(dia(i,j,k)+fla(i,j,k)+cya(i,j,k))   
+c            chl(i,j,k)=2.0*(dia(i,j,k)+fla(i,j,k)+cya(i,j,k))
+c            Note: For chlorophyll, the conversion factor is 2 mg-Chl/mmol-N (Neumann 2000). Hence, the unit of chl is mg-chl/m3.
 c
 c     changes: 
 c        May 2013: implemented format change in ERGOM data frames, adding more state variables; read test on data_sample2 OK
@@ -963,6 +964,7 @@ c     --- first handle derived properties
          call get_eco_3D(x1, iset, "dia")
          call get_eco_3D(x2, iset, "fla")
          call get_eco_3D(x3, iset, "cya")
+         ! The conversion factor is 2 mg-Chl/mmol-N (Neumann 2000). Hence, the unit of chla is mg-chl/m3.
          x = 2.0*(x1 + x2 + x3)
          deallocate( x1 )
          deallocate( x2 )

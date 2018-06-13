@@ -41,6 +41,12 @@ c     ------------ declarations ------------
       character*256 :: filename
       type(clock) :: aclock
       integer :: istat
+      real, external :: rho_UNESCO ! defiend in ooceanography_providers/generic_elements/water_density.f
+      real    :: pressure, rho, salt, temp
+      real, parameter  :: patm       = 1.01325    ! [bar] applied constant atmospheric pressure
+      real, parameter  :: g_x_Pa2bar = 9.81/1.e5 ! g * conversion from Pa to bar
+      real, parameter  :: rhow0      = 1027.0     ! [kg/m**3], applied constant water density for compressibility effects
+
       type(particle), pointer              :: this
 
 c     ------------   show time starts  ------------
@@ -85,22 +91,27 @@ c        -------- loop control       --------
 c         call set_clock_4i(aclock, year, month, day, second_of_day)
          call get_julian_day(current_time, julday)
          call get_second_in_day(current_time, isec)
-         if (mod(julday,7)==0 .and. isec == 30) then
+         if (mod(julday,1)==0 .and. isec == 30) then
            do i=1,last
 c            write(78,*) istep, julday, i, this%state%bio%nb_algae
 c            call write_state_attributes(par_ens%state_stack(i))
             call get_particle_position(get_particle(par_ens,i),xyz)
             call interpolate_wdepth(xyz,w_depth, istat)
+            call interpolate_temp(xyz,   temp,  istat)
+            call interpolate_salty(xyz,  salt,  istat)
+            pressure    = patm + g_x_Pa2bar*xyz(3)*rhow0   ! zeroth order approx., unit == bar
+            rho         = rho_UNESCO(salt,temp,pressure)   ! unit == kg/m**3
             write(72,*) istep,julday, i,
-     +          xyz,par_ens%state_stack(i)%bio%age,
-     +          par_ens%state_stack(i)%bio%nb_algae
+     +          xyz,w_depth, par_ens%state_stack(i)%bio%age,
+     +          par_ens%state_stack(i)%bio%nb_algae, istat,rho
            end do
          end if
          if (last>0) then
             call get_particle_position(get_particle(par_ens,1),xyz)
+            call interpolate_wdepth(xyz,w_depth, istat)
              this => get_particle(par_ens, 1)
 c            call write_state_attributes_tofile(par_ens%state_stack(1))
-            write(44,*) istep, julday, xyz, this%state%bio%age,
+            write(44,*) istep, julday, xyz,w_depth, this%state%bio%age,
      +          this%state%bio%nb_algae
          endif
 c        ---- quick way to dump e.g. vertical position of particles 1-10 for file fort.71        

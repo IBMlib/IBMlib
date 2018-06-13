@@ -95,7 +95,7 @@ c
       integer,parameter :: warn_and_continue = 1  ! print problem to stdout
       integer,parameter :: ignore_exceptions = 2  ! do nothing
 
-      integer :: checkstat_action = stop_execution  ! set this to change behavior
+      integer :: checkstat_action = warn_and_continue  ! set this to change behavior
 
       
 
@@ -835,7 +835,6 @@ c     -----------------------------------------------------
 
       call interpolate_wdepth(virpos, depth, istat)
       call checkstat(istat,"add_constrained_step:interpolate_wdepth")
-
       if (verbose>0) then
          write(*,*) "Vertical analysis begin: wdepth at virpos =", depth                   
       endif   
@@ -872,7 +871,7 @@ c.....check for and handle bottom crossing
 
          botenc  = .TRUE.
          if     (tracattr%bottomBC == BC_sticky) then
-            virpos(3)         = depth    ! place tracer at bottom --> but will fix particle since beginning of simulation
+            virpos(3)         = depth    ! place tracer at bottom
             tracattr%mobility = 0 ! freeze tracer to bottom
             tracattr%atbottom = .TRUE.
          elseif (tracattr%bottomBC == BC_reflect) then

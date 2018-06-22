@@ -165,9 +165,13 @@ c     ------------------------------------------
       real, intent(in) :: geo(:) 
       real             :: wd
       integer          :: status
-c     ------------------------------------------ 
-      call interpolate_wdepth(geo, wd, status) 
-      if (status==1) then     ! status = 1: horizontal range violation, set result = padval
+c     ------------------------------------------
+      call interpolate_wdepth(geo, wd, status)
+      if (status==3) then         ! status = 1: land point signalled
+         is_wet = .false.
+         status = 0               ! consider this situation as a normal lookup
+         return
+      elseif (status==1) then     ! status = 1: horizontal range violation, set result = padval
          is_wet = .true.
          return
       elseif (status==0) then ! status = 0: interior interpolation performed

@@ -1,0 +1,91 @@
+
+git clone https://github.com/IBMlib/IBMlib -b SRAAM
+git add ...
+git rm  ...
+git commit -m "message"
+git push https://github.com/IBMlib/IBMlib SRAAM
+git pull https://github.com/IBMlib/IBMlib SRAAM   # pull-in pushed stuff from remote
+
+# --- pull patches into FILES: 
+git fetch https://github.com/IBMlib/IBMlib SRAAM
+git checkout FETCH_HEAD -- <FILES>
+
+
+# ---------- create tagged versions ----------
+rm -f tmp/*
+GITTAG=`git log -1 --format="%H"`
+cp ibmrun_connect_bootHD.exe  tmp/ibmrun_connect_bootHD_${GITTAG}.exe
+cp ibmrun_connect_HBMdual.exe tmp/ibmrun_connect_HBMdual_${GITTAG}.exe
+cd tmp
+zip ../IBMrun_executables.zip *
+cd ..
+rm -f tmp/*
+
+--------------------------------------------------------------------------------------------------
+mingw  port fixes: 
+-------------------------------------------------------------------------------------------------
+
+rm -f compiler_defaults.mk; ln -s setups/compilers/gfortran/mingw_defaults.mk compiler_defaults.mk
+
+
+  ibmrun_connect_bootHD.exe : 
+  compiler_defaults.mk:    FCFLAGS += -fconvert=little-endian
+  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/ECOSMO_new/
+  
+
+  ibmrun_connect_HBM.exe    : 
+  compiler_defaults.mk:    FCFLAGS += -fconvert=big-endian
+  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/OPEC
+
+
+  ibmrun_connect_genericHD.exe    : 
+  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/BIMS-ECO
+
+CC=/usr/bin/x86_64-w64-mingw32-gcc
+AR=/usr/bin/x86_64-w64-mingw32-ar
+RANLIB=/usr/bin/x86_64-w64-mingw32-ranlib
+RC=/usr/bin/x86_64-w64-mingw32-windres
+
+libtime:  
+    cd libtime
+    tar xvfz libtime.tar.gz
+    ln -sf Makefile_adapted_mingw  Makefile  
+    cd ..
+  
+
+
+make ibmrun.exe > log  2>&1
+
+post-fix: 
+/usr/bin/x86_64-w64-mingw32-ranlib task.a
+/usr/bin/x86_64-w64-mingw32-ranlib particle_state.a
+/usr/bin/x86_64-w64-mingw32-ranlib physical_fields.a
+/usr/bin/x86_64-w64-mingw32-gfortran  -static grid_interpolations.o  runtime_tools.o string_tools.o  constants.o input_parser.o random_numbers.o time_tools.o libtime/libtime77.a  run_context.o output.o geometry.o polygons.o array_tools.o spline.o   task.a   particle_tracking.o particles.o particle_state.a   physical_fields.a          -o ibmrun.exe
+
+
+post-fix with NETCDF: 
+/usr/bin/x86_64-w64-mingw32-ranlib task.a
+/usr/bin/x86_64-w64-mingw32-ranlib particle_state.a
+/usr/bin/x86_64-w64-mingw32-ranlib physical_fields.a
+
+NETCDF=/home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows_64bit/mingw_netcdf/NETCDF
+/usr/bin/x86_64-w64-mingw32-gfortran  -static  -o ibmrun.exe  grid_interpolations.o  runtime_tools.o string_tools.o  constants.o input_parser.o random_numbers.o time_tools.o libtime/libtime77.a  run_context.o output.o geometry.o polygons.o array_tools.o spline.o   task.a   particle_tracking.o particles.o particle_state.a   physical_fields.a   -L${NETCDF}/lib   -lnetcdf -lnetcdff -lnetcdf -lnetcdff  -lnetcdf -lnetcdff 
+
+(NOTICE lib dublication at last !!)
+
+
+--------------------------------------------------------------------------------------------------
+ifort port fixes: 
+--------------------------------------------------------------------------------------------------
+
+rm -f compiler_defaults.mk; ln -s setups/compilers/ifort/compiler_defaults.mk
+
+
+ifort  grid_interpolations.o  runtime_tools.o  string_tools.o  constants.o input_parser.o random_numbers.o time_tools.o run_context.o output.o geometry.o polygons.o array_tools.o spline.o   particle_tracking.o particles.o  particle_state.a  task.a  physical_fields.a libtime/libtime77.a  -i4 -I/usr/local/include    -I/usr/local/include  -L/usr/local_intel/lib        -L/usr/local/lib -L/usr/lib -lnetcdff -lnetcdf  -lhdf5_hl -lhdf5 -lz  -o ibmrun  
+
+
+
+---------------------------- test cmds -------------------------------------
+
+cat simpar|l2w_EOL.py > simpar.txt
+rm -f ~/jj.zip; zip  ~/jj.zip  simpar.txt ibmrun.exe

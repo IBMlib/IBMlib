@@ -1,0 +1,27 @@
+! ================================================================================
+!                      COARDS compliant hydrography data
+! ================================================================================
+! 
+!   path to files with hydrographic files; windows user should add a trailing "\"
+!
+hydroDBpath            = /home/data/NCOM_NOAA_Caribia
+!
+!   Either all data in one file (hydrography_file) 
+!   or split in three files (current_file, temperature_file, salinity_file)
+!   
+hydrography_file    = NCOM_amseas_latest3d_bec1_fd79_ea18.nc
+!
+!  specify which variable names apply to each variable
+! 
+longitude_name    = longitude
+latitude_name     = latitude
+temperature_name  = water_temp
+salinity_name     = salinity
+u_name            = water_u
+v_name            = water_v
+!w_name            =   ! optional 
+!
+!  optinal user specified vertical/horizontal diffusivity
+! 
+horizontal_diffusivity = 50.0  ! optional: m2/s, default 1.e-9
+vertical_diffusivity   = 0.001 ! optional: m2/s, default 1.e-9

@@ -7,8 +7,8 @@
 #     
 ############################################################
 
-LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o BIMS-ECO_daily_mean.o
-#LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o ANONYMOUS_daily_mean.o
+#LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o BIMS-ECO_daily_mean.o
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o ANONYMOUS_daily_mean.o
 
 GENERIC_MESH = ../generic_elements
 

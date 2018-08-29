@@ -41,6 +41,11 @@ rm -f compiler_defaults.mk; ln -s setups/compilers/gfortran/mingw_defaults.mk co
   ibmrun_connect_genericHD.exe    : 
   config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/BIMS-ECO
 
+
+  ibmrun_connect_COARDS.exe    : 
+  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/COARDS_singlefile_simple
+
+
 CC=/usr/bin/x86_64-w64-mingw32-gcc
 AR=/usr/bin/x86_64-w64-mingw32-ar
 RANLIB=/usr/bin/x86_64-w64-mingw32-ranlib

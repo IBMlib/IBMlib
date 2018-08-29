@@ -148,15 +148,15 @@ c     ------------------------------------------
 c     --- provide primitive runtime linux/windows recognition, by allowing user to 
 c         supply path separator to hydroDBpath
 
-      lp      = len(path)
-      sbuf    = adjustr(path)
+      lp      = len(hydroDBpath)
+      sbuf    = adjustr(hydroDBpath)
       lastchr = sbuf(lp:lp)
       if     (lastchr == "/") then                  ! found explicit linux seperator
-         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+         hydroDBpath = trim(adjustl(hydroDBpath))          ! keep seperator as provided
       elseif (lastchr == "\") then                  ! found explicit windows seperator
-         hydroDBpath = trim(adjustl(path))          ! keep seperator as provided
+         hydroDBpath = trim(adjustl(hydroDBpath))          ! keep seperator as provided
       else
-         hydroDBpath = trim(adjustl(path)) // "/"   ! no separator, assume linux and prepend linux delimiter
+         hydroDBpath = trim(adjustl(hydroDBpath)) // "/"   ! no separator, assume linux and prepend linux delimiter
       endif
 
       write(*,*) "init_physical_fields: hydrographic database path =", 

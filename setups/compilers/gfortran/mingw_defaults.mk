@@ -25,7 +25,8 @@ export AR        = /usr/bin/x86_64-w64-mingw32-ar
 export RANLIB    = /usr/bin/x86_64-w64-mingw32-ranlib
 export NETCDF    = /home/asbjorn/DTU/Ballastvand_SRA/IBMlib_port_to_windows_64bit/mingw_netcdf/NETCDF
 
-# FCFLAGS += fconvert=big-endian   # for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
+#FCFLAGS += -fconvert=little-endian
+FCFLAGS += -fconvert=big-endian   # for the GNU compiler, everything incl main must be compiled with big-endian/little endian, per-file selection does not work
 
 MODDIRS = $(PHYSICAL_FIELDS_DIR) $(PARTICLE_STATE_DIR) $(TASK_DIR) $(OUTPUT_WRITER_DIRS) $(NETCDF)/include
 FCFLAGS += $(addprefix -I,$(MODDIRS))  

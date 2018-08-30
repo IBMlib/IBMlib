@@ -7,7 +7,10 @@ c     $LastChangedDate$
 c     $LastChangedBy$ 
 c
 c                                                      
-c                                                     
+c     TODO:
+c         in get_period_length_sec*, upgrade result to integer(8)  (integer4 span = 86 years)
+c         upgrade time library
+c      
 c     recompiled asbjorn(Aug2005)                    
 c     default scope public                          
 c                                                  

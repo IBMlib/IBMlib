@@ -80,9 +80,11 @@ c     =====================  main time loop =====================
          call update_physical_fields()
          istep = istep + 1
       enddo
-           
- 422  format(f8.3, 2x, 3f8.3, 2(2x,f8.3))
- 423  format(  a8, 2x,   a24, 2(2x,a8))     
+
+c      call dump_land_points("jj.ixiy")
+      
+ 422  format(f10.3, 2x, 3f10.3,      2(2x,f10.3))
+ 423  format(  a10, 2x, 10x,a10,10x, 2(2x,a10))     
 c
       call close_physical_fields()
       

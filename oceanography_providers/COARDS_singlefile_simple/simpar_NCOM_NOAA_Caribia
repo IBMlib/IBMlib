@@ -25,3 +25,17 @@ v_name            = water_v
 ! 
 horizontal_diffusivity = 50.0  ! optional: m2/s, default 1.e-9
 vertical_diffusivity   = 0.001 ! optional: m2/s, default 1.e-9
+!
+
+!-------------------------------------------------------------------
+!        Main simulation control file 
+!
+!        You also need to provide parameters that the other
+!        intefaces need
+!-------------------------------------------------------------------
+start_time           = 2017 06 10 0      !  year  month  day  second_of_day
+end_time             = 2017 06 10 20000  !  year  month  day  second_of_day
+particle_time_step   = 1800              !  seconds
+relative_depth       = 0.3               !  sampling depth (0=surf, 1=bottom)
+horizontal_pos       = 275.31 23.766     ! lon lat
+n_interpol_pts       = 100               ! print these number of points at vertical scan

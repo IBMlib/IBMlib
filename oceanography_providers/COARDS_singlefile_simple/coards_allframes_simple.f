@@ -1,18 +1,23 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c     ---------------------------------------------------
-c     COARDS like format with all frames in single file
-c     ---------------------------------------------------
+c     --------------------------------------------------------
+c     COARDS like format with all frames in single file(s)
+c     --------------------------------------------------------
 c
 c     Currently
-c         pick time frame closest to current time
-c         data on same and static vertical z-grid layer (no time varying sea surface elevation added)
-c         only physics
-c         assume all data on same grid and at same times
-c         only regular lon-lat is allowed horizontally
+c        * Pick time frame closest to current time
+c        * Grid is either in z-mode or sigma-mode   
+c        * Data on same and static vertical z/sigma-grid layer (no time varying sea surface elevation added)
+c        * Only physics
+c        * Assume all data on same grid and at same times
+c        * Only regular lon-lat is allowed horizontally
+c             
 c       
 c     NOTES: based on BIMS-ECO/POM_daily_mean.f
 c     TODO: add a input handle to allow flipping w (if present) to
 c           conform to IBMlib orientation (positive downward)
+c           add dynamic sea surface elevation, if present
+c           slim load (e.g. only currents)
+c           topography from currents rather than temperature
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
@@ -23,7 +28,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use run_context, only: simulation_file
       use time_services           ! import clock type and time handling
       use input_parser
-      use netcdf   ! use site installation
+      use coards_netcdf   ! 
 
       implicit none
       private     
@@ -47,6 +52,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: coast_line_intersection
       public :: get_pbi_version
 
+c      public :: dump_land_points ! non standard tmp
+      
 c     -------------------- module data --------------------  
       
       
@@ -54,7 +61,7 @@ c
 c     ------ data frame handler ------
       
       character*999              :: hydroDBpath ! hydrographic data sets (proper trailing separator will be added at read, if not provided)
-      type(clock)                :: time_offset ! 1970-01-01 00:00:00 - this is a particular to BIMS-ECO and should be removed from template ...
+      type(clock)                :: time_offset ! 
       
       
       character*(*), parameter   :: not_set_c = "none"     ! assume name conflict unlikely
@@ -67,21 +74,29 @@ c     ------ data frame handler ------
       integer                    :: ncid_salt    ! NetCDF file handler for salinity (possibly same as ncid )
       integer                    :: ncid_temp    ! NetCDF file handler for temperature (possibly same as ncid )        
       logical                    :: w_defined    ! vertical current available else set to zero
-      integer                    :: varid_u, varid_v, varid_w ! NetCDF varIDs for current components
-      integer                    :: varid_temp, varid_salt    ! NetCDF varIDs for temperature and salinity
+      type(coards_xyzt_variable) :: u_var        ! proxy var for easy loading/unpacking
+      type(coards_xyzt_variable) :: v_var        ! proxy var for easy loading/unpacking
+      type(coards_xyzt_variable) :: w_var        ! proxy var for easy loading/unpacking  
+      type(coards_xyzt_variable) :: t_var        ! proxy var for easy loading/unpacking 
+      type(coards_xyzt_variable) :: s_var        ! proxy var for easy loading/unpacking
                        
       real, parameter            :: molecular_diffusivity = 1.e-9    ! unit m2/s (lower limit on applied horizontal/vertical diffusivity)
       real                       :: constant_horiz_diffusivity       ! unit m2/s; 
       real                       :: constant_verti_diffusivity       ! unit m2/s; 
 
-      real, allocatable          :: ccdepth0(:) ! static vertical grid
+      logical                    :: zmode        ! grid mode toggle: TRUE : z-mode ... FALSE : sigma-mode 
+      real, allocatable          :: ccdepth0(:)  ! static vertical grid (z-mode)
+      real, allocatable          :: sigma(:)     ! sigma grid           (sigma-mode)
+      real, allocatable          :: wdepth0(:,:) ! static CC depths     (sigma-mode)
+      
 c
 c     ---------- time grid supported is a regularly spaced sequence described by these three parameters:
 c
-      integer                    :: time1          ! seconds since time offset of first time frame
-      integer                    :: dtime          ! time step between subsequent time frames
-      integer                    :: nt             ! number of time frames in data set       
-
+      integer                    :: time1             ! seconds since time offset of first time frame
+      integer                    :: dtime             ! time step between subsequent time frames
+      integer                    :: nt                ! number of time frames in data set       
+      integer                    :: sec_per_time_unit ! seconds per time unit in data set
+      
 c     --- units    ---    
  
 
@@ -98,7 +113,6 @@ c     ------------------------------------------
       character(len=len(hydroDBpath))  :: path
       character                        :: lastchr
       integer                          :: lp, varid
-      character*999                    :: toffstr
       integer                          :: year,month,day
       integer                          :: hour,minute,sec
       integer                          :: sec_of_day
@@ -132,32 +146,25 @@ c         supply path separator to hydroDBpath
 
       call open_data_files()  ! initializes netCDF handlers
       call reset_frame_handler()
-      call load_grid_desc()  ! invokes init_horiz_grid_transf
-      call init_mesh_grid(init_biogeochem = .false.)  ! allocate core arrays, currently no biogeochem
-      call init_topography() ! requires mesh_grid arrays are allocated
 
-
-c
-c     resolve the time offset for the time variable in the data set
-c     by parsing the attribute "time:units"
-c
-      call NetCDFcheck( nf90_inq_varid(ncid, "time", varid) )   ! fixed name
-      call NetCDFcheck( nf90_get_att(ncid, varid,                
-     +     "units", toffstr) )                                  ! retrieve time:units attribute
-      
-c      0...0....1....1....2....2....3
-c      1...5....0....5....0....5....0
-c     "seconds since 1970-01-01T00:00:00Z"
-c     "seconds since 1970-01-01 00:00:00"
- 711  format(14x,i4,5(1x,i2))
-
-      toffstr = adjustl(toffstr)
-      read(toffstr,711) year,month,day,hour,minute,sec
+      call resolve_time_parameters(ncid, "time", year, month, day, 
+     +                             hour, minute, sec, sec_per_time_unit)
+      write(*,*) "init_physical_fields: sec_per_time_unit=", 
+     +            sec_per_time_unit
       sec_of_day = 3600*hour + 60*minute + sec
       call set_clock(time_offset, year, month, day, sec_of_day) 
       write(*,*) "init_physical_fields: data time offset is"
       call write_clock(time_offset)
-    
+
+
+      call load_grid_desc()  ! invokes init_horiz_grid_transf, set zmode
+      call init_mesh_grid(init_biogeochem = .false.) ! allocate core arrays, currently no biogeochem
+      if (zmode) then
+         call init_topography_z()     ! requires mesh_grid arrays are allocated
+      else
+         call init_topography_sigma() ! requires mesh_grid arrays are allocated
+      endif
+
 
 c
 c     ---- currently no horizontal turbulent diffusivity in data set ----
@@ -261,30 +268,35 @@ c     assume grid is regular lon-lat oriented W->E, S->N
 c     invoke init_horiz_grid_transf
 c     root netCDF data set must be opened
 c     dimension and variable name of longitude and latitude must coinside
+c
+c     determine whether data is z or sigma vertically
+c     sigma grid is assumed, if a depth_file is found
 c     -------------------------------------------------------
       character*64         :: lon_name, lat_name ! assume long enough
-
+      character*999        :: fname ! assume long enough
       integer              :: dimid,varid,idum, gncid, ibuf(2)
       real                 :: lambda1, dlambda, phi1, dphi, rbuf(2) ! LOCAL DUMMIES
+      integer              :: iunit, ix, iy, nlines
+      real                 :: wd
 c     -------------------------------------------------------
       write(*,*) "load_grid_desc: loading grid from root data set"
 
       call read_control_data(simulation_file, "longitude_name", 
      +                       lon_name)
       call NetCDFcheck( nf90_inq_dimid(ncid, lon_name, dimid) )
-      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nx) )
+      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nx) )  ! resolve nx
 
       call read_control_data(simulation_file, "latitude_name", 
      +                       lat_name)
       call NetCDFcheck( nf90_inq_dimid(ncid, lat_name, dimid) )
-      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=ny) )
+      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=ny) )  ! resolve ny
 
 c     ---  only vertical dim/var name "depth" is recognized
       call NetCDFcheck( nf90_inq_dimid(ncid, "depth", dimid) )
-      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nz) )
+      call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nz) )  ! resolve nz
       
 c      
-c     --- probe horizontal grid descriptors from lon/lat arrays
+c     =======  probe horizontal grid descriptors from lon/lat arrays =======
 c
       
       call NetCDFcheck( nf90_inq_varid(ncid, lon_name, varid) )
@@ -305,12 +317,51 @@ c
       call init_horiz_grid_transf(lambda1, phi1, dlambda, dphi)
 
 c      
-c     --- assess vertical grid descriptor from depth arrays ---
+c     ======= assess vertical grid descriptor from depth arrays =======
 c   
-      allocate( ccdepth0(nz) )
-      call NetCDFcheck( nf90_inq_varid(ncid, "depth", varid) )
-      call NetCDFcheck( nf90_get_var(ncid, varid, ccdepth0))
-      write(*,241) "vertical", ccdepth0
+c     ---- set zmode: determine wheter data is sigma or z type by 
+c          asking for depth file ----
+
+      if (count_tags(simulation_file, "depth_file")/=0) then  ! initialize as sigma
+
+         zmode = .false.
+         write(*,255) "sigma"  
+c         
+         allocate( sigma(nz) )
+         call NetCDFcheck( nf90_inq_varid(ncid, "depth", varid) )
+         call NetCDFcheck( nf90_get_var(ncid, varid, sigma)) ! depth interpreted as sigma
+         write(*,241) "vertical sigma ", sigma
+c
+c     --- load depth file ---
+c
+         allocate( wdepth0(nx,ny) )
+         call read_control_data(simulation_file, "depth_file",
+     +                          fname)
+         write(*,261) trim(adjustl(fname)) 
+         call find_free_IO_unit(iunit)
+         open(iunit, file=fname, status='old')
+         nlines = 0
+         wdepth0 = 0.0  ! default dry, if no entries in depth_file
+         do 
+            read(iunit,*,end=345) ix,iy,wd
+            wdepth0(ix,iy) = wd
+            nlines = nlines + 1 
+         enddo 
+         write(*,265) nlines
+ 345     continue
+         close(iunit)
+
+      else   ! initialize as z mode
+
+         zmode = .true.
+         write(*,255) "z"      
+         allocate( ccdepth0(nz) )
+         call NetCDFcheck( nf90_inq_varid(ncid, "depth", varid) )
+         call NetCDFcheck( nf90_get_var(ncid, varid, ccdepth0)) ! depth interpreted as ccdepth0
+         write(*,241) "vertical z ", ccdepth0
+
+      endif
+      
 
   229 format(a,a)    
   231 format("load_grid_desc: 3d grid dim (nx,ny,nz) = ", i4,i4,i4)
@@ -320,9 +371,11 @@ c
      +                      " dphi    = ",f12.7," degrees")  
       
  241  format("load_grid_desc: static ", a, " grid = ", 999f9.3)
-
+ 255  format("load_grid_desc: grid type = ", a)
+ 261  format("load_grid_desc: reading depth data from ", a)
+ 265  format("load_grid_desc: found ", i, "depth points")
 c      
-c     --- assess time grid available (load it as integer)---
+c     ======= assess time grid available (load it as integer) =======
 c  
       call NetCDFcheck( nf90_inq_dimid(ncid, "time", dimid) )   ! fixed name
       call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nt) )
@@ -331,15 +384,18 @@ c
       time1 = ibuf(1)
       dtime = ibuf(2)-ibuf(1)   ! regular grid is assumed
       write(*,*) "load_grid_desc: data set contains", nt, "time frames"
-      write(*,*) "load_grid_desc: time resolution = ", dtime, "sec"
+c     --- sec_per_time_unit must be set ---
+      write(*,*) "load_grid_desc: time resolution = ", 
+     +            dtime*sec_per_time_unit, "sec"   
 
       end subroutine load_grid_desc
       
 
 
 
-      subroutine init_topography()
+      subroutine init_topography_z()
 c     ------------------------------------------------------------
+c     z-mode topography initialization
 c     Assess topography by probing first temperature frame  
 c     Set mesh_grid arrays (which are assumed initialized):
 c        wetmask      (static)
@@ -351,49 +407,16 @@ c     If dry points cannot be detected, all points are assumed wet
 c     ------------------------------------------------------------
       integer             :: dimid,varid,idum, gnci
       integer             :: ix,iy,iz,count4D(4),istat
-      real,allocatable    :: buffer(:,:,:), acc_width0(:)
+      real,allocatable    :: acc_width0(:)
       character*64        :: temp_name
       real                :: dry_val, landfrac, wetfrac, layerwidth 
 c     ------------------------------------------------------------
-      allocate( buffer(nx,ny,nz) )
-      count4D = (/nx,ny,nz,1/)
-      call read_control_data(simulation_file, "temperature_name", 
-     +                       temp_name)
-      call NetCDFcheck( nf90_inq_varid(ncid_temp, temp_name, varid) )
-      call NetCDFcheck( nf90_get_var(ncid_temp, varid, buffer,
-     +                       count=count4D))
-
-c
-c     check if we can retrieve a missing value attribute, otherwise assume
-c     nf90_fill_real is applied for dry points 
-c
-      istat = nf90_get_att(ncid_temp, varid,"missing_value", dry_val)  ! does possibly not exist
-      if (istat /= nf90_noerr) then
-          dry_val = nf90_fill_real  
-          write(*,*) "init_topography: warning: no missing_value "//
-     +         "in data set - assuming nf90_fill_real applies"
-       else
-          write(*,*) "init_topography: dry value identified"
-      endif
-      do ix = 1, nx
-         do iy = 1, ny
-            do iz = 1, nz
-               if (abs(buffer(ix,iy,iz))>0.999*abs(dry_val)) exit
-            enddo
-            bottom_layer(ix,iy) = iz-1   ! last wet layer in this column
-         enddo
-      enddo
-
-      where(bottom_layer > 0)
-         wetmask      = 1       ! wet
-      elsewhere
-         wetmask      = 0       ! dry
-      end where
+      call detect_topography(u_var, wetmask, bottom_layer)
       
       landfrac = 1.0 - 1.0*sum(wetmask)/nx/ny
       wetfrac  = 1.0*sum(bottom_layer)/nx/ny/nz
-      write(*,*) "init_topography: land fraction        = ", landfrac
-      write(*,*) "init_topography: wet volume fraction  = ", wetfrac
+      write(*,*) "init_topography_z: land fraction        = ", landfrac
+      write(*,*) "init_topography_z: wet volume fraction  = ", wetfrac
 c
 c     initialize dynamic 3D topographuc arrays ccdepth, acc_width and wdepth
 c     which are static for this PBI
@@ -414,10 +437,61 @@ c
          enddo
       enddo
 
-      deallocate( buffer )
       deallocate( acc_width0 )
 
-      end subroutine init_topography
+      end subroutine init_topography_z
+
+
+
+      subroutine init_topography_sigma()
+c     ------------------------------------------------------------
+c     sigma-mode topography initialization
+c     wdepth0 has already been loaded  
+c     Assess topography by probing first temperature frame  
+c     Set mesh_grid arrays (which are assumed initialized):
+c        wetmask      (static)
+c        bottom_layer (static)
+c        wdepth       (static)
+c        ccdepth      (static, no sea elevation)
+c        acc_width    (static, no sea elevation)
+c     If dry points cannot be detected, all points are assumed wet
+c     ------------------------------------------------------------
+      integer             :: dimid,varid,idum, gnci
+      integer             :: ix,iy,iz,count4D(4),istat
+      real,allocatable    :: acc_width0(:)
+      character*64        :: temp_name
+      real                :: dry_val, landfrac, wetfrac, layerwidth 
+c     ------------------------------------------------------------
+      call detect_topography(u_var, wetmask, bottom_layer)
+    
+      landfrac = 1.0 - 1.0*sum(wetmask)/nx/ny
+      wetfrac  = 1.0*sum(bottom_layer)/nx/ny/nz
+      write(*,*) "init_topography_sigma: land fraction    = ", landfrac
+      write(*,*) "init_topography_sigma: wet vol fraction = ", wetfrac
+c
+c     initialize dynamic 3D topographuc arrays ccdepth, acc_width and wdepth
+c     which are static for this PBI
+c  
+      allocate ( acc_width0(nz+1) )
+      acc_width0(1) = 0.0 
+      layerwidth    = 2*sigma(1)
+      acc_width0(2) = layerwidth    ! scaled depth
+      do iz = 2, nz
+         layerwidth = 2.0*(sigma(iz)-sigma(iz-1)) - layerwidth  ! scaled width
+         acc_width0(iz+1) = acc_width0(iz) + layerwidth         ! scaled depth
+      enddo
+ 
+      do ix = 1, nx
+         do iy = 1, ny
+            ccdepth(ix,iy,:)   = sigma*wdepth0(ix,iy)
+            acc_width(ix,iy,:) = acc_width0*wdepth0(ix,iy)
+            wdepth(ix,iy)      = wdepth0(ix,iy) 
+         enddo
+      enddo
+
+      deallocate( acc_width0 )
+
+      end subroutine init_topography_sigma
 
 
 
@@ -508,17 +582,17 @@ c     ----- resolve which variable names to look for in the netcdffile
 c           and retrieve the corresponding variable IDs
 
       call read_control_data(simulation_file, "u_name", varname)
-      call NetCDFcheck( nf90_inq_varid(ncid, varname, varid_u) )
-      write(*,362) "u", trim(varname), varid_u   
+      call attach_variable(u_var, varname, ncid)
+      write(*,362) "u", trim(varname) 
 c
       call read_control_data(simulation_file, "v_name", varname)
-      call NetCDFcheck( nf90_inq_varid(ncid, varname, varid_v) )
-      write(*,362) "v", trim(varname), varid_v
+      call attach_variable(v_var, varname, ncid)
+      write(*,362) "v", trim(varname)
 c     
       if (count_tags(simulation_file, "w_name")/=0) then
          call read_control_data(simulation_file, "w_name", varname)
-         call NetCDFcheck( nf90_inq_varid(ncid, varname, varid_w) )
-         write(*,362) "w", trim(varname), varid_v
+         call attach_variable(w_var, varname, ncid)
+         write(*,362) "w", trim(varname)
          w_defined = .true.
       else
          write(*,363) 
@@ -526,16 +600,15 @@ c
       endif
 c
       call read_control_data(simulation_file, "salinity_name", varname)
-      call NetCDFcheck( nf90_inq_varid(ncid_salt, varname, varid_salt))
-      write(*,362) "salinity", trim(varname), varid_salt
+      call attach_variable(s_var, varname, ncid_salt)
+      write(*,362) "salinity", trim(varname)
 c     
       call read_control_data(simulation_file, "temperature_name", 
      +                       varname)
-      call NetCDFcheck( nf90_inq_varid(ncid_temp, varname, varid_temp))
-      write(*,362) "temperature", trim(varname), varid_temp
+      call attach_variable(t_var, varname, ncid_temp)
+      write(*,362) "temperature", trim(varname)
 c  
- 362  format("open_data_files: varname for ", a," = ", a, 
-     +       " (varid=", i2, ")") 
+ 362  format("open_data_files: varname for ", a," = ", a) 
  363  format("open_data_files: w not available")
  
 
@@ -551,11 +624,12 @@ c     In case of exterior time points, the first/last frame will be applied
 c     ------------------------------------------------------------------------------------
       type(clock), intent(in) :: aclock
       integer, intent(out)    :: frame
-      integer                 :: numsec, it
+      integer                 :: numsec, it, numtics
       real                    :: t
 c     ------------------------------------------------------------------------------------
       call get_period_length_sec(time_offset, aclock, numsec)
-      it     = nint(1.0*(numsec-time1)/dtime) ! time grid 
+      numtics = numsec/sec_per_time_unit       ! integer division
+      it     = nint(1.0*(numtics-time1)/dtime) ! on time grid 
       if ((it < 1) .or. (it > nt)) then
          write(*,286) it
       endif
@@ -579,68 +653,44 @@ c     fortran index order opposite CDL dump order
 c     fortran: fastests index left most
 c     ------------------------------------------------------------------------------------
       integer, intent(in) :: frame
-      integer :: count4D(4), start4D(4)
 c     ------------------------------------------------------------------------------------ 
       write(*,*) "load_data_frame: loading frame ", frame
 
+      call load_xyz_frame_asreal(u_var, u, frame)
+      call load_xyz_frame_asreal(v_var, v, frame)
 
-c     -------------------- 3D frames ------------------------
-
-      start4D = (/1,1,1,frame/) 
-      count4D = (/nx,ny,nz, 1/) 
-      
-      
-c     ---- load u current component ---- 
-      call NetCDFcheck( nf90_get_var(ncid, varid_u, u,
-     +                  count=count4D, start=start4D) )
-      
-c     ---- load v current component ---- 
-      call NetCDFcheck( nf90_get_var(ncid, varid_v, v,
-     +                  count=count4D, start=start4D) )
-
-c     ---- load w current component (if present) ----
       if (w_defined) then
-          call NetCDFcheck( nf90_get_var(ncid, varid_w, w,
-     +        count=count4D, start=start4D) )
+         call load_xyz_frame_asreal(w_var, w, frame)
       else
           w = 0.  ! default
       endif
 
-c     ---- load temperature ----
-      call NetCDFcheck( nf90_get_var(ncid_temp, varid_temp, temp,
-     +                  count=count4D, start=start4D) )
+      call load_xyz_frame_asreal(t_var, temp, frame)
+      call load_xyz_frame_asreal(s_var, salinity, frame)
 
-c     ---- load salinity ---- 
-      call NetCDFcheck( nf90_get_var(ncid_salt, varid_salt, salinity,
-     +                  count=count4D, start=start4D) )
-      
 c     ------------ update state handlers ------------
       data_in_buffers = .true.
       cur_frame       = frame
 
       end subroutine load_data_frame
       
+      
 
 
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c     NetCDF auxillaries  
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-
-
-      subroutine NetCDFcheck(status)
-c     ------------------------------------------
-c     This subroutine supports the recommended reading 
-c     style of NetCDF4:
-c       call NetCDFcheck( nf90_get_var(ncid, varid, data_in) )
-c     Private to this module
-c     ------------------------------------------
-      integer, intent ( in) :: status
-    
-      if(status /= nf90_noerr) then 
-         print *, trim(nf90_strerror(status))
-         stop "NetCDFcheck:Stopped"
-      end if
-      end subroutine NetCDFcheck 
+      subroutine dump_land_points(fname)
+c     ------------------------------------
+c     for debugging
+c     ------------------------------------
+      character*(*) :: fname
+      integer       :: ix,iy
+      open(82, file=fname)
+      do ix=1,nx
+         do iy=1,ny
+            if (wetmask(ix,iy)==0) write(82,*) ix,iy
+         enddo
+      enddo
+      close(82)
+      end subroutine dump_land_points
 
 
 

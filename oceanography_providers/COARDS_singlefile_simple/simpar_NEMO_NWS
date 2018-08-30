@@ -4,14 +4,14 @@
 ! 
 !   path to files with hydrographic files; windows user should add a trailing "\"
 !
-hydroDBpath            = /home/data/NEMO_MedSea
+hydroDBpath            = /home/data/CMEMS/NWS/
 !
 !   Either all data in one file (hydrography_file) 
 !   or split in three files (current_file, temperature_file, salinity_file)
 !   
-current_file        =  sv03-med-ingv-cur-rean-d_1528702309049.nc
-temperature_file    =  sv03-med-ingv-tem-rean-d_1528702936527.nc
-salinity_file       =  sv03-med-ingv-sal-rean-d_1528702809386.nc
+current_file        =  MetO-NWS-PHYS-hi-TMB-CUR.nc
+temperature_file    =  MetO-NWS-PHYS-hi-TMB-TEM.nc
+salinity_file       =  MetO-NWS-PHYS-hi-TMB-SAL.nc
 !
 !  specify which variable names apply to each variable
 ! 
@@ -29,15 +29,19 @@ horizontal_diffusivity = 50.0  ! optional: m2/s, default 1.e-9
 vertical_diffusivity   = 0.001 ! optional: m2/s, default 1.e-9
 
 
+
+
+
 !-------------------------------------------------------------------
 !        Main simulation control file 
 !
 !        You also need to provide parameters that the other
 !        intefaces need
 !-------------------------------------------------------------------
-start_time           = 2012 01 02 0  !  year  month  day  second_of_day
-end_time             = 2012 01 04 0  !  year  month  day  second_of_day
+
+start_time           = 2017 06 29 0  !  year  month  day  second_of_day
+end_time             = 2017 06 30 0  !  year  month  day  second_of_day
 particle_time_step   = 1800              !  seconds
 relative_depth       = 0.3               !  sampling depth (0=surf, 1=bottom)
-horizontal_pos       = 10.26 38.63       ! lon lat
+horizontal_pos       = 5 55              ! lon lat
 n_interpol_pts       = 100               ! print these number of points at vertical scan

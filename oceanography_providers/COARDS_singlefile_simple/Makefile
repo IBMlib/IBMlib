@@ -7,7 +7,7 @@
 #     
 ############################################################
 
-LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_allframes_simple.o
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o coards_allframes_simple.o
 
 GENERIC_MESH = ../generic_elements
 
@@ -33,7 +33,8 @@ time_services.f:
 mesh_grid.f:
 	ln -sf $(GENERIC_MESH)/mesh_grid.f  # same name
 
-
+coards_netcdf.f:
+	ln -sf $(GENERIC_MESH)/coards_netcdf.f  # same name
 
 include $(COMMON_RULES) # shared information between makefiles
 FCFLAGS += -I/usr/local/include   # should contain netcdf.mod

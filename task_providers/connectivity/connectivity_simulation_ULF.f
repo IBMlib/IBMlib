@@ -61,8 +61,8 @@ c     ------------ declarations ------------
 
 c     ------ for windows debugging bind stdout/stderr to specific files (non portable) ------
 
-      open(0, file="stderr.txt")
-      open(6, file="stdout.txt")
+      open(0, file="stderr.txt")           ! comment to allow shell redirection of stderr
+c      open(6, file="stdout.txt")          ! comment to allow shell redirection of stdout
 
 c     ------------   show time starts  ------------
       call init_run_context()

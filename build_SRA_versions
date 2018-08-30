@@ -35,7 +35,7 @@ rm -f compiler_defaults.mk; ln -s setups/compilers/gfortran/mingw_defaults.mk co
 
   ibmrun_connect_HBM.exe    : 
   compiler_defaults.mk:    FCFLAGS += -fconvert=big-endian
-  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/OPEC
+  config.mk:               PHYSICAL_FIELDS_DIR = $(IBMLIB_DIR)/oceanography_providers/OPEC_dual_grid
 
 
   ibmrun_connect_genericHD.exe    : 

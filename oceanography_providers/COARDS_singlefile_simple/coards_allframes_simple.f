@@ -228,7 +228,9 @@ c     ------------------------------------------
       call close_horiz_grid_transf()
 c     --- local cleanup ---
       call close_data_files()
-      deallocate( ccdepth0 )
+      if (allocated(ccdepth0)) deallocate(ccdepth0)
+      if (allocated(sigma))    deallocate(sigma)
+      if (allocated(wdepth0))  deallocate(wdepth0)
 c     ------------------------------------------
       end subroutine 
 
@@ -346,9 +348,8 @@ c
             read(iunit,*,end=345) ix,iy,wd
             wdepth0(ix,iy) = wd
             nlines = nlines + 1 
-         enddo 
-         write(*,265) nlines
- 345     continue
+         enddo
+ 345     write(*,265) nlines
          close(iunit)
 
       else   ! initialize as z mode
@@ -373,7 +374,7 @@ c
  241  format("load_grid_desc: static ", a, " grid = ", 999f9.3)
  255  format("load_grid_desc: grid type = ", a)
  261  format("load_grid_desc: reading depth data from ", a)
- 265  format("load_grid_desc: found ", i, "depth points")
+ 265  format("load_grid_desc: found ", i, " depth points")
 c      
 c     ======= assess time grid available (load it as integer) =======
 c  

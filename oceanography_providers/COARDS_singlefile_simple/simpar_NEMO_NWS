@@ -12,6 +12,7 @@ hydroDBpath            = /home/data/CMEMS/NWS/
 current_file        =  MetO-NWS-PHYS-hi-TMB-CUR.nc
 temperature_file    =  MetO-NWS-PHYS-hi-TMB-TEM.nc
 salinity_file       =  MetO-NWS-PHYS-hi-TMB-SAL.nc
+depth_file          =  oceanography_providers/COARDS_singlefile_simple/tools/wd.ixiy
 !
 !  specify which variable names apply to each variable
 ! 

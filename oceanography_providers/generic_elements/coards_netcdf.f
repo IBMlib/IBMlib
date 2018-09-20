@@ -55,7 +55,7 @@ c     -----------------------------------------------------------------
       character*(*), intent(in)   :: time_vname
       integer, intent(out)        :: year,month,day,hour,minute,sec
       integer, intent(out)        :: tunit ! number of seconds per time unit
-      integer                     :: varid,ihyph
+      integer                     :: varid,ihyph,it
       character*999               :: toffstr, text, date, time
       integer                     :: start(99), nwords
 c     -----------------------------------------------------------------
@@ -67,12 +67,22 @@ c
       call NetCDFcheck( nf90_get_att(ncid, varid, "units", toffstr) )   ! retrieve time:units attribute
       
 c     --------- known variants ---------
-c     "seconds since 1970-01-01T00:00:00Z"
-c     "seconds since 1970-01-01 00:00:00"
-c     "hours since 2014-04-01 01:00:00"
-c     "seconds since 2014-4-1 00:00:00
+c     1) "seconds since 1970-01-01T00:00:00Z"
+c     2) "seconds since 1970-01-01 00:00:00"
+c     3) "hours since 2014-04-01 01:00:00"
+c     4) "seconds since 2014-4-1 00:00:00"
 
       call tokenize(toffstr, start, nwords) ! in string_tools.f
+      if (nwords == 3) then     ! assume variant 1) above
+         it = index(toffstr, "T")
+         if (it<1) then
+            write(*,*) "resolve_time_parameters: nwords==3, but no T"
+            write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
+         endif
+         toffstr(it:it) = " "      ! remove "T" for easier parsing below
+         call tokenize(toffstr, start, nwords) ! reparse, robust toward spaces
+      endif
+      
       if (nwords /= 4) then
          write(*,*) "resolve_time_parameters: unable to parse unit attr"
          write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
@@ -103,24 +113,26 @@ c     --- check "since" is next word ---
          stop
       endif
 c     --- capture offset date ---
-      date = toffstr(start(3):start(4)-1)   ! 2014-04-01 or 2014-4-1 
-     
-      read(date, 708, err=833) year                  !
+      date = toffstr(start(3):start(4)-1)   ! like 2014-04-01 or 2014-4-1 
+      read(date, 708, err=832) year         !
       ihyph = index(date, "-", back=.true.) ! last "-" in date token
-      read(date(6:ihyph-1), *, err=833) month 
-      read(date(ihyph+1:), *, err=833)  day
+      read(date(6:ihyph-1), *, err=832) month 
+      read(date(ihyph+1:),  *, err=832) day
 c     --- capture offset time-in-day ---      
       time = toffstr(start(4):)
-      time = toffstr(start(4):)
       read(time, 711, err=833) hour,minute,sec
- 708  format(i4)        ! 4 digit year expected
- 711  format(3(i2,1x))          ! match known time variants
+ 708  format(i4)             ! 4 digit year expected
+ 711  format(i2,1x,i2,1x,i2) ! match known time variants
       
       return
       
- 833  write(*,*) "resolve_time_parameters: error parsing datetime"
+ 832  write(*,*) "resolve_time_parameters: error parsing offset date"
+      write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
+      stop     
+ 833  write(*,*) "resolve_time_parameters: error parsing offset time"
       write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
       stop
+      
       end subroutine resolve_time_parameters
 
 

@@ -55,8 +55,8 @@ c     -----------------------------------------------------------------
       character*(*), intent(in)   :: time_vname
       integer, intent(out)        :: year,month,day,hour,minute,sec
       integer, intent(out)        :: tunit ! number of seconds per time unit
-      integer                     :: varid
-      character*999               :: toffstr, text
+      integer                     :: varid,ihyph
+      character*999               :: toffstr, text, date, time
       integer                     :: start(99), nwords
 c     -----------------------------------------------------------------
 c
@@ -70,11 +70,10 @@ c     --------- known variants ---------
 c     "seconds since 1970-01-01T00:00:00Z"
 c     "seconds since 1970-01-01 00:00:00"
 c     "hours since 2014-04-01 01:00:00"
-c          
- 711  format(i4,5(1x,i2))  ! match known variants
+c     "seconds since 2014-4-1 00:00:00
 
       call tokenize(toffstr, start, nwords) ! in string_tools.f
-      if (nwords<3) then
+      if (nwords /= 4) then
          write(*,*) "resolve_time_parameters: unable to parse unit attr"
          write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
          stop
@@ -103,10 +102,25 @@ c     --- check "since" is next word ---
          write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
          stop
       endif
-c     --- capture time offset ---
-      text    = toffstr(start(3):) 
-      read(text,711) year,month,day,hour,minute,sec
-
+c     --- capture offset date ---
+      date = toffstr(start(3):start(4)-1)   ! 2014-04-01 or 2014-4-1 
+     
+      read(date, 708, err=833) year                  !
+      ihyph = index(date, "-", back=.true.) ! last "-" in date token
+      read(date(6:ihyph-1), *, err=833) month 
+      read(date(ihyph+1:), *, err=833)  day
+c     --- capture offset time-in-day ---      
+      time = toffstr(start(4):)
+      time = toffstr(start(4):)
+      read(time, 711, err=833) hour,minute,sec
+ 708  format(i4)        ! 4 digit year expected
+ 711  format(3(i2,1x))          ! match known time variants
+      
+      return
+      
+ 833  write(*,*) "resolve_time_parameters: error parsing datetime"
+      write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
+      stop
       end subroutine resolve_time_parameters
 
 

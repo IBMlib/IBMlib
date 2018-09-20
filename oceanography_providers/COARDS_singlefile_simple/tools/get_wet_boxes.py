@@ -65,7 +65,7 @@ ny_sub = len(range(ny0,ny1,nsp))
 print "# nxsub,nysub= %d %d" % (nx_sub,   ny_sub)
 print "# SW-corner=   %f %f" % (lon0_sub, lat0_sub)
 print "# dlonlat=     %f %f" % (dlon_sub, dlat_sub)
-
+print "# x0         y0         x1       y1       ix(offset0) iy(offset0)" 
 # ---- sub grid scan on native grid ----
 for ix in range(nx0,nx1,nsp):     # fill grid scannx0,ny0 = map(nint, get_grid_coor(lonmin,latmin))
     for iy in range(ny0,ny1,nsp): # fill grid scan

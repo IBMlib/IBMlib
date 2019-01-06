@@ -53,8 +53,27 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_salty   
 
 c      public :: interpolate_wind    ! currently unused
-c      public :: interpolate_zooplankton
+c     public :: interpolate_zooplankton
+      
+c     ---- currently not implemented ----
+      
+      public :: interpolate_zooplankton
+      public :: interpolate_oxygen
+      public :: interpolate_nh4                       
+      public :: interpolate_no3                       
+      public :: interpolate_po4                        
+      public :: interpolate_diatoms                   
+      public :: interpolate_flagellates                 
+      public :: interpolate_cyanobacteria              
+      public :: interpolate_organic_detritus                   
+      public :: interpolate_part_org_matter 
+      public :: interpolate_DIC 
+      public :: interpolate_alkalinity  
+      public :: interpolate_DIN    
+      public :: interpolate_chlorophyl  
+c      
 
+      
 
       public :: interpolate_wdepth
       public :: is_wet    

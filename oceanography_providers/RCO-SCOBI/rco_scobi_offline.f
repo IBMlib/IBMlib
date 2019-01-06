@@ -580,7 +580,8 @@ c     --------------------------------------------------------------------------
       write(*,411) year, month, day, hour, minute, second
       write(*,412) NSNAPS
 
- 411  format("skip_header: reading header for time frame",i4,5(":",i2))
+ 411  format("skip_header: reading header for frame ",
+     +     i4, 2("-",i2.2), "  ", 3(":",i2.2))
  412  format("skip_header: time frame contains",1x,i8,1x,"data layers")     
       end subroutine skip_header
 

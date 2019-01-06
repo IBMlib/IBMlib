@@ -1,0 +1,4 @@
+hydroDBpath            = /home/data/RCO-Scobi_test
+horizontal_diffusivity = 100   ! m2/s - optional
+vertical_diffusivity   = 0.001 ! m2/s - optional
+

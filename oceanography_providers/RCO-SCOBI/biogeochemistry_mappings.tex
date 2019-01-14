@@ -1,0 +1,53 @@
+\documentstyle{article}
+\begin{document}
+
+\begin{itemize}
+   \item Redfield molar stoichiometry :   C:N:P == 106:16:1 \newline
+         Redfield weight ratio        :   C:N:P == 41:7:1   \newline
+         Ref: Redfield A.C., On the proportions of organic derivations in sea water and their relation to the composition of plankton.
+         In James Johnstone Memorial Volume. (ed. R.J. Daniel). University Press of Liverpool, pp. 176–192, 1934.
+         Redfield, A.C., The biological control of chemical factors in the environment, American Scientist, 1958
+   \item Zooplankton DW/WW mass $\sim$ 0.19 \newline
+         Ref: Makoto Omori, Marine Biology, May 1969, Volume 3, Issue 1, pp 4–10
+         "33 species of zooplankton distributed predominantly in the open sea region of the North Pacific. 
+         Sampling covered the waters from 44N to the equator. Average percentage of dry weight to wet weight was about 19 \% of all samples from the whole area"
+   \item Zooplankton carbon weight content $\sim$ 0.4 x DW \newline
+         Ref: J.A. Lindley D.B. Robins R. Williams ,Journal of Plankton Research Vol.21 no.11 pp.2053–2066,  1999
+   \item Birds: CC(g) = 0.1807 x FW(g) = 0.4571 x DW(g)  \newline 
+         Ref: Journal of Experimental Marine Biology and Ecology 481:41-48, 2016
+   \item For chlorophyll, the conversion factor is 2 mg-Chl = mmol-N (Neumann 2000). 
+   \item Cell proxy relation: 1 mg-N $\sim$ 1/8 mg-CHL\newline 
+         Ref:Yentsch, Charles S.; Vaccaro, Ralph F., Phytoplankton Nitrogen in the Oceans, Limnology and Oceanography, 
+         1958, Volume 3, Issue 4, pp. 443-448\newline 
+         1mmol-N = 14 mg-N $\sim$ 14/8 mg-CHL $\sim$ 2 mg-CHL
+   \item Converting ml/l to mmol/m3: 1 ml/l = 44.65948 mmol/m3\newline
+         \begin{verbatim}
+real, parameter :: O2_g_per_L   =  1.42905                       ! USGS, Office of Water Quality Technical Memorandum 2011.03
+real, parameter :: O2_g_per_mol = 15.9994*2                      ! standard atomic weight
+real, parameter :: mll_2_mmolm3 = 1.e3 * O2_g_per_L/O2_g_per_mol ! derived factor for converting ml/l    -> mmol/m3 
+         \end{verbatim}
+         Ref: Office of Water Quality Technical Memorandum 2011.03, Change to Solubility Equations for Oxygen in Water
+\end{itemize}
+
+\begin{tabular}{|c|c|c|c|c|} \hline
+interpolate\_X & RCO-SCOBI       & RCO-SCOBI                &  IBMlib      & conversion factor \\ 
+               & unit            &  parameter key \#        &  unit        & RCO-SCOBI $\rightarrow$ IBMlib) \\ \hline \hline
+zooplankton    & mgC/m3          & 10                       &  kg DW/m3    & 1e-6/0.4  \\ \hline
+diatoms        & mgCHL/m3        & 11                       &  mmol/m3     & 0.5       \\ \hline   
+flagellates    & mgCHL/m3        & 12                       &  mmol/m3     & 0.5       \\ \hline    
+cyanobacteria  & mgCHL/m3        & 13                       &  mmol/m3     & 0.5       \\ \hline    
+organic\_detritus & mgC/m3       & 14                       &  mmolN/m3    & 12*16/106 \\ \hline 
+ammonimum      & mmolN/m3        & 15                       &  mmol/m3     & 1         \\ \hline
+nitrate        & mmolN/m3        & 16                       &  mmol/m3     & 1         \\ \hline     
+phosphate      & mmolP/m3        & 17                       &  mmol/m3     & 1         \\ \hline        
+oxygen         & ml/l            & 18                       &  mmol/m3     & 1e3*1.42905/15.9994/2   \\ \hline
+POM            & NA              & NA                       &  mmolN/m3     & NA     \\ \hline   
+DIC            & NA              & NA                       &  mmolN/m3     & NA     \\ \hline   
+alkalinity     & NA              & NA                       &  mmolN/m3     & NA     \\ \hline   
+DIN            & NA              & NA                       &  mmolN/m3     & NA     \\ \hline   
+chlorophyl     & NA              & NA                       &  mgCHL/m3    & 1*(\#11+\#12+\#13) \\ \hline   
+\end{tabular}
+
+\end{document}
+
+-------------------------------------------------------------------------------------------

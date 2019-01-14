@@ -13,11 +13,11 @@ c     specific ordering
 c
 c     API implementation based on pseudo fortran code fragments provided
 c     by SMHI (see format_snap.txt)
-c  
+c
+c     Unit conversions: see note biogeochemistry_mappings.tex
+c      
 c     TODO:
 c       interpolate_currents: w + RCO flux conservation scheme
-c       convert potential temperature (provided) to physical temperature
-c       load biogeochem
 c       load diffusivity  
 c 
 c     NOTES: 
@@ -53,10 +53,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: interpolate_salty   
 
 c      public :: interpolate_wind    ! currently unused
-c     public :: interpolate_zooplankton
-      
-c     ---- currently not implemented ----
-      
+     
       public :: interpolate_zooplankton
       public :: interpolate_oxygen
       public :: interpolate_nh4                       
@@ -72,9 +69,6 @@ c     ---- currently not implemented ----
       public :: interpolate_DIN    
       public :: interpolate_chlorophyl  
 c      
-
-      
-
       public :: interpolate_wdepth
       public :: is_wet    
       public :: is_land
@@ -90,6 +84,7 @@ c     ------ data frame handler ------
       
       character*999              :: hydroDBpath ! hydrographic data sets (proper trailing separator will be added at read, if not provided)
       
+      logical                    :: include_bio  = .true. ! handle to control whether biodata is read (physics is always read)     
       integer, parameter         :: tag_lenght  = 10   ! 
       character*(*), parameter   :: not_set_c = "none" ! assume name conflict unlikely
       integer, parameter         :: not_set_i = -9999
@@ -103,7 +98,6 @@ c     ------ data frame handler ------
       real                       :: constant_horiz_diffusivity       ! unit m2/s; negative => load data from data set
       real                       :: constant_vertic_diffusivity      ! unit m2/s; negative => load data from data set
 c     --- 3D grids ---
-      real, allocatable          :: zoobuf(:,:,:)  ! buffer for adding micro+meso zooplankton 
       real,allocatable,target    :: ccdepth0(:,:,:)   ! reference cell center depth water below surface [m] (dslm=0)
       real,allocatable,target    :: acc_width0(:,:,:) ! accumulated water above this undisturbed layer [m] dim=nz+
 c     --- 2D grids ---    
@@ -112,7 +106,13 @@ c     --- 2D grids ---
 c     --- 1D grids ---
   
 c     --- units    ---    
- 
+      real, parameter :: O2_g_per_L    = 1.42905  ! USGS, Office of Water Quality Technical Memorandum 2011.03
+      real, parameter :: O2_g_per_mol  = 31.9988  ! standard atomic weight
+      real, parameter :: mll_2_mmolm3  = 1.e3 * O2_g_per_L/O2_g_per_mol ! derived factor for converting ml/l    -> mmol/m3
+      real, parameter :: mgCHL_2_mmolN = 0.5      ! Yentsch 1958/Neumann 2000
+      real, parameter :: mgC_2_mmolN   = 1.8113   ! 12*16/106, Redfield 1958
+      real, parameter :: mgC_2_kgDW    = 2.5e-06  !  1e-6/0.4, Lindley 1999
+      
       include "CERES_setup.h"
 c     ===================================================
                             contains
@@ -156,6 +156,20 @@ c         supply path separator to hydroDBpath
       write(*,*) "init_physical_fields: hydrographic database path =", 
      +           trim(adjustl(hydroDBpath)) 
 
+      if (count_tags(simulation_file, "include_biogeochem") /= 0) then
+         call read_control_data(simulation_file,"include_biogeochem",
+     +                       include_bio)
+      else 
+         include_bio = .true. ! set runtime default
+      endif
+
+      if (include_bio) then
+         write(*,*) "init_physical_fields: including biogeochemistry"
+      else
+         write(*,*) "init_physical_fields: omitting biogeochemistry"
+      endif
+
+
       if (present(time)) then
          call resolve_tag_from_time(time, tag)
       else
@@ -166,10 +180,8 @@ c         supply path separator to hydroDBpath
       call reset_frame_handler()
       call open_data_files(tag)
       call load_grid()  ! invokes init_horiz_grid_transf
-      call init_mesh_grid(init_biogeochem = .false.)  ! allocate core arrays, currently no biogeochem
+      call init_mesh_grid(init_biogeochem = include_bio)  ! allocate core arrays
       call load_topography() ! requires mesh_grid arrays are allocated
-
-      allocate( zoobuf(nx, ny, nz) )
      
 c
 c     ---- currently no horizontal turbulent diffusivity in data set ----
@@ -245,7 +257,6 @@ c     ------------------------------------------
       call reset_frame_handler()
       call close_horiz_grid_transf()
 c     --- local cleanup ---
-      deallocate( zoobuf   )
       deallocate( wdepth0  )
       deallocate( kmu      )
 c     ------------------------------------------
@@ -598,9 +609,29 @@ c     --------------------------------------------------------------------------
       integer, allocatable :: ispvar(:), isplev(:) 
       real*4, allocatable  :: rd1d(:,:), rd2d(:,:), snap1d(:)
       integer  :: check_dslm
-      integer  :: check_u(nz_expect), check_v(nz_expect)
+c     automatic arrays     
+      integer  :: check_u(nz_expect), check_v(nz_expect)        
       integer  :: check_temp(nz_expect), check_salinity(nz_expect)
+      integer  :: check_zooplankton(nz_expect)    
+      integer  :: check_diatoms(nz_expect)          
+      integer  :: check_flagellates(nz_expect)       
+      integer  :: check_cyano(nz_expect)
+      integer  :: check_orgdetri(nz_expect)
+      integer  :: check_ammonimum(nz_expect)      
+      integer  :: check_nitrate(nz_expect)            
+      integer  :: check_phosphate(nz_expect)            
+      integer  :: check_oxygen(nz_expect)         
+      
       real     :: dz
+      real, allocatable :: p_approx(:,:,:), b(:,:,:), c(:,:,:)
+      real, parameter :: a1 =  1.067610e-5   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a2 = -1.434297e-6   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a3 = -7.566349e-9   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a4 = -8.535585e-6   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a5 =  3.074672e-8   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a6 =  1.918639e-8   ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: a7 =  1.788718e-10  ! J. Atmos. Oceanic Technol., 20, 730-741, table A1
+      real, parameter :: rhoref = 1025.0     ! kg/m3 - for approx pressure calc
 c     ------------------------------------------------------------------------------------
       call skip_header(nsnaps,nlen) ! after rewind
       write(*,*) "load_data_frame: loading frame ", cur_tag
@@ -630,6 +661,15 @@ c
       check_v        = 0
       check_temp     = 0
       check_salinity = 0
+      check_zooplankton = 0     ! -> zoo
+      check_diatoms     = 0     ! -> diatoms     
+      check_flagellates = 0     ! -> flagellates  
+      check_cyano       = 0     ! -> cyanobacteria
+      check_orgdetri    = 0     ! -> organic_detritus
+      check_ammonimum   = 0     ! -> nh4
+      check_nitrate     = 0     ! -> no3       
+      check_phosphate   = 0     ! -> po4      
+      check_oxygen      = 0     ! -> oxygen
 c      
       !     Loop over the fields or until we found everything we want.
       do iv = 1, nsnaps
@@ -638,7 +678,7 @@ c
          vlen = ird             ! Number of active points in this field.
          if (vlen.gt.0) then
             read(iunit_data) snap1d(1:vlen)
-c     write(*,332) ispvar(iv), isplev(iv), vlen
+c           write(*,332) ispvar(iv), isplev(iv), vlen
          else
             cycle 
          endif
@@ -669,8 +709,56 @@ c     write(*,332) ispvar(iv), isplev(iv), vlen
             call unpack_snap_data(snap1d(1:vlen),iz,kmu,v(:,:,iz))   
             check_v(iz) = 1
          endif
-         
-      enddo
+c        ----- parse biogeochemistry, if enabled
+         if (include_bio) then
+            if     (ispvar(iv) == levnum_zoo) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            zoo(:,:,iz))
+               check_zooplankton(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_diat) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            diatoms(:,:,iz))
+               check_diatoms(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_flag) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            flagellates(:,:,iz))
+               check_flagellates(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_cyan) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            cyanobacteria(:,:,iz))
+               check_cyano(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_orgd) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            organic_detritus(:,:,iz))
+               check_orgdetri(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_ammo) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            nh4(:,:,iz))
+               check_ammonimum(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_nit) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            no3(:,:,iz))
+               check_nitrate(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_phos) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            po4(:,:,iz))
+               check_phosphate(iz) = 1
+               
+            elseif (ispvar(iv) == levnum_oxy) then
+               call unpack_snap_data(snap1d(1:vlen),iz,bottom_layer,
+     +                            oxygen(:,:,iz))
+               check_oxygen(iz) = 1
+               
+            endif ! ispvar
+         endif    ! include_bio
+      enddo       ! iv = 1, nsnaps
 c
       if (check_dslm /= 1) then
          write(*,*) "load_data_frame: dslm not found"
@@ -696,6 +784,59 @@ c
          write(*,*) "load_data_frame: check_v = ", check_v
          stop 126
       endif
+      if (include_bio) then
+         if (sum(check_zooplankton) /= nz_expect) then
+            write(*,*) "load_data_frame: temp frames missing"
+            write(*,*) "load_data_frame: check_temp = ", check_temp
+            stop 151
+         endif
+         if (sum(check_diatoms)     /= nz_expect) then
+            write(*,*) "load_data_frame: diatom frames missing"
+            write(*,*) "load_data_frame: check_diatoms = ",
+     +                  check_diatoms
+            stop 152
+         endif  
+         if (sum(check_flagellates) /= nz_expect) then
+            write(*,*) "load_data_frame: flagellate frames missing"
+            write(*,*) "load_data_frame: check_flagellates = ",
+     +                 check_flagellates
+            stop 153
+         endif     
+         if (sum(check_cyano)       /= nz_expect) then
+            write(*,*) "load_data_frame: cyano frames missing"
+            write(*,*) "load_data_frame: check_cyano = ", check_cyano
+            stop 154
+         endif
+         if (sum(check_orgdetri)    /= nz_expect) then
+            write(*,*) "load_data_frame: organic detri frames missing"
+            write(*,*) "load_data_frame: check_orgdetri = ",
+     +                  check_orgdetri
+            stop 155
+         endif
+         if (sum(check_ammonimum)   /= nz_expect) then
+            write(*,*) "load_data_frame: ammonimum frames missing"
+            write(*,*) "load_data_frame: check_ammonimum = ",
+     +                  check_ammonimum
+            stop 156
+         endif  
+         if (sum(check_nitrate)     /= nz_expect) then
+            write(*,*) "load_data_frame: nitrate frames missing"
+            write(*,*) "load_data_frame: check_nitrate = ",
+     +                  check_nitrate
+            stop 157
+         endif  
+         if (sum(check_phosphate)   /= nz_expect) then
+            write(*,*) "load_data_frame: phosphate frames missing"
+            write(*,*) "load_data_frame: check_phosphate = ",
+     +                  check_phosphate
+            stop 158
+         endif  
+         if (sum(check_oxygen)      /= nz_expect) then
+            write(*,*) "load_data_frame: oxygen frames missing"
+            write(*,*) "load_data_frame: check_oxygen = ", check_oxygen
+            stop 159
+         endif    
+      endif   ! include_bio
       
 c     ------ generate auxillary wet point descriptors
 c            ccdepth/acc_width already initialized
@@ -711,14 +852,48 @@ c
             ccdepth(ix,iy,2:)   = ccdepth0(ix,iy,2:)   + dz       
          enddo
       enddo
-      
+
+c
+c     ---- apply approximate correction to potential temperature
+c          to get physical in situ temperature, based on McDougall 2003, J. Atmos. Oceanic Technol., 20, 730-741. 
+c          p_approx is approximate pressure at CC points, based on a ref density of water
+c          accurate to within a few per cent; it would be slightly more accurate to
+c          generate real pressure, using EOS in McDougall 2003 integrating downward using acc_width      
+c      
+      allocate( p_approx(nx,ny,nz) )
+      allocate( b(nx,ny,nz) )
+      allocate( c(nx,ny,nz) )
+      p_approx = 9.82*rhoref*ccdepth ! pressure unit = Pa
+      p_approx = p_approx / 1.0e4 ! Pa -> dbar
+c
+      b = 1.0 + p_approx*(a4 + a5*salinity + a7*p_approx)
+      c = temp - p_approx*(a1 + a2*salinity + a3*p_approx)
+      temp = c/b        ! limit of Eq A3 in McDougall 2003, solved wrt. temp
+c    
+      deallocate( p_approx ) 
+      deallocate( b )
+      deallocate( c ) 
 c
 c     ---- enforce exact consistency between acc_width(:,:,nz+1) and wdepth 
 c          (there are numerical diffs of order 10^-5)
 c
       acc_width(:,:,nz+1) = wdepth 
-
-
+c
+c     ---- biogeochemistry transformations, if enabled
+c
+c     ammonimum,nitrate,phosphate are already in mmol/m3
+c     uncovered biogeochemistry fields are left unset
+c
+      if (include_bio) then
+         chlorophyl       = diatoms + flagellates + cyanobacteria ! loaded in units mgCHL/m3
+         zoo              = zoo*mgC_2_kgDW                        ! mgC/m3   ->  kg DW/m3        
+         diatoms          = diatoms*mgCHL_2_mmolN                 ! mgCHL/m3 ->  mmolN/m3    
+         flagellates      = flagellates*mgCHL_2_mmolN             ! mgCHL/m3 ->  mmolN/m3    
+         cyanobacteria    = cyanobacteria*mgCHL_2_mmolN           ! mgCHL/m3 ->  mmolN/m3
+         organic_detritus = organic_detritus*mgC_2_mmolN          ! mgC/m3   ->  mmolN/m3
+         oxygen           = oxygen*mll_2_mmolm3                   ! ml/l     ->  mmol/m3       
+      endif
+      
 c     ------------ update state handlers ------------
       
       data_in_buffers = .true.

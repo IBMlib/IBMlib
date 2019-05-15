@@ -1,0 +1,260 @@
+General description of the file format of snap files from RCO-Scobi.
+
+
+The file type is unformatted Fortran file written in big endian byte
+order.  All values are written as real*4 or real*8 even if the natural
+type is integer.
+
+The numbers in the file names are the date and time for which the data
+in the file is valid.  The format is yyyymmddhh.
+
+The following code can be used to read the file.  It is not complete
+but meant for understanding the format.  It can of course be used as a
+skeleton for a read routine.
+
+
+
+integer itt, km, nt, imt, jmt, nlen, nsnaps
+integer year, month, day, hour, minute, second
+real*8  dx, dy, stlon, stlat, dtts, snapd, totsec
+
+integer, allocatable :: ispvar(:), isplev(:), kmt(:,:), kmu(:,:)
+
+real*4  ird, ird2, ird3, ird4
+real*8  ird0,ird20,ird30,ird40
+real*4, allocatable :: rd1d(:,:), rd2d(:,:)
+
+open(unit=11,file=filename,status='old',form='unformatted', action='read')
+
+read(11) ird
+itt = ird      ! Running number of timesteps in the model.  Ignore!
+read(11) ird
+km = ird       ! Number of levels for 3D-fields.
+read(11) ird
+nt = ird       ! Number of tracers in snapfile.  Ignore!
+read(11) ird
+imt = ird      ! Number of points along a parallel (x or i direction).
+read(11) ird
+jmt = ird      ! Number of points along a meridian (y or j direction).
+read(11) ird
+NLEN = ird     ! Maximum number of active points in any field/level.
+               ! Can be used for array allocation.
+read(11) ird
+NSNAPS = ird   ! Number of fields in this file where 3d-fields are counted as
+               ! the number of levels they contain.
+read(11) ird
+year = ird     ! year, month, day, hour, minute and second for which the fields
+read(11) ird   ! in this file are valid.
+month = ird
+read(11) ird
+day = ird
+read(11) ird
+hour = ird
+read(11) ird
+minute = ird
+read(11) ird
+second = ird
+
+read(11) ird0,ird20,ird30
+dtts = ird0    ! Timestep in seconds used in the model.  Ignore!
+totsec = ird20 ! Number of seconds since an "unknown" reference date.  The
+               ! reference date is set at compile time of the model and
+               ! can be different for different runs.  If needed, calculate
+               ! the reference date from the date of the first file and the
+               ! value in the first file, otherwise ignore.
+snapd = ird30  ! Number of days between snap-files.  This can be used to find
+               ! the date for the file name of the next file to open.
+
+read(11) dx, dy, dxdeg, dydeg
+! dx      Distance between data points in cm along a parallel.
+! dy      Distance between data points in cm along a meridian.
+! dxdeg   Step in longitude between data points in degrees.
+! dydeg   Step in latitude between data points in degrees.
+
+read(11) stlon, stlat
+! stlon   Longitude of reference point.  Explained below.
+! stlat   Latitude of reference point.  Explained below.
+
+allocate(rd1d(nsnaps,2))
+allocate(ispvar(nsnaps))
+allocate(isplev(nsnaps))
+read(11) rd1d(1:nsnaps,1), rd1d(1:nsnaps,2)
+do i=1,NSNAPS
+   ispvar(i) = rd1d(i,1)  ! Array of parameter numbers.
+   isplev(i) = rd1d(i,2)  ! Array of levels.
+enddo
+
+allocate(rd2d(imt,jmt)
+allocate(kmt(imt,jmt)
+read(11) rd2d(1:imt,1:jmt)
+do i=1,imt
+   do j=1,jmt
+      kmt(i,j) = rd2d(i,j)  ! Number of levels in each grid cell on t-grid.
+   enddo
+enddo
+
+! Calculate number of levels on u-grid.
+allocate(kmu(imt,jmt))
+kmu(:,:) = 0
+do i=1,imt-1
+   do j=1,jmt-1
+      kmu(i,j)=min(kmt(i,j),kmt(i+1,j),kmt(i,j+1),kmt(i+1,j+1))
+   enddo
+enddo
+
+
+allocate(snap1d(nlen))
+
+! Loop over the fields or until we found everything we want.
+do iv = 1, nsnaps
+   ! Reading parameter ispvar(iv), level isplev(iv)
+
+   read(11) ird
+   vlen = ird       ! Number of active points in this field.
+   if (vlen.gt.0) then
+      read(11) snap1d(1:vlen)
+   endif
+
+   ! Unpack into 2d-array if this field is wanted.
+   jj = 0
+   if (this parameter is stored on a t-grid) then
+      ! t-grid
+      do j=1,jmt
+         do i=1,imt
+            if(kmt(i,j).ge.isplev(iv)) then
+               jj=jj+1
+               field(i,j)=snap1d(jj)
+            else
+               field(i,j)=dry_value
+            endif
+         enddo
+      enddo
+   else
+      ! u-grid
+      do j=1,jmt
+         do i=1,imt
+            if(kmu(i,j).ge.isplev(iv)) then
+               jj=jj+1
+               field(i,j)=snap1d(jj)
+            else
+               field(i,j)=dry_value
+            endif
+         enddo
+      enddo
+   endif
+enddo
+
+close(11)
+
+
+The fields have the point with index 1,1 in the south west corner.
+
+There are two different kinds of grid, t-grid and u-grid.  For the
+t-grid, the reference point would have index 0.5,0.5, i.e., it is
+0.5*dxdeg west of and 0.5*dydeg south of the grids most southwesterly
+point.  For u-grid the reference point would have index 0,0, i.e., it
+is dxdeg west of and dydeg south of the grids most southwesterly
+point.  The spacing between points in the grid is for both grids dxdeg
+and dydeg.
+
+There are two ways to know if a field is on a t-grid or u-grid.  One
+is to get information from elsewhere.  The other is to check the value
+of vlen against the expected number of active points for this level.
+Generally most values are on t-grid but transports, such as currents,
+are on u-grid.
+
+The interpretation of the parameter number might vary between
+different setups of the model even though the basic set remains the
+same.  You should get the relevant list together with the files.  This
+list should also contain information on type of grid for each
+parameter.
+
+Levels increases downwards, i.e., level 1 is the surface.  2D-fields
+have level set to 1.  The thickness of the layers can be different for
+different setups of the model.  The following is some of the more
+common ones.
+
+If km = 83 then all levels are 3 m thick.
+
+If km = 41 then 
+
+      dz( 1)=   3.0
+      dz( 2)=   3.0
+      dz( 3)=   3.0
+      dz( 4)=   3.0
+      dz( 5)=   3.0
+      dz( 6)=   3.0
+      dz( 7)=   3.0
+      dz( 8)=   3.0
+      dz( 9)=   3.0
+      dz(10)=   3.0
+      dz(11)=   3.0
+      dz(12)=   3.0
+      dz(13)=   3.0
+      dz(14)=   3.007080
+      dz(15)=   3.063581
+      dz(16)=   3.175872
+      dz(17)=   3.342542
+      dz(18)=   3.561495
+      dz(19)=   3.829976
+      dz(20)=   4.144610
+      dz(21)=   4.501440
+      dz(22)=   4.895979
+      dz(23)=   5.323265
+      dz(24)=   5.777925
+      dz(25)=   6.254241
+      dz(26)=   6.746222
+      dz(27)=   7.247683
+      dz(28)=   7.752317
+      dz(29)=   8.253778
+      dz(30)=   8.745760
+      dz(31)=   9.222075
+      dz(32)=   9.676735
+      dz(33)=   10.10402
+      dz(34)=   10.49856
+      dz(35)=   10.85539
+      dz(36)=   11.17002
+      dz(37)=   11.43851
+      dz(38)=   11.65746
+      dz(39)=   11.82413
+      dz(40)=   11.93642
+      dz(41)=   11.99292
+      
+=====================================================================
+On Fri, 2018-07-06 at 12:06 +0000, Asbjørn Christensen wrote:
+> Q1: layer (level) 1 is denoted as "surface": but is data vertically
+> vertex-centered
+>     (so layer 1 corresponds to 0 meter depth, layer 2 corresponds to 3
+> meter depth etc)
+>     OR layer centered
+>     (so layer 1 corresponds to 1.5 meter depth, layer 2 corresponds to
+> 4.5 meter depth etc)
+
+Layer 1 corresponds to 0 -- 3 m or you could say 1.5 m.
+Layer 2 corresponds to 3 -- 6 m or 4.5 m.
+
+If we should be really picky, then layer 1 is 0 -- 3+ssh m,
+layer 2 3+ssh -- 6+ssh and so on.
+    
+> Q2: it seems that RCO-SCOBI has a sea surface elevation field; what is
+> the positive orientation of this?
+>     and should we add this to the surface layer or bottom layer to
+> have a correct depth association of
+>     RCO-SCOBI snaps.
+
+The sea surface height (parameter 1) should be added to the surface
+layer.  Positive means higher sea surface height.
+
+
+> Q3: has Stokes-drift from wave motion been added to the currents?
+
+No.
+
+
+You also asked about the parameter list.  I've attached a file with that
+information.  The number in the comment at the end of the line is the
+parameter number you find in the files.  The boolean values are true if
+the parameter is defined on a t-grid and false for u-grid.  As you can
+see it is only currents that are on a u-grid.
+
+/Anders

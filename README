@@ -91,3 +91,10 @@ at the command line. You can then edit files config.mk and compiler_defaults.mk 
 
  to generate the user guide IBMlib_manual.pdf
  
+ An anthology of selected works using IBMlib along with framework design considerations is avaliable in this 
+ open access reference:
+ 
+    A. Christensen,P. Mariani, M. R. Payne:
+    A generic framework for individual-based modelling and physical-biological interaction
+    PLoS ONE 13(1) 2018: e0189956. https://doi.org/10.1371/journal.pone.0189956
+ 

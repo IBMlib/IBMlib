@@ -222,6 +222,57 @@ c     ------------------------------------------------
       end subroutine add_seconds_to_clock
 
 
+      
+      subroutine add_hours_to_clock(aclock, hours)
+c     ------------------------------------------------
+c     Works for both positive and negative increments hours
+c     time_add includes a time normalization
+c     ------------------------------------------------
+      type(clock) :: aclock
+      integer     :: old_date(7), hours
+      integer     :: dt(7)
+c     ------------------------------------------------
+      old_date = aclock%date
+      dt    = 0
+      dt(3) = hours
+      call time_add(old_date, dt, aclock%date)
+      end subroutine add_hours_to_clock
+
+
+      subroutine add_days_to_clock(aclock, days)
+c     ------------------------------------------------
+c     Works for both positive and negative increments days
+c     time_add includes a time normalization
+c     ------------------------------------------------
+      type(clock) :: aclock
+      integer     :: old_date(7), days
+      integer     :: dt(7)
+c     ------------------------------------------------
+      old_date = aclock%date
+      dt    = 0
+      dt(2) = days
+      call time_add(old_date, dt, aclock%date)
+      end subroutine add_days_to_clock
+      
+
+      
+      subroutine add_years_to_clock(aclock, years)
+c     ------------------------------------------------
+c     Works for both positive and negative increments years
+c     time_add includes a time normalization
+c     ------------------------------------------------
+      type(clock) :: aclock
+      integer     :: old_date(7), years
+      integer     :: dt(7)
+c     ------------------------------------------------
+      old_date = aclock%date
+      dt    = 0
+      dt(1) = years
+      call time_add(old_date, dt, aclock%date)
+      end subroutine add_years_to_clock
+
+      
+
       integer function get_POSIXtime(aclock)
 c     ------------------------------------------------
 c     Converts a clock to POSIX (UNIX) time by doing 

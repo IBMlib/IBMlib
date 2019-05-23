@@ -238,7 +238,7 @@ c
       integer              :: varid, ndims, dimids(99),xtype
       character*256        :: name1,name2
       integer              :: len1,len2, lonid, latid,istat
-      integer              :: dry_int, nremap
+      integer              :: dry_int, nremap,ix,iy
       real                 :: dry_real
       real, allocatable    :: lon(:), lat(:), rbuf(:,:)
       logical, allocatable :: native_mask(:,:)
@@ -398,12 +398,16 @@ c
 c     post process normalized mask, generate/nullify remap
 c
       if (cast_mode == "nearest_valid") then
-         nremap = count(.not.grid%mask)
-         if (nremap<1)
-     +        call NetCDFstop("grid contains only invalid points")
-         allocate( grid%remap(4,nremap) )
-         call set_remap_nearest_valid(grid%mask, grid%remap)
-         grid%mask = .true.     ! overwrite loaded mask
+         nremap = count(.not.grid%mask)  ! number of points to remap
+         if (nremap == (grid%nx*grid%nx)) then
+            call NetCDFstop("grid contains only invalid points") ! we can't fix this
+         elseif (nremap == 0) then ! all points are valid, signal no remapping
+            nullify (grid%remap)   ! implies grid%mask == .true. everywhere
+         else                      ! in this case some point need remapping
+            allocate( grid%remap(4,nremap) )
+            call set_remap_nearest_valid(grid%mask, grid%remap)
+            grid%mask = .true.     ! overwrite loaded mask
+         endif
       elseif (cast_mode == "native") then
          nullify (grid%remap)   ! signal no remapping, keep loaded mask
       else
@@ -769,9 +773,9 @@ c     status = 0: interior interpolation performed
 c     status = 1: horizontal range violation, attempt extrapolation (superseedes status == 3 if both applies)
 c     status = 3: rank deficit situation, set result = padval
 c     -----------------------------------------------------------------     
-      real, intent(in)                      :: geo(:)
+      real, intent(in)                      :: geo(:)  ! only geo(1:2) is assessed
       type(coards_xyt_variable), intent(in) :: xyt
-      integer, intent(in)                   :: deriv ! 0=value; deriv = (1,2) gives derivative wrt (x,y) 
+      integer, intent(in)                   :: deriv   ! 0=value; deriv = (1,2) gives derivative wrt (x,y) 
       real, intent(out)                     :: result
       integer, intent(out)                  :: status
       real, parameter                       :: padval = 0.0

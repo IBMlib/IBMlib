@@ -7,7 +7,10 @@
 # ----------------------------------------------------------------
 
 verbose = False
-from Scientific.IO.NetCDF import *
+
+import  netCDF4 as netcdf
+#depricated netcdf API:   from Scientific.IO.NetCDF import *  depricated
+
 from numpy  import *
 from string import * # aqquire split
 import os
@@ -111,9 +114,9 @@ class TransportMatrix:
         # Compartible with fortran module connectivity 
         # ---------------------------------------------
         if fname is not None:
-            f = NetCDFFile( os.path.join(thisdir, fname), "r")
-            self.tmat = f.variables['tmat'].getValue()                   # [ntime,ndest,nsource]
-            self.time = f.variables['time'].getValue().tolist()          # [ntime] - make index() available by list cast
+            f = netcdf.Dataset( os.path.join(thisdir, fname), "r")   # netCDF4 API
+            self.tmat = f.variables['tmat'][:]                       # [ntime,ndest,nsource]   netCDF4 API
+            self.time = f.variables['time'][:].tolist()              # [ntime] - make index() available by list cast  netCDF4 API
             f.close()
             assert len(self.time) == len(self.tmat)
         
@@ -325,7 +328,7 @@ class BoxSet(list):
     #    tags[ibx]:  optional tag for box ibx (default is "")
     #    bbox:       minimal bounding box for box set as (SWlon, SWlat, NElon, NElat)
     # ========================================================== 
-    def __init__(self, fname):
+    def __init__(self, fname=None):
         # ---------------------------------------------------
         # File fname contains lines of lon-lat box corners
         #   SWlon, SWlat, NElon, NElat [,tag]
@@ -333,20 +336,41 @@ class BoxSet(list):
         # boxes; tag is optional, any elements after tag are ignored
         # Minimal bounding box is generated during initialization
         # ---------------------------------------------------
+        if fname is not None:  # argument provided
+            f = open(fname, "r")
+            self.tags = []
+            self.bbox = _init_bbox
+            for line in f.readlines():
+                items = line.split()
+                self.append(map(float, items[:4]))
+                if len(items)>4: # ignore 5+ elements
+                    self.tags.append(items[4]) # keep as string
+                else:
+                    self.tags.append("")
+                self.bbox = get_common_bbox(self.bbox, self[-1])
+            f.close()
+            
+    def create_boxes_from_points(self, fname, dlon, dlat):
+        # ---------------------------------------------------
+        # create box set from file with center points
+        # with box size (dlon, dlat)
+        # ---------------------------------------------------
         f = open(fname, "r")
+        dx = 0.5*dlon   # half box width
+        dy = 0.5*dlat   # half box height
         self.tags = []
         self.bbox = _init_bbox
         for line in f.readlines():
             items = line.split()
-            self.append(map(float, items[:4]))
-            if len(items)>4: # ignore 5+ elements
-                self.tags.append(items[4]) # keep as string
+            x,y = map(float, items[:2])
+            self.append([x-dx, y-dy, x+dx, y+dy])
+            if len(items)>2: # ignore 5+ elements
+                self.tags.append(items[2]) # keep as string
             else:
                 self.tags.append("")
             self.bbox = get_common_bbox(self.bbox, self[-1])
         f.close()
-
-	
+        
     def get_groups(self, tagmap = lambda x:x):
 	# ---------------------------------------------------
         # Return a mapping of lon-lat boxes

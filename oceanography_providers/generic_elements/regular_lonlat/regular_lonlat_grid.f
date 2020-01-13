@@ -97,12 +97,12 @@ c     ------- error codes/messages shared betweem grids/data
       integer, parameter :: err_reglonlat_inconsisty         = 5
       
       character(len=256), parameter :: err_msg_reglonlat(0:5)= (/
-     +     "successful query / operation",                     !  error 0
-     +     "horizontal range violation (result = padval)",     !  error 1
-     +     "vertical range violation (result = padval)",       !  error 2
-     +     "dry point / rank deficit situation for operation", !  error 3
-     +     "runtime error (arrays not initialized)",           !  error 4
-     +     "internal inconsistency"/)                          !  error 5
+     +     "successful query / operation                    ",   !  error 0
+     +     "horizontal range violation (result = padval)    ",   !  error 1
+     +     "vertical range violation (result = padval)      ",   !  error 2
+     +     "dry point / rank deficit situation for operation",   !  error 3
+     +     "runtime error (arrays not initialized)          ",   !  error 4
+     +     "internal inconsistency                          "/)  !  error 5
       
 c     ===================================================
       contains

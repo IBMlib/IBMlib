@@ -95,7 +95,7 @@ c
       integer,parameter :: warn_and_continue = 1  ! print problem to stdout
       integer,parameter :: ignore_exceptions = 2  ! do nothing
 
-      integer :: checkstat_action = stop_execution  ! set this to change behavior
+      integer :: checkstat_action = ignore_exceptions  ! set this to change behavior
 
       
 

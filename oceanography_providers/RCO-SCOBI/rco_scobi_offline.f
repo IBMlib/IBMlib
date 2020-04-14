@@ -836,7 +836,19 @@ c
             write(*,*) "load_data_frame: check_oxygen = ", check_oxygen
             stop 159
          endif    
-      endif   ! include_bio
+      endif                     ! include_bio
+
+c
+c     ------ convert from RCO-SCOBI units to IBMlib units for physics
+c            dslm:   RCO-SCOBI [cm]   -> IBMlib [m], same orientation
+c            u,v,w : RCO-SCOBI [cm/s] -> IBMlib [m/s], same orientation
+c            temp: same unit (but conversion from potential to physical temperature below)
+c            salinity: same unit 
+c
+      dslm = dslm*0.01
+      u    = u*0.01
+      v    = v*0.01
+      w    = w*0.01        ! not loaded, but anyway, in case it comes later
       
 c     ------ generate auxillary wet point descriptors
 c            ccdepth/acc_width already initialized

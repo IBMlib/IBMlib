@@ -92,10 +92,10 @@ c     ------ data frame handler ------
 c
 c     ---------- time grid supported is a regularly spaced sequence described by these three parameters:
 c
-      integer                    :: time1             ! seconds since time offset of first time frame
-      integer                    :: dtime             ! time step between subsequent time frames
+      integer                    :: time1             ! time since offset of first time frame (in data set time unit) 
+      integer                    :: dtime             ! time step between subsequent time frames (in data set time unit) 
       integer                    :: nt                ! number of time frames in data set       
-      integer                    :: sec_per_time_unit ! seconds per time unit in data set
+      integer                    :: sec_per_time_unit ! seconds per time unit of data set
       
 c     --- units    ---    
  
@@ -620,17 +620,18 @@ c
       subroutine resolve_corresp_frame(aclock, frame)
 c     ------------------------------------------------------------------------------------
 c     Resolve which time frame (1 <= frame <= nt) to use in data set corresponding to aclock
-c     based on time grid descriptors (time1, dtime, nt) resolved at initialization
+c     based on time grid descriptors (time1, dtime, nt) resolved at initialization.
+c     Use cell centered time association, so nearest time point on grid is applied      
 c     In case of exterior time points, the first/last frame will be applied
 c     ------------------------------------------------------------------------------------
       type(clock), intent(in) :: aclock
       integer, intent(out)    :: frame
-      integer                 :: numsec, it, numtics
-      real                    :: t
+      integer                 :: numsec, it
+      real                    :: t, numtics
 c     ------------------------------------------------------------------------------------
       call get_period_length_sec(time_offset, aclock, numsec)
-      numtics = numsec/sec_per_time_unit       ! integer division
-      it     = nint(1.0*(numtics-time1)/dtime) ! on time grid 
+      numtics = 1.0*numsec/sec_per_time_unit    ! time distance to offset in data set time unit
+      it      = 1 + nint((numtics-time1)/dtime) ! on time grid 
       if ((it < 1) .or. (it > nt)) then
          write(*,286) it
       endif

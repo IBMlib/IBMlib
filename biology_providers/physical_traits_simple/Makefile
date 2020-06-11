@@ -1,8 +1,9 @@
 ############################################################3
 #                Makefile for particle_state.mod
 ############################################################
-# 
-LOCAL_OBJ = traits.o  settler.o  rho_UNESCO.o
+#
+LOCAL_OBJ = traits.o  rho_UNESCO.o
+#LOCAL_OBJ = traits_embedded.o  settler.o  rho_UNESCO.o
 
 SOURCES     = $(addsuffix .f, $(basename $(LOCAL_OBJ)))
 

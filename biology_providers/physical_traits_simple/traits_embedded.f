@@ -1,6 +1,6 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     -------------------------------------------------------------------------
-c     Minimalistic biological module addressing 3 major traits : 
+c     Minimalistic biological module for embedded state dynamics addressing 3 major traits : 
 c           1) pelagic period length 
 c           2) bouyancy 
 c           3) start time of pelagic period (handled by calling modules)
@@ -20,15 +20,14 @@ c     $LastChangedDate:  $
 c     $LastChangedBy: asch $ 
 c
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      module particle_state ! NB, different module name
+      module particle_state_bio ! NB, different module name
 
       use time_tools           ! import clock type
       use particle_tracking    ! space types/methods
       use physical_fields
       use run_context, only: ctrlfile => simulation_file
       use input_parser
-      use output  ! access polytype for get_prop_state/get_metadata_state
-
+     
       implicit none
       private    
       
@@ -47,17 +46,9 @@ c     ---- export generic particle_state interface ----
       public :: init_particle_state  ! module operator
       public :: close_particle_state ! module operator
       public :: init_state_attributes
-      public :: delete_state_attributes
       public :: get_active_velocity
       public :: write_state_attributes
-      public :: update_particle_state ! basic argument list
-
-      public :: get_particle_version 
-      public :: get_property
-      public :: get_metadata_state
-      interface get_property
-        module procedure get_prop_state
-      end interface
+      public :: update_particle_state_ ! extended argument list
       
 
 c     =================================================
@@ -145,13 +136,7 @@ c     ---------------------------------------------------------
       end subroutine init_state_attributes
 
 
-      
-      subroutine delete_state_attributes(state)
-c     ----------------------------------------------------
-      type(state_attributes), intent(inout) :: state 
-      end subroutine 
 
-      
 
       subroutine get_active_velocity(state, space, v_active)
 c     --------------------------------------------------------------
@@ -210,54 +195,46 @@ c
 
 
 
-      subroutine update_particle_state(state, space, dt)
+      subroutine update_particle_state_(state, space, dt, 
+     +                       mortality_rate, die, next)
 c     --------------------------------------------------------------
-c     This subroutine should integrate state forward for time period dt 
-c     Settlement conditions: 
-c        1) settle_period_start < age < settle_period_end => set_tracer_mobility_stop
+c     This subroutine should integrate state forward for
+c     time period dt (extended argument list)
+c     Also set auxillary parameters:
+c        mortality_rate: current net mortality rate [1/sec]
+c        die           : if .true. kill this entity (avoid having mortality_rate=infinity)
+c        next          : if .true. advance (or regress) to ontogenetic stage (depending on sign of dt)
 c
-c     condition age > settle_period_end unhandled
+c     Settlement conditions: 
+c          1) settle_period_start < age < settle_period_end
 c     --------------------------------------------------------------
       type(state_attributes), intent(inout)   :: state
       type(spatial_attributes), intent(inout) :: space
       real,intent(in)                         :: dt ! in seconds
+      real,intent(out)                        :: mortality_rate
+      logical,intent(out)                     :: die, next 
       real                                    :: xyz(3)
       integer                                 :: status
 c     --------------------------------------------------------------
       state%age      = state%age + dt/86400.
-      
+      mortality_rate = 0.0
 c      call get_tracer_position(space,xyz)
 c      call interpolate_wdepth(xyz,cwd,status)
+      
 c
-      if ((state%age > settle_period_start).and.
-     +     (state%age < settle_period_end)) then
-         call set_tracer_mobility_stop(space)  
+      if (state%age < settle_period_start) then
+         die            = .false.
+         next           = .false.
+      elseif ((state%age > settle_period_start).and.
+     +        (state%age < settle_period_end)) then
+         die            = .false.
+         next           = .true.   ! try settling 
+      else ! missed settlement
+         die            = .true.   
+         next           = .false.   
       endif
 c     ----------------------------------------
-      end subroutine update_particle_state
+      end subroutine update_particle_state_
 
 
-      character*100 function get_particle_version()  
-      end function
-
-      
-      subroutine get_prop_state(state,var,bucket,status)
-c------------------------------------------------------------  
-      type(state_attributes),intent(in) :: state
-      type(variable),intent(in)         :: var
-      type(polytype), intent(out)       :: bucket
-      integer, intent(out)              :: status
-c------------------------------------------------------------  
-      end subroutine
-
-
-      subroutine get_metadata_state(var_name,var,status)
-c------------------------------------------------------------  
-      character(*), intent(in)   :: var_name
-      type(variable),intent(out) :: var
-      integer, intent(out)       :: status
-c------------------------------------------------------------  
-      end subroutine get_metadata_state
-
-      
       end module

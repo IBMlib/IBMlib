@@ -61,7 +61,7 @@ c     --- attributes relating to settlement dynamics
       type(clock) :: settle_time      ! only defined if type = settled
       type(state_attributes_bio) :: bio ! embedded particle_state
       real        :: survival         ! chance of survival, 0<survival<1, only updated to settlement. survival==0 means dead 
-      integer     :: type       ! 0 = free, 1 = settled, 2 = dead (missed settlement)
+      integer     :: type       ! allowed values defined below
       integer     :: sourceBox  ! spatial release box
       integer     :: settleBox  ! spatial settlement box (settlement set possibly different from release set); only defined if type = settled
       integer     :: tracerID   ! negative is unset

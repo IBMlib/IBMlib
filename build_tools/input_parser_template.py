@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # ------------------------------------------------------------------
 # Generate f90 code for input_parser.f
 #
@@ -360,10 +360,10 @@ for (tag,decl,readfmt) in cases:
 # -----------------------------------------
 template_file = os.path.abspath(os.path.join(os.getcwd(),  __file__))
 
-print header % (strftime("%d %b %Y %H:%M:%S", localtime()), template_file)
+print((header % (strftime("%d %b %Y %H:%M:%S", localtime()), template_file)))
 
 
-print interface
-print body
-print read_control_subs
-print "      end module"
+print(interface)
+print(body)
+print(read_control_subs)
+print("      end module")

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -----------------------------------------------------------------
 # ar extension with archiving merging capability
 # -----------------------------------------------------------------
@@ -77,9 +77,9 @@ usage = "Usage: ", sys.argv[0] + " <archive_file>  {<archive_object>}+"
 #
 try:
     opts, args = getopt.getopt(sys.argv[1:], "")
-except getopt.GetoptError, err:
+except getopt.GetoptError as err:
     # print help information and exit:
-    print str(err) # will print something like "option -a not recognized"
+    print(str(err)) # will print something like "option -a not recognized"
     sys.exit()
 #
 # ------------ parse options ------------
@@ -94,8 +94,8 @@ except getopt.GetoptError, err:
 # ------------ parse arguments   ------------
 #
 if len(args)<2: 
-    print "no objects for archiving provided"
-    print usage
+    print("no objects for archiving provided")
+    print(usage)
     sys.exit()
 
 
@@ -115,7 +115,7 @@ for obj in source_objects:
         archlist = archlist + extracted_objects
         tmpdirs.append(dir)
     else:
-        print "do not know how to flatten object", obj, "with extension", ext
+        print("do not know how to flatten object", obj, "with extension", ext)
         sys.exit()
     
 #

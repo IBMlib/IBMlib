@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -----------------------------------------------------------------
 #  Module dependencies scan 
 # ---------------------------------------------
@@ -33,6 +33,7 @@
 #                    NB: modulename should be without extension !
 #
 # Extended version 2 / Jun 16, 2010
+# Migrated to python 3 / Mar 29 2021
 # -----------------------------------------------------------------
 import sys
 import os
@@ -52,9 +53,9 @@ use_assoc = re.compile("^[ ]*use[ ]*(?P<modname>[\w]+)[,\s]", re.IGNORECASE|re.M
 #
 try:
     opts, args = getopt.getopt(sys.argv[1:], "x:")
-except getopt.GetoptError, err:
+except getopt.GetoptError as err:
     # print help information and exit:
-    print str(err) # will print something like "option -a not recognized"
+    print(str(err)) # will print something like "option -a not recognized"
     sys.exit()
 #
 # ------------ parse options ------------
@@ -75,7 +76,7 @@ for filename in args:
     for line in open(filename).readlines():
         m = use_assoc.match(line)
         if m is not None:
-            modname = string.lower(m.group('modname'))
+            modname = m.group('modname').lower()
             if not (modname in exclude_modules):
                 dependencies = dependencies + modname + modext + " "
     # --- flush result for this F90 file, if any dependencies

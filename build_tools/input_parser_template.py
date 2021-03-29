@@ -70,6 +70,7 @@ c          * 23mar2006    drop trailing "!" when reading string (and other) valu
 c          * 07jan2014    optional separator/comment single-character symbols
 c          * 07jan2014    fix parsing irregularity ("= xxx" was previously considered valid markup)
 c                         and segregate out line parsing to separate subroutine
+c          * 30mar2021    migrated from python2 to python3
 c        
 c     SVN tags:
 c           $Rev:  $

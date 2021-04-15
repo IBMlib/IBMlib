@@ -291,8 +291,8 @@ c     -----------------------------------------------------------
 c     -----------------------------------------------------------
 c     Generate the approximative (tangent space) area per grid cell
 c     for data normalization
-c     area(lat/deg, dlon/deg, dlat/deg) = R*sin(pi*lat/180)*(pi*dlat/180) * R*(pi*dlon/180)
-c                                       = (R*pi/180)**2 * sin(pi*lat/180) * dlon * dlat
+c     area(lat/deg, dlon/deg, dlat/deg) = R*cos(pi*lat/180)*(pi*dlat/180) * R*(pi*dlon/180)
+c                                       = (R*pi/180)**2 * cos(pi*lat/180) * dlon * dlat
 c     where R is representative Earth radius in km
 c     assume buffer area_km2(:,:) is at least (nxs, nys)
 c     -----------------------------------------------------------          
@@ -304,7 +304,7 @@ c     -----------------------------------------------------------
       fac = (R_earth*pi/180.)**2 * nch%dlon * nch%dlat
       do iy=1, nch%nys
          lat = nch%lat1 + (iy-1)*nch%dlat
-         area_km2(1:nch%nxs, iy) = fac*sin(pi*lat/180)
+         area_km2(1:nch%nxs, iy) = fac*cos(pi*lat/180)
       enddo
       end subroutine get_area_matrix
       

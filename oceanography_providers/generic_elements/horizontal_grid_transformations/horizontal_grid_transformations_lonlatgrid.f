@@ -15,6 +15,7 @@ c       * node centered cells has centers at mesh points
 c         and cell faces at half-valued lines in grid space
 c
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      use constants           ! earth_radius, deg2rad
       implicit none
       private
       integer, public :: nx   ! mesh generic, set directly by user
@@ -30,6 +31,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: horizontal_range_check
       public :: get_horiz_grid_coordinates
       public :: get_horiz_geo_coordinates
+      public :: get_horiz_grid_coor_deriv
       public :: get_surrounding_box
       public :: get_horiz_ncc_index
       public :: get_horiz_ncc_corners
@@ -162,9 +164,23 @@ c     --------------------------------------------------------
       call get_horiz_geo_coor_scalar(xy(1),xy(2),geo)
       end subroutine get_horiz_geo_coor_vector
 
+      subroutine get_horiz_grid_coor_deriv(geo, dxy_dxy)
+c     -------------------------------------------------------- 
+c     Compute the derivative of horizontal grid coordinates
+c     wrt local induced Cartesian coordinates (unit meters)
+c     --------------------------------------------------------  
+      real, intent(in)    :: geo(:)
+      real, intent(out)   :: dxy_dxy(:,:) ! buffer at least (2,2)
+      real                :: dr1, dr2
+c     -------------------------------------------------------- 
+      dxy_dxy(1:2,1:2) = 0
+      dr1 = dlambda*deg2rad*earth_radius*cos(geo(2)*deg2rad)
+      dr2 = dphi*deg2rad*earth_radius
+      dxy_dxy(1,1) = 1./dr1
+      dxy_dxy(2,2) = 1./dr2
+      end subroutine get_horiz_grid_coor_deriv
 
-
-
+      
       subroutine get_surrounding_box(geo,ix,iy,sx,sy) ! NB previously: get_horiz_grid_coordinates
 c     ------------------------------------------------------
 c     From the lon/lat vector geo (which may include the z component)

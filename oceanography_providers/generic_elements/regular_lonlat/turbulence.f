@@ -1,28 +1,29 @@
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
-c     Updates the arrays
+c     Miscellaneous simple zero-equation schemes for vertical/horizontal diffusivity
+c
+c     Updates the exported arrays
 c
 c        vertical diffusivity    vdiffus(:,:,:)   ! ix,iy,iz   [m**2/s]
 c        horizontal diffusivity  hdiffus(:,:,:)   ! ix,iy,iz   [m**2/s]
 c     
-c     exported to physical_fields. Standalone verion that can be applied with regular lon-lat data grids
-c     for posterior evaluation of vertical/horizontal diffusivities (undeveloped module from NSParticletracking)
+c     Standalone version that can be applied with regular lon-lat data grids (horizontally static)
+c     for posterior evaluation of vertical/horizontal diffusivities
+c     Grid oriented North/East, positive down
 c
-c     Do not dublicate array dimensions (nx,ny,nz) as explicit module data, but
-c     perform query at the entry of relevant methods
 c     The module current also holds and updates ocean surface stress taus(nx,ny) 
 c     is private attribute (may be moved to another module later)
+c     zeroes can be provided for schemes not employing taus
 c
 c     Provides:
-c       init_particle_state:                    parameters from input file
+c       init_turbulence:                        load options/parameters from input file and allocate internal arrays
 c       update_turbulence(...):                 arguments specific to each provider
 c       interpolate_turbulence(pos, k)          pos = scaled coor    k( 3) == turbulence at pos
-c       interpolate_turbulence_deriv(pos, dk)   pos = scaled coor    dk(3) == turbulence deriv at pos
-c       close_turbulence:                       civilized module close-down 
+c       interpolate_turbulence_deriv(pos, dk)   pos = scaled coor    dk(3) == scaled turbulence deriv at pos
+c       close_turbulence:                       civilized module close-down    
 c
-c     TODO:
-c        alternative posteori turbulence algorithms from GOTM  (www.gotm.net)
-c       
+c     Aug 2021: internalized static auxillary arrays to reduce number of function arguments
+c               keep in/out in grid coordinates to avoid too much local code repetition
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module turbulence
       use input_parser
@@ -45,8 +46,16 @@ c   hdiffus(2:nx-1, 2:ny-1, 1:botlay)
 
       real, allocatable, public    :: vdiffus(:,:,:) ! nx,ny,nz+1  face centered vertical   diffusivity [m**2/s]                               
       real, allocatable, public    :: hdiffus(:,:,:) ! nx,ny,nz    cell centered horizontal diffusivity [m**2/s]
-      real, allocatable            :: taus(:,:)      ! nx,ny       cell centered surface stress         [N/m**2]
 
+c     private array descriptors / aux arrays
+      real, allocatable            :: taus(:,:)    ! nx,ny       cell centered surface stress         [N/m**2]
+      integer                      :: nx, ny, nz   ! basic array dimensions
+      real                         :: lon1, lat1   ! SW corner cell center
+      real                         :: dlon, dlat   ! grid lon/lat spacings
+      integer, allocatable         :: botlayer(:,:)  ! nx,ny       bottom layer      (assumed shape array)
+      real, allocatable            :: xfacelen(:)    ! ny+1        xfacelen(j) is W:E length of cell j south face [meters] last element upper north face
+      real                         :: yfacelen       ! S:N cell length [meters]
+      
       character*4                  :: vertical_diffusivity_update     ! "none" / "cons" / "ppmx" / "pohl" / "bshm"
       character*4                  :: horizontal_diffusivity_update   ! "none" / "cons" / "smag"
       real                         :: vertical_diffusivity_constant   ! (only defined for vertical_diffusivity_update   == "cons")
@@ -82,11 +91,9 @@ c.....ONLY temp public
       contains
  
 
-      subroutine init_turbulence(nx,ny,nz)
+      subroutine init_turbulence(nxi,nyi,nzi,lon1i,lat1i,dloni,dlati,
+     +                           static_botlay)
 c     ---------------------------------------------------
-c     nx,ny,nz from physical_fields are not accessible via 
-c     use association - do not dublicate to module data
-c     
 c     look for input tage: 
 c         vertical_diffusivity_scheme
 c         horizontal_diffusivity_scheme
@@ -98,15 +105,37 @@ c     v/h_diffusivity_scheme == constant: set v/h diffusivity to v/h_diffusivity
 c
 c     v/h_diffusivity_scheme is not present: use intrinsic update (eddyvis_v/h)
 c     ---------------------------------------------------   
-      integer, intent(in) :: nx,ny,nz
+      integer, intent(in) :: nxi,nyi,nzi   ! basic grid dimensions
+      real, intent(in)    :: lon1i,lat1i   ! SW corner cell center
+      real, intent(in)    :: dloni,dlati   ! grid lon/lat spacings
+      integer, intent(in) :: static_botlay(:,:) ! bottom layer (last wet) of grid point (ix,iy)
       character*256       :: chr_option
-      real                :: diffus_val
-      integer             :: ntags
+      real                :: diffus_val, phi
+      integer             :: ntags, iy
 c     ---------------------------------------------------  
-      write(*,*) "init_turbulence: allocating"   
+      write(*,*) "init_turbulence: allocating"
+      
+      nx   = nxi    ! local copy
+      ny   = nyi    ! local copy
+      nz   = nzi    ! local copy
+      lon1 = lon1i  ! local copy
+      lat1 = lat1i  ! local copy
+      dlon = dloni  ! local copy
+      dlat = dlati  ! local copy 
+      
       allocate( vdiffus(nx,ny,nz+1) ) 
       allocate( hdiffus(nx,ny,nz) ) 
-      allocate( taus(nx,ny)       ) 
+      allocate( taus(nx,ny)       )
+
+      allocate( botlayer(nx,ny) ) 
+      allocate( xfacelen(ny+1)  )
+     
+      botlayer = static_botlay  ! local copy
+      yfacelen = earth_radius*deg2rad*dlat
+      do iy = 1, ny+1
+         phi = (lat1 + dlat*(iy-1.5))*deg2rad ! latitude of south face of cell iy
+         xfacelen = earth_radius*cos(phi)*deg2rad*dlon
+      enddo
 c
 c     ----------------------------------------
 c     ------  resolve vertical update   ------
@@ -260,11 +289,16 @@ c     ---------------------------------------------------
       if (allocated(vdiffus)) deallocate(vdiffus)
       if (allocated(hdiffus)) deallocate(hdiffus)
       if (allocated(taus))    deallocate(taus)
+
+      if (allocated(botlayer))    deallocate(botlayer)
+      if (allocated(xfacelen))    deallocate(xfacelen)
+     
       end subroutine close_turbulence
 
 
-      subroutine update_turbulence(u, v, uswind, vswind, rho, h, depth,
-     +                             botlayer, dth, xfacelen, yfacelen)   
+      
+
+      subroutine update_turbulence(u,v,uswind,vswind,rho,h,depth,dth)   
 c     -----------------------------------------------------------------------------
 c     Update horizontal/vertical turbulence fields from present physical fields
 c     
@@ -279,14 +313,10 @@ c     --------------------------------------------------------------------------
       real, intent(in)    :: rho(:,:,:)    ! water density     (assumed shape array)
       real, intent(in)    :: h(:,:,:)      ! layer thickness   (assumed shape array)
       real, intent(in)    :: depth(:,:)    ! local water depth (assumed shape array)
-      integer, intent(in) :: botlayer(:,:) ! bottom layer      (assumed shape array)
       real, intent(in)    :: dth           ! hydrodynamic time step
-      real, intent(in)    :: xfacelen(:)   ! WE cell face length (assumed shape array)
-      real, intent(in)    :: yfacelen      ! SN cell face length
 c     ---------------------------------------------------
       write(*,*) "update_turbulence: vertica/horizontal turbulence"
       call update_taus(uswind, vswind)
-
 c
 c     ------ select vertical update ------
 c
@@ -297,13 +327,13 @@ c
          vdiffus = vertical_diffusivity_constant
       elseif (vertical_diffusivity_update == "ppmx") then
          write(*,*) "update_turbulence: call ppmix_vertical_viscosity"
-         call ppmix_vertical_viscosity(u, v, rho, h, botlayer)
+         call ppmix_vertical_viscosity(u, v, rho, h)
       elseif (vertical_diffusivity_update == "pohl") then
          write(*,*) "update_turbulence: call hamsom_vertical_viscosity"
-         call hamsom_vertical_viscosity(u, v, rho, h, botlayer)
+         call hamsom_vertical_viscosity(u, v, rho, h)
       elseif (vertical_diffusivity_update == "bshm") then
          write(*,*) "update_turbulence: call eddyvis_vertical"
-         call eddyvis_vertical(u, v, rho, h, depth, botlayer, dth)         
+         call eddyvis_vertical(u, v, rho, h, depth, dth)         
       else
          write(*,*) "update_turbulence: " //
      +              "unhandled vertical_diffusivity_update = ",
@@ -311,7 +341,7 @@ c
          stop
       endif
 
-      call apply_vdiffus_BC(botlayer)
+      call apply_vdiffus_BC()
 c
 c     ------ select horizontal update ------
 c
@@ -322,7 +352,7 @@ c
          hdiffus = horizontal_diffusivity_constant
       elseif (horizontal_diffusivity_update == "smag") then
          write(*,*) "update_turbulence: call eddyvis_horizontal"
-         call eddyvis_horizontal(u,v, botlayer, xfacelen,yfacelen)
+         call eddyvis_horizontal(u,v)
       else
          write(*,*) "update_turbulence: " //
      +              "unhandled horizontal_diffusivity_update",
@@ -331,7 +361,6 @@ c
       endif
       
       call apply_hdiffus_BC()
-c
 c
       end subroutine update_turbulence
 
@@ -358,8 +387,8 @@ c     ------------------------------------------------------------------
       deallocate(ws2)
       end subroutine update_taus
 
-      
-      subroutine apply_vdiffus_BC(botlayer)
+     
+      subroutine apply_vdiffus_BC()
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     Apply boundary conditions on vertical diffusivity vdiffus
 c
@@ -370,12 +399,8 @@ c           "nman" Neumann   BC    (d(vdiffus)/dz=0)
 c
 c     Assume interior part of vdiffus has been updated
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      integer, intent(in) :: botlayer(:,:) ! bottom layer      (assumed shape array)
-      integer             :: ix,iy,iz,kb,nx,ny
+      integer             :: ix,iy,iz,kb
 c     --------------------------------------------------------------------------------
-      nx      = size(botlayer,1)     
-      ny      = size(botlayer,2)     
-
       if (vertical_diffusivity_BC == "diri") then
          do ix = 1, nx
             do iy = 1, ny  
@@ -422,7 +447,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 
 
-      subroutine ppmix_vertical_viscosity(u, v, rho, h, botlayer)
+      subroutine ppmix_vertical_viscosity(u, v, rho, h)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     Provide simplified vertical eddy viscosity/diffusivity scheme of 
@@ -445,21 +470,16 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(in)    :: v(:,:,:)      ! nx,ny,nz  S:N current   [meter/second]
       real, intent(in)    :: rho(:,:,:)    ! nx,ny,nz  water density [kg/m3]
       real, intent(in)    :: h(:,:,:)      ! nx,ny,nz  actual layer thickness (including surface elevation) [meter]
-      integer, intent(in) :: botlayer(:,:) ! nx,ny     bottom layer thickness in this water column
       
       real, parameter   :: vdiffus_shallow   = 1.45d0   ! diffusion length per day == 500 m
  
-      integer       :: ix, iy, iz, nx, ny, nz, kb, izu, izl,last
+      integer       :: ix, iy, iz, kb, izu, izl,last
       real          :: du_dz2, dv_dz2, drho_dz, hcen, arg 
       real          :: h_umx, h_lmx, BVfreq2, ricut, ppdenom, rhomid
       real          :: rich(size(u,3))       ! Richadrson numbers for water column
       real          :: eddyvis(size(u,3))    ! eddy viscosity [meter**2/second                    
 c     ------------------------------
       vdiffus = 0.            ! set pad value (for undefined cells)
-      nx      = size(u,1)     ! assume u,v matches
-      ny      = size(u,2)     ! assume u,v matches
-      nz      = size(u,3)     ! assume u,v matches
-
       do ix = 2, nx
          do iy = 1, ny-1            
             rich    = 0.0d0
@@ -529,11 +549,7 @@ c      enddo
 
 
 
-
-
-
-
-      subroutine hamsom_vertical_viscosity(u, v, rho, h, botlayer)
+      subroutine hamsom_vertical_viscosity(u, v, rho, h)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     Provide simplified vertical k-epsilon eddy viscosity/diffusivity
@@ -570,7 +586,6 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(in)    :: v(:,:,:)      ! nx,ny,nz  S:N current   [meter/second]
       real, intent(in)    :: rho(:,:,:)    ! nx,ny,nz  water density [kg/m3]
       real, intent(in)    :: h(:,:,:)      ! nx,ny,nz  actual layer thickness (including surface elevation) [meter]
-      integer, intent(in) :: botlayer(:,:) ! nx,ny     bottom layer thickness in this water column
       
       real, parameter   :: vdiffus_shallow   = 1.45d0   ! diffusion length per day == 500 m
       real, parameter   :: eddyvis_molecular = 1.34d-6  ! laminar water viscosity [meter**2/second]
@@ -580,7 +595,7 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, parameter   :: ricut_min         = 3.e-3    ! heuristic min limit on Richardson number
       real, parameter   :: ricut_max         = 1.e6
 
-      integer       :: ix, iy, iz, nx, ny, nz, kb, izu, izl,last
+      integer       :: ix, iy, iz, kb, izu, izl,last
       real          :: du_dz2, dv_dz2, drho_dz, hcen, arg 
       real          :: h_umx, h_lmx, BVfreq2, ricut
       real          :: rich(size(u,3)), schmidt(size(u,3)) ! Richadrson and Schmidt numbers for water column
@@ -588,10 +603,6 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real          :: vforce(size(u,3))                           
 c     ------------------------------
       vdiffus = 0.            ! set pad value (for undefined cells)
-      nx      = size(u,1)     ! assume u,v matches
-      ny      = size(u,2)     ! assume u,v matches
-      nz      = size(u,3)     ! assume u,v matches
-
       do ix = 2, nx
          do iy = 1, ny-1            
             rich    = 0.0d0
@@ -709,7 +720,7 @@ c      enddo
       end subroutine hamsom_vertical_viscosity
 
 
-      subroutine eddyvis_vertical(u, v, rho, h, depth, botlayer, dt)
+      subroutine eddyvis_vertical(u, v, rho, h, depth, dt)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     Port of eddyvis.f90, provided by Per Berg from DMI (per@dmi.dk) December, 2006
@@ -765,19 +776,12 @@ c     -------------------------------------------------------------------
 c     Notes on DMI variables:
 c        h == layer thickness  h(1) == first, h(kb) == last wet      
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc     
-c - modules -------------------------------------------------------------------
-
-c - directives ----------------------------------------------------------------
-      implicit none
-
-c - arguments -----------------------------------------------------------------
    
       real, intent(in)    :: u(:,:,:)      ! nx,ny,nz  W:E current   [meter/second]
       real, intent(in)    :: v(:,:,:) ! nx,ny,nz  S:N current   [meter/second]
       real, intent(in)    :: rho(:,:,:)    ! nx,ny,nz  water density [kg/m3]
       real, intent(in)    :: h(:,:,:)      ! nx,ny,nz  actual layer thickness (including surface elevation) [meter]
       real, intent(in)    :: depth(:,:)    ! nx,ny     actual depth of this water column (incl surface elevation) [meter]
-      integer, intent(in) :: botlayer(:,:) ! nx,ny     bottom layer thickness in this water column
       real, intent(in)    :: dt            ! hydrodynamic time step [seconds]
 
 c .... important references to module data:
@@ -797,7 +801,7 @@ c - local constants + vars -----------------------------------------------------
 c.....added constants, Asbjorn
       real, parameter         :: vdiffus_shallow = 1.45d0 ! diffusion length per day == 500 m
 
-      integer       :: k, kb, ki, ix, iy, nx, ny, nz
+      integer       :: k, kb, ki, ix, iy
       real          :: wu, eu, sv, nv, ell0_reci, qdt
       real          :: ell0_k, fac0, fac, vau_k, ell_k, rrdvk2, avv_k
       real          :: hho, hhu, hh, rhoo, rhou, drhodz, Rg, alri
@@ -828,9 +832,6 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     - some initialisations:
 
       vdiffus = 0.            ! set pad value (for undefined cells)
-      nx      = size(u,1)
-      ny      = size(u,2)
-      nz      = size(u,3)
       rdt     = r*dt                  ! rdt is bed friction parameter
       qdt     = 0.25e0*dt
       rrdvk2  = rdt/(dt*vkarm*vkarm)
@@ -991,7 +992,7 @@ c                  if (k==2) write(23,*) ix,iy,avv_k*1.0d4
 
 
 
-      subroutine eddyvis_horizontal(u,v,botlayer,xfacelen,yfacelen)
+      subroutine eddyvis_horizontal(u,v)
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c  Update horizontal diffusivity  hdiffus(2:nx-1, 2:ny-1, wetpts)   ! ix,iy,iz   [m**2/s]
@@ -1024,22 +1025,16 @@ c  on tracer time step
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(in)    :: u(:,:,:)       ! ix,iy,iz  W:E current, on cell east face   [meter/second]
       real, intent(in)    :: v(:,:,:)       ! ix,iy,iz  S:N current, on cell south face  [meter/second]
-      integer, intent(in) :: botlayer(:,:)  ! last wet layer (0 for dry points) ix,iy
-      real, intent(in)    :: xfacelen(:)    ! xfacelen(j) is W:E length of cell j south face [meters]
-                                            ! array size = xfacelen(1:ny+1) 
-      real, intent(in)    :: yfacelen       ! S:N cell length [meters]
-c      real, intent(in)    :: dt             ! hydrodynamic time step
+      
 c --- locals ---------
       real, parameter     :: Csmag2 = 0.2**2    ! Smagorinsky prefactor squared
       real                :: L2                 ! Smagorinsky squared length scale
       real                :: dudx, dudy, dvdx, dvdy, deform  ! v shear components, cell centered
       real                :: xf0,xf1,xfm, Eh
-      integer             :: nx,ny,ix,iy,iz
+      integer             :: ix,iy,iz
 c     ---------------------------------------------------------------------------
       hdiffus = 0.         ! set pad value (for undefined cells)
-      nx      = size(u,1)  ! retrieve grid dimension
-      ny      = size(u,2)  ! retrieve grid dimension
-c   
+     
 c     --- update diffus(2:nx-1, 2:ny-1, 1:nz) 
 c
       do iy=2,ny-1
@@ -1081,15 +1076,14 @@ c.....Divide by Schmidt number to obtain the diffusivity
       end subroutine eddyvis_horizontal
       
 
-      logical function range_check(x,y,z,nx,ny,nz)
+      logical function range_check(x,y,z)
 c     ---------------------------------------------
 c     Assess 0.5 <= x,y,z <= nx+0.5,ny+0.5,nz+0.5
 c     which is the relevant interpolation ranges 
 c     for cell centered data (it is not checked that
 c     position is in a wet point)
 c     ---------------------------------------------
-      real       ::  x, y, z
-      integer    :: nx,ny,nz
+      real,intent(in)  ::  x, y, z
 c     ---------------------------------------------
       range_check = (((0.5d0 < x).and.(x < (nx+0.5d0))).and.
      +               ((0.5d0 < y).and.(y < (ny+0.5d0))).and.
@@ -1097,7 +1091,7 @@ c     ---------------------------------------------
       end function range_check
 
 
-
+      
       subroutine interpolate_turbulence(position, k) 
 c     -----------------------------------------------------------------------------
 c     Interpolate module turbulence data 
@@ -1116,23 +1110,20 @@ c     --------------------------------------------------------------------------
       real, intent(out)    :: k(:)        ! assumed shape real(3+)
       
       integer           :: ix0,iy0,iz0,ix1,iy1,iz1
-      integer           :: nx,ny,nz,nzp1
+      integer           :: nzp1
       integer           :: nextrp, nintp
       real              :: x,y,z, sx,sy,sz
       real              :: k000,k100,k010,k110, k001,k101,k011,k111
 c     -----------------------------------------------------------------------------
       nextrp = 0    ! extrapolation counter
       nintp  = 0    ! interpolation counter
-      nx     = size(vdiffus, 1) ! shape(vdiffus) = (nx,ny,nz+1)
-      ny     = size(vdiffus, 2)
-      nzp1   = size(vdiffus, 3)
-      nz     = nzp1 - 1
-
+      nzp1   = nz+1
+      
       x = position(1)
       y = position(2)
       z = position(3)
       
-      if ( range_check(x,y,z,nx,ny,nz) ) then
+      if ( range_check(x,y,z) ) then
          nintp  = nintp + 1
       else
          nextrp = nextrp + 1    ! do not distinguish array bound violations
@@ -1234,23 +1225,20 @@ c     --------------------------------------------------------------------------
       real, intent(out)    :: dk(:)        ! assumed shape real(3+)
       
       integer           :: ix0,iy0,iz0,ix1,iy1,iz1
-      integer           :: nx,ny,nz,nzp1
+      integer           :: nzp1
       integer           :: nextrp, nintp
       real              :: x,y,z, sx,sy,sz
       real              :: k000,k100,k010,k110, k001,k101,k011,k111
 c     -----------------------------------------------------------------------------     
       nextrp = 0    ! extrapolation counter
       nintp  = 0    ! interpolation counter
-      nx     = size(vdiffus, 1)
-      ny     = size(vdiffus, 2)
-      nzp1   = size(vdiffus, 3)
-      nz     = nzp1 - 1
+      nzp1   = nz + 1
 
       x = position(1)
       y = position(2)
       z = position(3)
 
-      if ( range_check(x,y,z,nx,ny,nz) ) then
+      if ( range_check(x,y,z) ) then
          nintp  = nintp + 1
       else
          nextrp = nextrp + 1    ! do not distinguish array bound violations
@@ -1500,21 +1488,23 @@ c$$$
 c$$$      call close_turbulence()
 c$$$
 c$$$      end program
-
+c$$$
+c$$$       
 c$$$      program test_module
 c$$$c     -----------------------------------------------
 c$$$c     ifort -e90 turbulence.f input_parser.o run_context.o constants.o
 c$$$c     -----------------------------------------------
 c$$$      use turbulence
 c$$$      implicit none
-c$$$      integer, parameter :: nx=10, ny=10, nz=10
+c$$$      integer, parameter :: nx=10,ny=10,nz=10
 c$$$      real, parameter    :: dd = 1.e-3
 c$$$      real    :: pos(3),k(3),dk(3),z
 c$$$      integer :: ix,iy,iz
+c$$$      integer :: static_botlay(nx,ny) 
 c$$$c     -----------------------------------------------
-c$$$   
-c$$$      allocate( vdiffus(nx,ny,nz+1) )
-c$$$      allocate( hdiffus(nx,ny,nz)   )
+c$$$      static_botlay = 7
+c$$$      call init_turbulence(nx,ny,nz,10.,50.,0.16,0.1,
+c$$$     +                           static_botlay)
 c$$$      do ix=1,nx
 c$$$         do iy=1,ny
 c$$$            do iz = 1, nz+1
@@ -1525,12 +1515,11 @@ c$$$         enddo
 c$$$      enddo
 c$$$
 c$$$      pos(1:2) = 2.4
-c$$$      do z = 0.5, nz+0.5, 0.01
-c$$$         pos(3)=z
+c$$$      pos(3)   = 0.5
+c$$$      do while (pos(3) < nz+0.5)
 c$$$         call interpolate_turbulence(pos, k)
 c$$$         call interpolate_turbulence_deriv(pos, dk)
-c$$$         write(*,*) z,k(3),dk(3)
+c$$$         write(*,*) pos(3), k(3), dk(3)
+c$$$         pos(3) = pos(3) + 0.01
 c$$$      enddo
-c$$$ 
-c$$$
 c$$$      end program

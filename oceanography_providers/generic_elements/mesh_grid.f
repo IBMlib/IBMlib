@@ -198,7 +198,7 @@ c     ----- physics -----
       allocate( w(nx,ny,nz)       )   
       allocate( temp(nx,ny,nz)    )  
       allocate( salinity(nx,ny,nz))  
-      allocate( vdiffus(nx,ny,nz+1) ) ! enable data points at vertical faces
+      allocate( vdiffus(nx,ny,nz+1) ) ! enable data points at vertical faces, default is cell-centered data
       allocate( hdiffus(nx,ny,nz) ) 
       allocate( ccdepth(nx,ny,nz) )  
       allocate( acc_width(nx,ny,nz+1)   )
@@ -651,7 +651,9 @@ c     ------------------------------------------
 
 
       subroutine interpolate_turbulence(geo, r3, status)
-c     ------------------------------------------ 
+c     ------------------------------------------
+c     Default interpolation assumes vdiffus is cell-centered
+c     otherwise a customized interpolater must be applied
 c     ------------------------------------------ 
       real, intent(in)     :: geo(:)
       real, intent(out)    :: r3(:)
@@ -1057,31 +1059,40 @@ c     ------------------------------------------
       end function
 
 
-      subroutine get_grid_coordinates(geo,x,y,z)  ! formerly named get_ncc_coordinates
+      subroutine get_grid_coordinates(geo,x,y,z,dxyz_dr)  ! formerly named get_ncc_coordinates
 c     -------------------------------------------------------------------------------- 
 c     Get continuous node-centered grid coordinates with grid points 
 c     on integer values of (x,y,z) from geo = (lon,lat,depth)
 c     water surface is at z = 0.5, sea bed at z = bottum_layer+0.5
+c     layer boundaries at half-integers inbetween.
 c     It is not checked that z is above the sea bed. The inter grid
-c     range is 0.0 <= z <= nz+0.5.
+c     range is 0.5 <= z <= nz+0.5.
 c     If vertical range is exceeded the first/last layer, respectively,
 c     is used to extrapolate a vertical grid coordinate smoothly
 c     (no extrapolation is flagged) 
 c     Include intracell interpolation of layer spacings
+c     Optionally compute grid coordinate derivative wrt. Cartesian coordinates 
+c     if argument dxyz_dr is provided. dxyz_dr(i,j) is ds_j/dr_i with s = (x,y,z) so that
+c     dfdr(i) = sum(dxyz_dr(i,k)*df_dxyz(k), k=1,3)
 c     -------------------------------------------------------------------------------- 
       real, intent(in)  :: geo(:)
       real, intent(out) :: x,y,z
-
+      real, intent(out), optional :: dxyz_dr(:,:) ! required shape at least (3,3)
+      
       integer           :: ix,iy,ix0,iy0,ix1,iy1,iz
       
       real, pointer     :: z00(:), z01(:)
       real, pointer     :: z10(:), z11(:)
       real, allocatable :: z0(:), z1(:), acclay(:)
+      real, allocatable :: dacc_dX(:), dacc_dY(:)
       real              :: layerw,sx,sy,cwd
+      real              :: dlw_dX,dlw_dY,facx,facy
 c     ------------------------------------------ 
       allocate( z0(nz+1)     )
       allocate( z1(nz+1)     )
       allocate( acclay(nz+1) )
+      allocate( dacc_dX(nz+1)) ! Cartesian derivative of acclay, for dxyz_dr
+      allocate( dacc_dY(nz+1)) ! Cartesian derivative of acclay, for dxyz_dr
       call get_horiz_grid_coordinates(geo,x,y)   ! define x,y
 c
 c     ----- interpolate local layer spacings from acc_width: acclay -----
@@ -1099,20 +1110,37 @@ c     --- trilin interpolation  ---
       z11 => acc_width(ix1, iy1, :)  ! range = 1:nz+1
       z0  = z00 + sx*(z10 - z00)   ! vector operation (south face)
       z1  = z01 + sx*(z11 - z01)   ! vector operation (north face)
-      acclay = z0 + sy*(z1-z0)     ! vector operation (north-south)  
+      acclay = z0 + sy*(z1-z0)  ! vector operation (north-south)
 c
 c     ----- interpolate z from local layer spacings -----
 c
 c     search_sorted_list: result = iz (0 <= iz <= nz+1)
 c                         acclay(iz) < geo(3) < acclay(iz+1)   (iz<=nz)
-c                         acclay(1) = 0
+c                         acclay(1) = 0        
 c
       call search_sorted_list(geo(3), acclay, iz)  ! iz is layer numer, where geo(3) belongs
       iz = min(max(iz,1),nz) ! capture vertical range excess 
       layerw = acclay(iz+1) -  acclay(iz) 
-      z      = (iz - 0.5) + (geo(3) - acclay(iz))/layerw ! provides smooth extrapolation at range excess 
+      z      = (iz - 0.5) + (geo(3) - acclay(iz))/layerw ! provides smooth extrapolation at range excess
 c
-      deallocate( z0, z1, acclay  )
+c     --- optionally evaluate Cartesian derivative (X,Y,Z) of (x,y,z) ---
+c
+      if ( present(dxyz_dr) ) then
+         dxyz_dr(1:3,1:3) = 0.0
+         call get_horiz_grid_coor_deriv(geo, dxyz_dr(1:2,1:2))
+         dacc_dX = (z10-z00)*dxyz_dr(1,1) + (z01-z00)*dxyz_dr(1,2) +
+     +           (z11+z00-z01-z10)*(sx*dxyz_dr(1,2) + dxyz_dr(1,1)*sy)
+         dacc_dY = (z10-z00)*dxyz_dr(2,1) + (z01-z00)*dxyz_dr(2,2) +
+     +           (z11+z00-z01-z10)*(sx*dxyz_dr(2,2) + dxyz_dr(2,1)*sy)
+         dlw_dX       = dacc_dX(iz+1) - dacc_dX(iz)
+         dlw_dY       = dacc_dY(iz+1) - dacc_dY(iz) 
+         dxyz_dr(3,3) = 1/layerw ! dz/dZ
+         dxyz_dr(1,3) = -dacc_dX(iz)*layerw - (geo(3)-acclay(iz))*dlw_dX ! dz/dX
+         dxyz_dr(1,3) = dxyz_dr(1,3)/layerw**2
+         dxyz_dr(2,3) = -dacc_dY(iz)*layerw - (geo(3)-acclay(iz))*dlw_dY ! dz/dY
+         dxyz_dr(2,3) = dxyz_dr(2,3)/layerw**2
+      endif      
+      deallocate( z0, z1, acclay, dacc_dX, dacc_dY)
       nullify( z00, z01, z10, z11 )
 c     ------------------------------------------ 
       end subroutine get_grid_coordinates

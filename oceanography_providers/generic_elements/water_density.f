@@ -28,8 +28,9 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public close_water_density
       public interpolate_rhow               ! with automitic update, if enabled
       public update_water_density           ! force update
+      public rhow                           ! allow direct grid access
+      public pressure                       ! allow direct grid access
       
-
       contains
 
 
@@ -138,6 +139,7 @@ c-----------------------------------------------------------------------
       logical, parameter :: debug  = .false. ! write state variables to stdout 
       integer         :: ix,iy,iz,im
       real            :: dp, plast, s, t
+      real, external  :: rho_UNESCO          ! currently defined in physical_oceanography/rho_UNESCO.f
 c-----------------------------------------------------------------------    
       pressure = patm  ! initial condition on all cells     
       rhow     = rhow0 ! initial condition on all cells

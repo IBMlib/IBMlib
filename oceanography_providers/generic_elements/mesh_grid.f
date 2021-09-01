@@ -1073,7 +1073,7 @@ c     (no extrapolation is flagged)
 c     Include intracell interpolation of layer spacings
 c     Optionally compute grid coordinate derivative wrt. Cartesian coordinates 
 c     if argument dxyz_dr is provided. dxyz_dr(i,j) is ds_j/dr_i with s = (x,y,z) so that
-c     dfdr(i) = sum(dxyz_dr(i,k)*df_dxyz(k), k=1,3)
+c     dfdr = matmul(dxyz_dr, df_dxyz)
 c     -------------------------------------------------------------------------------- 
       real, intent(in)  :: geo(:)
       real, intent(out) :: x,y,z

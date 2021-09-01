@@ -7,7 +7,9 @@
 #     
 ############################################################
 
-LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o coards_allframes_simple.o
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o rho_UNESCO.o water_density.o turbulence.o added_turbulence.o 
+
+#LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o coards_allframes_simple.o
 
 GENERIC_MESH = ../generic_elements
 
@@ -35,6 +37,15 @@ mesh_grid.f:
 
 coards_netcdf.f:
 	ln -sf $(GENERIC_MESH)/coards_netcdf.f  # same name
+
+rho_UNESCO.f:
+	ln -sf $(GENERIC_MESH)/physical_oceanography/rho_UNESCO.f  # same name
+
+water_density.f:
+	ln -sf $(GENERIC_MESH)/water_density.f  # same name
+
+turbulence.f:
+	ln -sf $(GENERIC_MESH)/regular_lonlat/turbulence.f  # same name
 
 include $(COMMON_RULES) # shared information between makefiles
 FCFLAGS += -I/usr/local/include   # should contain netcdf.mod

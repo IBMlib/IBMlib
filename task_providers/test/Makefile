@@ -5,12 +5,16 @@
 #      task_provider test (in file $(MAIN).f)          #
 ########################################################
 
-MAIN = test_depth_scan
+PROVIDERS = test2_pbi.o write_netcdf_lonlat_data.o
+#PROVIDERS = test_pbi.o
 
-task.a: $(MAIN).o
-	ar rcs task.a $(MAIN).o
+task.a: $(PROVIDERS)
+	ar rcs task.a $(PROVIDERS)
 
 include $(COMMON_RULES)
+
+write_netcdf_lonlat_data.f:
+	ln -sf ../generic_elements/write_netcdf_lonlat_data.f  # same name
 
 clean: FORCE
 	rm -f  *.o  *.a  *.mod  dependences.mk
@@ -24,6 +28,6 @@ FORCE:
 #
 #     EXTRES = -x time_tools  -x run_context  -x physical_fields  -x particles
 
-input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  particles.mod: 
+input_parser.mod  time_tools.mod  run_context.mod  physical_fields.mod  particles.mod netcdf.mod: 
 	echo "update of" $@ "suppressed"
 

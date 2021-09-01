@@ -67,6 +67,7 @@ c
       real                         :: smagorinsky_constant     =  0.31    ! 0.31 (effective small viscosity DMI setting)
       real                         :: smagorinsky_schmidtnum   =  1.0     ! 1.0 
       real                         :: smagorinsky_eddyvisc_max =  0.1     ! unit == m2/sec (suggested NS value 0.1 m2/sec)
+      real                         :: dth                      = 90.0     ! hydrodynamic time step [sec] - needed only in scheme bshm
 c
 c     notation as J. Phys. Ocean. 11(1981) p1450, but in SI units
 c
@@ -165,7 +166,11 @@ c
             
          elseif (chr_option(1:6) == "bshmod") then
             vertical_diffusivity_update = "bshm" 
-         
+            call read_control_data(simulation_file, 
+     +                       "hydrodynamic_time_step", dth)   ! mandatory for scheme bshm
+            write(*,231) "init_turbulence: hydrodynamic_time_step = ",
+     +                    dth
+    
          elseif (chr_option(1:5) == "ppmix") then
             vertical_diffusivity_update = "ppmx" 
            
@@ -296,9 +301,7 @@ c     ---------------------------------------------------
       end subroutine close_turbulence
 
 
-      
-
-      subroutine update_turbulence(u,v,uswind,vswind,rho,h,depth,dth)   
+      subroutine update_turbulence(u,v,uswind,vswind,rho,h,depth)   
 c     -----------------------------------------------------------------------------
 c     Update horizontal/vertical turbulence fields from present physical fields
 c     
@@ -313,7 +316,6 @@ c     --------------------------------------------------------------------------
       real, intent(in)    :: rho(:,:,:)    ! water density     (assumed shape array)
       real, intent(in)    :: h(:,:,:)      ! layer thickness   (assumed shape array)
       real, intent(in)    :: depth(:,:)    ! local water depth (assumed shape array)
-      real, intent(in)    :: dth           ! hydrodynamic time step
 c     ---------------------------------------------------
       write(*,*) "update_turbulence: vertica/horizontal turbulence"
       call update_taus(uswind, vswind)
@@ -333,7 +335,7 @@ c
          call hamsom_vertical_viscosity(u, v, rho, h)
       elseif (vertical_diffusivity_update == "bshm") then
          write(*,*) "update_turbulence: call eddyvis_vertical"
-         call eddyvis_vertical(u, v, rho, h, depth, dth)         
+         call eddyvis_vertical(u, v, rho, h, depth)         
       else
          write(*,*) "update_turbulence: " //
      +              "unhandled vertical_diffusivity_update = ",
@@ -720,7 +722,7 @@ c      enddo
       end subroutine hamsom_vertical_viscosity
 
 
-      subroutine eddyvis_vertical(u, v, rho, h, depth, dt)
+      subroutine eddyvis_vertical(u, v, rho, h, depth)
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c
 c     Port of eddyvis.f90, provided by Per Berg from DMI (per@dmi.dk) December, 2006
@@ -758,7 +760,7 @@ c         * removed unused variables
 c         * renamed output variable avt -> vdiffus
 c         * changed real(8) -> real to conform rest of code
 c         * replaced tiefe(mi1) -> depth(ix,iy,1)
-c           (  tiefe(mi1) er vanddybden i pkt (i,j), mens h(mi1) er lagtykkelsen af øverste lag.
+c           (  tiefe(mi1) er vanddybden i pkt (i,j), mens h(mi1) er lagtykkelsen af oeverste lag.
 c              tiefe(:) er et wetpoint-compressed 2D array
 c              h(:) er et wetpoint-compressed 3D array  )
 c         * restrict horizontal loop to
@@ -766,10 +768,10 @@ c              do iy = 1, ny-1
 c              do ix = 2, nx
 c           to avoid illegal indexation
 c
-c     Time step ambiguity (dt):  er vort time step, som for update af eddy visc. er et eller andet multiplum
-c           af  time step for momentum equations. Jeg kan ikke svare på, hvad disse har
-c           været i alle versioner gennem hele modellens operationelle levetid, men dt er
-c           sikkert af størrelsen 3 min for update af vertikal eddy.
+c     Time step ambiguity (dth):  er vort time step, som for update af eddy visc. er et eller andet multiplum
+c           af  time step for momentum equations. Jeg kan ikke svare paa, hvad disse har
+c           vaeret i alle versioner gennem hele modellens operationelle levetid, men dth er
+c           sikkert af stoerrelsen 3 min for update af vertikal eddy.
 c
 c     Implicitly assume w=0 ?
 c     -------------------------------------------------------------------
@@ -782,7 +784,6 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       real, intent(in)    :: rho(:,:,:)    ! nx,ny,nz  water density [kg/m3]
       real, intent(in)    :: h(:,:,:)      ! nx,ny,nz  actual layer thickness (including surface elevation) [meter]
       real, intent(in)    :: depth(:,:)    ! nx,ny     actual depth of this water column (incl surface elevation) [meter]
-      real, intent(in)    :: dt            ! hydrodynamic time step [seconds]
 
 c .... important references to module data:
 c     
@@ -832,9 +833,9 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c     - some initialisations:
 
       vdiffus = 0.            ! set pad value (for undefined cells)
-      rdt     = r*dt                  ! rdt is bed friction parameter
-      qdt     = 0.25e0*dt
-      rrdvk2  = rdt/(dt*vkarm*vkarm)
+      rdt     = r*dth                  ! rdt is bed friction parameter
+      qdt     = 0.25e0*dth
+      rrdvk2  = rdt/(dth*vkarm*vkarm)
 
 c     - do the computations: (horizontal loop)  
       
@@ -881,9 +882,11 @@ c               nv = (v(m(i-1,j,k-1))-v(m(i-1,j,k)))**2
                   alpha(k) = alpha0
                enddo
 
-c           - account for wind stress (this part of NS ice free, removed ice parts, asbjorn):
+c     - account for wind stress (this part of NS ice free, removed ice parts, asbjorn):
+c     - avoid singular expression for special case h(ix,iy,1) = 0 (asch, 01 Sep 2021)               
 
-               duvdzq(1) = odrhovk2*taus(ix,iy)/h(ix,iy,1)**2 + 1.e-8
+               duvdzq(1) = odrhovk2*taus(ix,iy)/max(h(ix,iy,1)**2, 1e-6)
+     +                     + 1.e-8
 
 c           - account for bedfriction:  mib = index of bottom layer
 c            wu = u(m(i,j-1,kb)) 
@@ -1000,19 +1003,19 @@ c
 c  hdiffus is cell centered, i.e. hdiffus(ix,iy,iz) corresponds to (x,y,z) = (ix,iy,iz)
 c  ---------------------------------------------------------------------------
 c  Horizontalt benytter vi Smagorinsky parametriseringen i momentligningerne;
-c  første side i vedhængte EddyViscosity.doc angiver det basale i denne (glem
-c  side 2 i denne sammenhæng). For tracers, benytter vi så en effektiv
+c  foerste side i vedhaengte EddyViscosity.doc angiver det basale i denne (glem
+c  side 2 i denne sammenhaeng). For tracers, benytter vi saa en effektiv
 c  horizontal diffusivitet D_eff beregnet udfra den horizontale eddy viskositet
 c  Eh som
 c  
-c  D_eff = 0.25*Eh/(0.1 + Eh*dt/L**2)
+c  D_eff = 0.25*Eh/(0.1 + Eh*dth/L**2)
 c  
-c  hvor L er længdeskalaen i Smagorinsky modellen
+c  hvor L er laengdeskalaen i Smagorinsky modellen
 c  
 c  L**2 = Csmag**2 * dx * dy,    Csmag = 0.2
 c  
 c  Damping envelope:
-c   L**2/dt ~ 2000^2/90. ~ 44444.
+c   L**2/dth ~ 2000^2/90. ~ 44444.
 c   f(x) = 0.25*x/(0.1 + x/44444.)
 c   Plot[{x,0.25*x/(0.1 + x/44444.)}, {x,0,500}]
 c
@@ -1057,7 +1060,7 @@ c
 
 c..............DMI procedure: (hdiffus <- damped Eh) 
 c               Eh   = L2*deform               
-c               hdiffus(ix,iy,iz) = 0.25*Eh/(0.1 + Eh*dt/L2)
+c               hdiffus(ix,iy,iz) = 0.25*Eh/(0.1 + Eh*dth/L2)
 c
                hdiffus(ix,iy,iz) = L2*deform 
             enddo
@@ -1343,7 +1346,6 @@ c$$$      real    :: h(nx,ny,nz)      ! layer thickness
 c$$$      real    :: lcd(nx,ny,nz)    ! layer center depth
 c$$$      real    :: depth(nx,ny)     ! current depth at this point
 c$$$      integer :: botlayer(nx,ny)  ! bottom layer
-c$$$      real    :: dth              ! hydrodynamic time step
 c$$$      real    :: xfacelen(ny+1)   ! WE cell face length
 c$$$      real    :: yfacelen         ! SN cell face length
 c$$$      real    :: pos(3,npos),k(2,npos),dk(3,npos)
@@ -1362,7 +1364,6 @@ c$$$
 c$$$      ib       = nz
 c$$$      rho      = 1027.00d0
 c$$$      botlayer = ib
-c$$$      dth      = 90.d0
 c$$$      yfacelen = 1.0d4
 c$$$      xfacelen = 1.0d4
 c$$$
@@ -1427,7 +1428,7 @@ c$$$c$$$      enddo
 c$$$     
 c$$$
 c$$$      call update_turbulence(u, v, uswind, vswind, rho, h, depth,
-c$$$     +                       botlayer, dth, xfacelen, yfacelen) 
+c$$$     +                       botlayer) 
 c$$$       
 c$$$
 c$$$      do iz=1,nz

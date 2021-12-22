@@ -133,10 +133,12 @@ c     ---------------------------------------------------
      
       botlayer = static_botlay  ! local copy
       yfacelen = earth_radius*deg2rad*dlat
+      
       do iy = 1, ny+1
          phi = (lat1 + dlat*(iy-1.5))*deg2rad ! latitude of south face of cell iy
-         xfacelen = earth_radius*cos(phi)*deg2rad*dlon
+         xfacelen(iy) = max(0.0, earth_radius*cos(phi)*deg2rad*dlon) ! avoid negative at poles
       enddo
+      
 c
 c     ----------------------------------------
 c     ------  resolve vertical update   ------
@@ -1045,7 +1047,6 @@ c
          xf1 = xfacelen(iy+1)  ! ny+1 slot is defined
          xfm = 0.5*(xf0+xf1) 
          L2  = (smagorinsky_constant**2)*yfacelen*xfm
-
          do ix=2,nx-1
             do iz=1,botlayer(ix,iy)
 
@@ -1075,10 +1076,10 @@ c.....Impose upper limit on viscosity
 c.....Divide by Schmidt number to obtain the diffusivity
       hdiffus = hdiffus/smagorinsky_schmidtnum
 
-
       end subroutine eddyvis_horizontal
       
 
+      
       logical function range_check(x,y,z)
 c     ---------------------------------------------
 c     Assess 0.5 <= x,y,z <= nx+0.5,ny+0.5,nz+0.5
@@ -1191,7 +1192,6 @@ c.....cube degenerate at extraplation
      &                  sz *((1-sy)*(k001*(1-sx) + sx*k101)  + 
      &                          sy *(k011*(1-sx) + sx*k111))
 
-      
 c      write(*,*) "interpolate_turbulence : ", nextrp, "extrapolations"
 c      write(*,*) "interpolate_turbulence : ", nintp,  "interpolations"
 
@@ -1311,8 +1311,7 @@ c.....cube degenerate at extraplation
      &                  (k001*(1 - sx) + k101*sx)*(1 - sy) - 
      &                  (k010*(1 - sx) + k110*sx)*sy +
      &                  (k011*(1 - sx) + k111*sx)*sy
-
-
+      
 c      write(*,*) "interpolate_turbulence_deriv : ",
 c     +            nextrp, "extrapolations"
 c      write(*,*) "interpolate_turbulence_deriv : ", 

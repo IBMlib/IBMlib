@@ -5,13 +5,14 @@ c     --------------------------------------------------------------------------
 c
 c     Currently
 c        * optional zero-equation posteori turbulence schemes
-c        * Pick time frame closest to current time
+c        * optional Stokes drift for near-surface drifters
+c        * Pick time frame closest to current time, assume time frames is regularly spaced
 c        * Grid is either in z-mode or sigma-mode   
 c        * Data on same and static vertical z/sigma-grid layer (no time varying sea surface elevation added)
 c        * Only physics
 c        * Assume all data on same grid and at same times
 c        * Only regular lon-lat is allowed horizontally
-c             
+c        * Allow year bootstrapping     
 c       
 c     NOTES: based on coards_allframes_simple.f
 c     TODO: add a input handle to allow flipping w (if present) to
@@ -24,8 +25,9 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       module physical_fields
 
       use mesh_grid,
-     +     redir_t  => interpolate_turbulence, ! shadow by redirection
-     +     redir_dt => interpolate_turbulence_deriv ! shadow by redirection
+     +     redir_t  => interpolate_turbulence,                    ! shadow by redirection
+     +     redir_dt => interpolate_turbulence_deriv,              ! shadow by redirection
+     +     interpolate_currents_eulerian => interpolate_currents  ! overlay Stokes drift
       use water_density, only:
      +     rhow,
      +     init_water_density,
@@ -37,7 +39,9 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use run_context, only: simulation_file
       use time_services           ! import clock type and time handling
       use input_parser
-      use coards_netcdf   ! 
+      use coards_netcdf    ! 3D
+      use coards_netcdf_2D,   ! coards_xyt_variable + methods
+     +     attach_variable_2d =>  attach_variable             ! same name as coards_netcdf
       use turbulence,
      +     ext_turb_intp   => interpolate_turbulence, ! hide by redirection
      +     ext_turbderiv_intp => interpolate_turbulence_deriv ! hide by redirection
@@ -63,6 +67,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       public :: coast_line_intersection
       public :: get_pbi_version
 
+      public :: write_topomask  ! from mesh_grid
+      
 c      public :: dump_land_points ! non standard tmp
       
 c     -------------------- module data --------------------  
@@ -72,8 +78,10 @@ c
 c     ------ data frame handler ------
       
       character*999              :: hydroDBpath ! hydrographic data sets (proper trailing separator will be added at read, if not provided)
-      type(clock)                :: time_offset ! 
+      type(clock)                :: time_offset !
       
+      integer, parameter         :: no_bootstrap = -9999
+      integer                    :: bootstrap_year ! allow year bootstrapping
       
       character*(*), parameter   :: not_set_c = "none"     ! assume name conflict unlikely
       integer, parameter         :: not_set_i = -999999999 ! assume number conflict unlikely
@@ -99,7 +107,16 @@ c     ------ data frame handler ------
       real                       :: lambda1, dlambda, phi1, dphi ! local copies for convenience
       real, allocatable          :: uswind(:,:)  ! W:E surface wind [m/s] (currently unused)
       real, allocatable          :: vswind(:,:)  ! S:N surface wind [m/s]  (currently unused)
-      real, allocatable          :: layer_width(:,:,:)  ! generated from acc_width
+      real, allocatable          :: layer_width(:,:,:) ! generated from acc_width
+
+c
+c     ---------- provision for optional Stokes drift
+c
+      type(coards_xyt_variable) :: ustokes            ! u_component_stokes_drift
+      type(coards_xyt_variable) :: vstokes            ! v_component_stokes_drift
+      real                      :: stokes_decay_depth ! for exponential extrapolation of Stokes drift from surface
+      logical                   :: incl_stokes        ! logical switch to control whether Stokes drift is incl
+      integer                   :: ncid_stokes        ! data set handlers
 c
 c     ---------- time grid supported is a regularly spaced sequence described by these three parameters:
 c
@@ -187,7 +204,16 @@ c
       call init_water_density()       ! follows init_mesh_grid
       call init_turbulence(nx,ny,nz, lambda1, phi1, dlambda, dphi, 
      +                     bottom_layer)                  
- 
+c 
+c     --- enable time bootstrapping, if requested ---
+c
+      if (count_tags(simulation_file, "bootstrap_year")/=0) then
+         call read_control_data(simulation_file, 
+     +                     "bootstrap_year",bootstrap_year)
+         write(*,*) "WARNING: bootstrap_year=",bootstrap_year
+      else
+         bootstrap_year = no_bootstrap
+      endif
 
       end subroutine init_physical_fields
 
@@ -207,6 +233,10 @@ c     ------------------------------------------
       call reset_frame_handler()
       call close_horiz_grid_transf()    
       call close_turbulence()
+      if (incl_stokes) then
+         call close_coards_xyt_variable(ustokes) ! includes grid
+         call close_coards_xyt_variable(vstokes) ! includes grid
+      endif
 c     --- local cleanup ---
       call close_data_files()
       if (allocated(ccdepth0)) deallocate(ccdepth0)
@@ -236,11 +266,19 @@ c     ------------------------------------------
       endif
 c
       call resolve_corresp_frame(aclock, frame)
-
+c
       if ((.not.data_in_buffers).or.(frame /= cur_frame)) then
          call load_data_frame(frame)  ! updates state handlers + secondary updates
       endif
-      
+c      
+c     ---- stokes data does not necessary use same time grid
+c
+      if (incl_stokes) then
+         aclock => get_master_clock()
+         call sync_to_time(ustokes, aclock)   
+         call sync_to_time(vstokes, aclock)  
+      endif
+
 c     ------------------------------------------       
       end subroutine update_physical_fields
 
@@ -523,6 +561,9 @@ c     ---------------------------------------------------
       character*999    :: fname ! assume long enough
       integer          :: timedimID, ntime, varid
       character*64     :: varname
+      character*999    :: cbuf
+      character*512    :: path,vname,vname2
+      integer          :: status, start(99),nwords
 c     ------------------------------------------
       call close_data_files() ! in case they are open ...
 
@@ -595,6 +636,46 @@ c
  362  format("open_data_files: varname for ", a," = ", a) 
  363  format("open_data_files: w not available")
  
+c
+c     ---------- optional Stokes drift ----------
+c
+      if (count_tags(simulation_file, "stokes_drift")/=0) then
+
+         incl_stokes = .true.
+         call read_control_data(simulation_file, "stokes_drift",cbuf) ! filename varname_u, varname_v
+         call tokenize(cbuf, start, nwords) ! in string_tools.f
+         read(cbuf(start(1):start(2)-1),'(a)') path
+         read(cbuf(start(2):start(3)-1),'(a)') vname
+         read(cbuf(start(3):),          '(a)') vname2
+      
+         path = trim(hydroDBpath) // trim(adjustl(path))
+         status = nf90_open(path, nf90_nowrite, ncid_stokes)
+         if (status /= nf90_noerr) then
+            write(*,*) "error opening stokes_drift set",
+     +                 trim(adjustl(path))
+            stop 22
+         endif
+         call attach_variable_2d(ustokes, trim(adjustl(vname)),
+     +     ncid_stokes,"nearest_valid") 
+         call attach_variable_2d(vstokes, trim(adjustl(vname2)),
+     +     ncid_stokes,"nearest_valid")
+         call read_control_data(simulation_file, "stokes_decay_depth",
+     +     stokes_decay_depth)  !
+      
+         write(*,318) "u stokes drift",trim(adjustl(path)),
+     +     trim(adjustl(vname))
+         write(*,318) "v stokes drift",trim(adjustl(path)),
+     +     trim(adjustl(vname2))
+         write(*,*) "stokes decay depth=",stokes_decay_depth,"m"
+
+ 318     format("reading",1x,a,1x,a,1x,"(varname=",1x,a,")")
+
+      else
+
+         incl_stokes = .false.
+         write(*,*)  "open_data_files: no Stokes drift"
+
+      endif
 
       end subroutine open_data_files
 
@@ -606,20 +687,35 @@ c     Resolve which time frame (1 <= frame <= nt) to use in data set correspondi
 c     based on time grid descriptors (time1, dtime, nt) resolved at initialization.
 c     Use cell centered time association, so nearest time point on grid is applied      
 c     In case of exterior time points, the first/last frame will be applied
+c
+c     08 Nov 2021: replaced get_period_length_sec -> get_period_length_hour
+c                  since we are hitting roof on period length > 69 years measured in seconds
+c     16 Nov 2021: enable year bootstrapping, if set
 c     ------------------------------------------------------------------------------------
       type(clock), intent(in) :: aclock
+      type(clock)             :: clock_bootstrapped
       integer, intent(out)    :: frame
-      integer                 :: numsec, it
-      real                    :: t, numtics
+      integer                 :: it,  iye, imo, idy, isec
+      real                    :: numhours, numtics
 c     ------------------------------------------------------------------------------------
-      call get_period_length_sec(time_offset, aclock, numsec)
-      numtics = 1.0*numsec/sec_per_time_unit    ! time distance to offset in data set time unit
+      if (bootstrap_year /= no_bootstrap) then
+         call get_date_from_clock(aclock, iye, imo, idy)
+         call get_second_in_day(aclock, isec)
+         call set_clock(clock_bootstrapped, 
+     +                  bootstrap_year, imo, idy, isec)
+         call get_period_length_hour(time_offset, 
+     +                  clock_bootstrapped, numhours)               ! apply bootstrapped clock
+      else
+         call get_period_length_hour(time_offset, aclock, numhours) ! no bootstrapping
+      endif
+
+      numtics = 3600.0*numhours/sec_per_time_unit    ! time distance to offset in data set time unit
       it      = 1 + nint((numtics-time1)/dtime) ! on time grid 
       if ((it < 1) .or. (it > nt)) then
          write(*,286) it
       endif
- 286  format("resolve_corresp_frame: warning: time extrapolation (it=",
-     +    i4,")")
+ 286  format("resolve_corresp_frame::warning: time extrapolation (it=",
+     +    i,")")
       frame = min(nt, max(it,1))
       end subroutine resolve_corresp_frame
 
@@ -643,7 +739,7 @@ c     --------------------------------------------------------------------------
 
       call load_xyz_frame_asreal(u_var, u, frame)
       call load_xyz_frame_asreal(v_var, v, frame)
-
+        
       if (w_defined) then
          call load_xyz_frame_asreal(w_var, w, frame)
       else
@@ -663,6 +759,7 @@ c     ------------ secondary updates ------------
       call update_water_density()
       call update_turbulence(u,v,uswind,vswind,rhow,layer_width,wdepth)   
       
+
       end subroutine load_data_frame
       
 
@@ -701,6 +798,30 @@ c     ------------------------------------------
       end subroutine interpolate_turbulence_deriv
 
       
+      subroutine interpolate_currents(xyz, uvw, status)      
+c     -------------------------------------------------------------- 
+c     Add optional stokes drift to Eulerian currents
+c     -------------------------------------------------------------- 
+      real, intent(in)     :: xyz(:)  ! (lon,lat,depth)
+      real, intent(out)    :: uvw(:)
+      integer, intent(out) :: status
+
+      integer              :: statu, statv, statw, ist1,ist2,ist
+      real                 :: x,y,z, sx,sy,sz, uv(3)
+c     -------------------------------------------------------------- 
+      call interpolate_currents_eulerian(xyz, uvw, status) 
+c
+      if (incl_stokes) then
+         call interpolate_xyt_variable(xyz,ustokes,0,uv(1),ist1)
+         call interpolate_xyt_variable(xyz,vstokes,0,uv(2),ist2)
+         ist   = max(ist1,ist2)
+         uv(3) = 0                     ! no vertical component
+         if (ist > 0) uv = 0.0         ! silently ignore problems
+         uvw = uvw + uv * exp(-xyz(3)/stokes_decay_depth) ! vector operation
+      endif
+c     ------------------------------------------ 
+      end subroutine interpolate_currents
+
 
 
       subroutine dump_land_points(fname)

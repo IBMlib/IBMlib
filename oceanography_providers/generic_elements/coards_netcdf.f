@@ -90,15 +90,16 @@ c     1) "seconds since 1970-01-01T00:00:00Z"
 c     2) "seconds since 1970-01-01 00:00:00"
 c     3) "hours since 2014-04-01 01:00:00"
 c     4) "seconds since 2014-4-1 00:00:00"
+c     case 2-4 with no HH:MM:SS at end (implicitly 00:00:00)
 
       call tokenize(toffstr, start, nwords) ! in string_tools.f
       if (nwords == 3) then     ! assume variant 1) above
          it = index(toffstr, "T")
          if (it<1) then
-            write(*,*) "resolve_time_parameters: nwords==3, but no T"
-            write(*,*) "unit attr = >",trim(adjustl(toffstr)),"<"
+            toffstr = trim(adjustl(toffstr)) // " 00:00:00" ! no T;  add default midnight
+         else
+            toffstr(it:it) = " "      ! remove "T" for easier parsing below
          endif
-         toffstr(it:it) = " "      ! remove "T" for easier parsing below
          call tokenize(toffstr, start, nwords) ! reparse, robust toward spaces
       endif
       

@@ -84,7 +84,11 @@ c     ---------- other exports ----------
       public :: get_grid_coordinates       ! formerly named get_ncc_coordinates
       public :: interpolate_cc_3Dgrid_data ! generic interpolator for 3D CC data
       public :: interpolate_cc_2Dgrid_data ! generic interpolator for 2D CC data
- 
+
+c     ---------- diagnostic exports ----------
+      
+      public :: write_topomask
+      
 c     -------------------- module data --------------------  
 
       integer, parameter :: verbose = 0  ! debugging output control
@@ -1087,7 +1091,7 @@ c     --------------------------------------------------------------------------
       real, allocatable :: dacc_dX(:), dacc_dY(:)
       real              :: layerw,sx,sy,cwd
       real              :: dlw_dX,dlw_dY,facx,facy
-c     ------------------------------------------ 
+c     ------------------------------------------
       allocate( z0(nz+1)     )
       allocate( z1(nz+1)     )
       allocate( acclay(nz+1) )
@@ -1120,7 +1124,8 @@ c                         acclay(1) = 0
 c
       call search_sorted_list(geo(3), acclay, iz)  ! iz is layer numer, where geo(3) belongs
       iz = min(max(iz,1),nz) ! capture vertical range excess 
-      layerw = acclay(iz+1) -  acclay(iz) 
+      layerw = acclay(iz+1) -  acclay(iz)
+      layerw = max(layerw, 1e-6)  ! avoid numerical exceptions for źero width layers
       z      = (iz - 0.5) + (geo(3) - acclay(iz))/layerw ! provides smooth extrapolation at range excess
 c
 c     --- optionally evaluate Cartesian derivative (X,Y,Z) of (x,y,z) ---
@@ -1146,5 +1151,40 @@ c     ------------------------------------------
       end subroutine get_grid_coordinates
 
 
+cccccccccccccccccccc     diagnostic   subroutines   ccccccccccccccccccc
+
+      subroutine write_topomask(iunit, dry)
+c     -----------------------------------------------------------------
+c     print wet/dry grid points to logical unit iunit
+c     dry = .TRUE.  -> print dry (i.e. land) grid points (default)
+c     dry = .FALSE. -> print wet grid points (+ water depth at grid point)
+c     wet/dry condition accessed from wetmask (must have been initialized)
+c     water depth accessed with interpolate_wdepth
+c     -----------------------------------------------------------------      
+      integer, intent(in)           :: iunit
+      logical, intent(in),optional  :: dry
+      logical  :: printdry
+      real     :: geo(2),wd
+      integer  :: ix,iy,idum
+c     -----------------------------------------------------------------      
+      if (present(dry).and.(dry==.false.)) then
+         printdry = .false.
+      else                     
+         printdry = .true.
+      endif
+      do ix=1, nx
+         do iy=1,ny
+            call get_horiz_geo_coordinates(1.0*ix, 1.0*iy, geo)
+            if (printdry) then
+               if (wetmask(ix,iy)==0) write(iunit,*) geo
+            else
+               if (wetmask(ix,iy)==1) then
+                  call interpolate_wdepth(geo,wd,idum)
+                  write(iunit,*) geo, wd
+               endif   
+            endif
+         enddo
+      enddo
+      end subroutine write_topomask
 
       end module

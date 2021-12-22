@@ -636,7 +636,7 @@ c     --------------------------------------------------------------------------
          write(*,286) it
       endif
  286  format("resolve_corresp_frame: warning: time extrapolation (it=",
-     +    i4,")")
+     +      i,")")
       frame = min(nt, max(it,1))
       end subroutine resolve_corresp_frame
 

@@ -1,3 +1,4 @@
+
 ############################################################3
 #              Makefile for physical_fields.mod 
 #     $Rev: $
@@ -7,7 +8,7 @@
 #     
 ############################################################
 
-LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o rho_UNESCO.o water_density.o turbulence.o added_turbulence.o 
+LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o coards_netcdf_2D.o rho_UNESCO.o water_density.o turbulence.o added_turbulence.o 
 
 #LOCAL_OBJ    = horizontal_grid_transformations.o horizontal_representation.o mesh_grid.o time_services.o coards_netcdf.o coards_allframes_simple.o
 
@@ -37,6 +38,9 @@ mesh_grid.f:
 
 coards_netcdf.f:
 	ln -sf $(GENERIC_MESH)/coards_netcdf.f  # same name
+
+coards_netcdf_2D.f:
+	ln -sf $(GENERIC_MESH)/coards_netcdf_2D.f  # same name
 
 rho_UNESCO.f:
 	ln -sf $(GENERIC_MESH)/physical_oceanography/rho_UNESCO.f  # same name

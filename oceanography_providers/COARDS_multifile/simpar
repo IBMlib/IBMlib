@@ -1,0 +1,32 @@
+! ================================================================================
+!            COARDS compliant hydrography multifile data 
+! ================================================================================
+! 
+!   path to files with hydrographic files; windows user should add a trailing "\"
+!
+hydroDBpath            = /home/data/tmp         ! both primary and stokes, if enabled
+!
+longitude_name    = longitude
+latitude_name     = latitude
+temperature_name  = thetao
+salinity_name     = so
+u_name            = uo
+v_name            = vo
+!
+!   optional Stokes drift 
+!     
+stokes_drift       = ust  vst   ! uvarname vvarname
+stokes_decay_depth = 4          ! meters
+!
+!  a posteori user specified vertical/horizontal diffusivity
+! 
+
+vertical_diffusivity_scheme   = ppmix      ! none/constant/pohlmann/bshmod/ppmix - sub options see turbulence.f
+
+horizontal_diffusivity_scheme = smagorinsky  ! none/constant/smagorinsky
+
+smagorinsky_constant          = 0.31 ! smagorinsky
+smagorinsky_schmidtnum        = 1.0  ! smagorinsky
+smagorinsky_eddyvisc_max      = 100  ! smagorinsky
+
+

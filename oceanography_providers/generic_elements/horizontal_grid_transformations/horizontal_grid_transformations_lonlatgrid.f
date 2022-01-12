@@ -201,10 +201,10 @@ c     ------------------------------------------------------
 c     ------------------------------------------------------
       dx1 = (geo(1)-lambda1)/dlambda
       dy1 = (geo(2)-phi1)   /dphi
-      ix  = 1 + int(dx1)    ! truncate decimals to get lon cell
-      iy  = 1 + int(dy1)    ! truncate decimals to get lat cell
-      sx  = dx1 - int(dx1)  ! intra cell coordinate 0<sx<1
-      sy  = dy1 - int(dy1)  ! intra cell coordinate 0<sy<1
+      ix  = 1 + floor(dx1)    ! truncate decimals to get lon cell
+      iy  = 1 + floor(dy1)    ! truncate decimals to get lat cell
+      sx  = dx1 - floor(dx1)  ! intra cell coordinate 0<sx<1
+      sy  = dy1 - floor(dy1)  ! intra cell coordinate 0<sy<1
 c     ------------------------------------------------------
       end subroutine get_surrounding_box
 

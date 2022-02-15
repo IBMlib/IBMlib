@@ -119,7 +119,7 @@ c
       type(clock)                :: time_offset       ! for netcdf time vector
       integer                    :: time1             ! time since offset of first time frame (in data set time unit) 
       integer                    :: dtime             ! time step between subsequent time frames (in data set time unit) 
-      integer                    :: nt                ! number of time frames in data set       
+      integer                    :: nt                ! number of time frames in data set (possibly only 1)      
       integer                    :: sec_per_time_unit ! seconds per time unit of data set
       
 c
@@ -673,15 +673,22 @@ c
 
       call NetCDFcheck( nf90_inq_dimid(ncid, "time", dimid) )   ! fixed name
       call NetCDFcheck( nf90_inquire_dimension(ncid, dimid, len=nt) )
-      call NetCDFcheck( nf90_inq_varid(ncid, "time", varid) )   ! fixed name
-      call NetCDFcheck( nf90_get_var(ncid, varid, ibuf, count=(/2/)) )
-      time1 = ibuf(1)
-      dtime = ibuf(2)-ibuf(1)   ! regular grid is assumed
-      write(*,*) "open_data_files: data set contains", nt, 
-     +            "time frames"
+      call NetCDFcheck( nf90_inq_varid(ncid, "time", varid) ) ! fixed name
+c     --- set time1 and time1, depending on nt
+      if (nt>1) then
+         call NetCDFcheck(nf90_get_var(ncid,varid,ibuf,count=(/2/)))
+         time1 = ibuf(1)
+         dtime = ibuf(2)-ibuf(1) ! regular grid is assumed
+         write(*,*) "open_data_files: data set contains", nt, 
+     +        "time frames"
 c     --- sec_per_time_unit must be set ---
-      write(*,*) "open_data_files: time resolution = ", 
-     +            dtime*sec_per_time_unit, "sec"   
+         write(*,*) "open_data_files: time resolution = ", 
+     +        dtime*sec_per_time_unit, "sec" 
+      else                     ! nt==1 : file only contains a single frame
+         call NetCDFcheck( nf90_get_var(ncid, varid, time1) )
+         dtime = 0 ! render defined 
+         write(*,*) "open_data_files: data set contains 1 time frame"
+      endif
 
       end subroutine open_data_file
 
@@ -760,6 +767,7 @@ c     Resolve which time frame (1 <= frame <= nt) to use in data set correspondi
 c     based on current time grid descriptors (time1, dtime, nt) resolved at open_data_file
 c     Use cell centered time association, so nearest time point on grid is applied      
 c     In case of exterior time points, the first/last frame will be applied
+c     Special case with one time frame in data set is handled
 c
 c     08 Nov 2021: replaced get_period_length_sec -> get_period_length_hour
 c                  since we are hitting roof on period length > 69 years measured in seconds
@@ -782,14 +790,21 @@ c     --------------------------------------------------------------------------
          call get_period_length_hour(time_offset, aclock, numhours) ! no bootstrapping
       endif
 
-      numtics = 3600.0*numhours/sec_per_time_unit    ! time distance to offset in data set time unit
-      it      = 1 + nint((numtics-time1)/dtime) ! on time grid 
-      if ((it < 1) .or. (it > nt)) then
-         write(*,286) it
+
+      if (nt>1) then  ! multi frame data file
+         numtics = 3600.0*numhours/sec_per_time_unit ! time distance to offset in data set time unit
+         it      = 1 + nint((numtics-time1)/dtime) ! on time grid 
+         if ((it < 1) .or. (it > nt)) then
+            write(*,286) it
+         endif
+ 286     format("resolve_data_frame::warning: time extrapolation (it=",
+     +        i,")")
+         frame = min(nt, max(it,1))
+      else
+         frame = 1    ! data file only contains a single frame
       endif
- 286  format("resolve_data_frame::warning: time extrapolation (it=",
-     +    i,")")
-      frame = min(nt, max(it,1))
+
+
       end subroutine resolve_data_frame
 
 

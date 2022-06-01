@@ -745,8 +745,11 @@ c     --- delegate normal interior interpolation to interp_2Dbox_data
       ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
       iy0 = min(max(iy,    1),ny)  ! cover boundary layers
       iy1 = min(max(iy + 1,1),ny)  ! cover boundary layers
-      vc(1:2) = wdepth(ix0, iy0:iy1)
-      vc(3:4) = wdepth(ix1, iy0:iy1)
+      vc(1) = wdepth(ix0, iy0)
+      vc(2) = wdepth(ix0, iy1)
+      vc(3) = wdepth(ix1, iy0)
+      vc(4) = wdepth(ix1, iy1)
+
       call interp_2Dbox_data(sx, sy, vc, 0, result)
       status = 0
 c     ------------------------------------------ 

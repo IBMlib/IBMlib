@@ -643,8 +643,8 @@ c        Return state flags:
 c          surfenc = .FALSE.: water surface not crossed not by dR
 c          surfenc = .TRUE. : water surface crossed at least once by dR
 c        Tracer state is updated after application of BC to step:
-c          tracattr%atsurface = .TRUE.  => tracattr%mobility = (/1,1,0/)
-c                   (this allows particle to flow with surface currents)
+c          tracattr%atsurface = .TRUE.  => tracattr%mobility(3) = 0
+c                   (this allows particle to flow with surface currents, if free)
 c          tracattr%atsurface = .FALSE. => tracattr%mobility unchanged
 c
 c        Response controller:
@@ -852,8 +852,8 @@ c
          surfenc              = .TRUE.
          if     (tracattr%surfaceBC == BC_sticky) then
             virpos(3)  = 0.0   ! place tracer at surface
-            tracattr%mobility = (/1,1,0/) ! freeze tracer to water surface
-            tracattr%atsurface = .TRUE.
+            tracattr%mobility(3) = 0 ! freeze tracer to water surface, don't modify mobility(1:2)
+            tracattr%atsurface   = .TRUE.
          elseif (tracattr%surfaceBC == BC_reflect) then
             zv        =  2*vert_eps -zv      ! surface reflection (about vert_eps)
             virpos(3) =  zv      ! handle ping pong situation at bottom, if relevant  

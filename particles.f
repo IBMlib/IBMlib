@@ -113,7 +113,9 @@ c     .............................................................
       public :: get_ensemble_size   !Returns the size of an ensemble
       public :: insert_particle ! no copy
       public :: delete_particle
-      public :: get_active_particle_states 
+      public :: get_active_particle_states
+      public :: get_active_spatial_parts
+      
       public :: update_particles ! spatial/biological, no emit - incl respond to BC
       
 
@@ -415,6 +417,7 @@ c     ---------------------------------------------------
          stop
       endif
       end subroutine set_last_particle
+
       
       function get_ensemble_size(par_ens)
 c     ---------------------------------------------------
@@ -585,6 +588,26 @@ c     --------------------------------------------------
       end function get_active_particle_states
 
 
+      
+      function get_active_spatial_parts (par_ens)  
+c     ---------------------------------------------------
+c     Return vector of active space_attributes (i.e. of 
+c     initialized particles, not the entire space attributes stack)
+c     Return nullified pointer, if no particles are active
+c     Assume integrity of par_ens is OK and
+c     that par_ens is initialized
+c     ---------------------------------------------------
+      type(spatial_attributes), pointer :: get_active_spatial_parts(:)
+      type(particle_ensemble)           :: par_ens
+c     --------------------------------------------------
+      if (par_ens%last > 0) then
+         get_active_spatial_parts=>par_ens%space_stack(1:par_ens%last) 
+      else
+         nullify (get_active_spatial_parts) ! last==0 for no active
+      endif
+      end function get_active_spatial_parts
+      
+      
 
       subroutine update_particles(par_ens, time_step)
 c     ---------------------------------------------------

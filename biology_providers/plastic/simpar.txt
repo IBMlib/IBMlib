@@ -1,0 +1,2 @@
+sink_rate  = 0.003000      ! per day
+k_transfer = 0.070000      ! coalessed drag factor; unitless ; v = uv10*k_transfer

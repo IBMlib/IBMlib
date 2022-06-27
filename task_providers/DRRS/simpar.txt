@@ -1,0 +1,19 @@
+start_time     = 2008 01 01 30   ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+end_time       = 2012   12 31 0    ! format = YYYY MM DD S  where 0 < S < 86400 is second in the day
+
+advec_intg_method  = euler    !  euler/rk2
+particle_time_step = 1800     ! seconds
+
+emitbox  = 2008 01 01 10  2008 01 01 20     13.0000 53.8000 -0.00001   30.0000 65.74 -0.00001  100000
+
+reshuf_memory_time = 30 ! unit = days
+wet_point_file     = wet_13+.lonlat  ! allowed source points
+source_point_file  = all_input_10g_13+.lonlat
+open_boundary_line = 13 55 -1 0   ! x0,y0,vx0,vy0 : (x0,y0) = basept (vx0,vy0) = forbidden dir
+
+outputfile           = PBAU_wpi_10g_2008-2012_srate_0.003_hdiff_00050_ktrans_0.07.nc
+output_grid_dims     = 102 120
+output_grid_SWcorner = 13.08333 53.75
+output_grid_spacings = 0.166667 0.1
+output_frequency     = 1   ! unit days
+

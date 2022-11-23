@@ -1,0 +1,14 @@
+---------------------------------------------------------------------------------------------------------------------------
+This folder contain input files for macroplastic simulation in the Baltic Sea conducted withing the Horizon 2020 CLAIM project ( https://www.claim-h2020project.eu )
+---------------------------------------------------------------------------------------------------------------------------
+   run3_GF_baltic_baseline.py: script that setup and execute Greens function calculation for 6 major rivers inflows to the Baltic Sea
+
+   run3_PBAU_baltic_baseline.py: simulate plastic distribution dynamics activating all mapped river and beach litter sources
+
+   all_input_10g_13+.lonlat: mapped point sources for macroplastic input (both river and beach litter), containing point source location (lon,lat) and average discharge rate. File name can be changed, but value of srcfilename in script run3_PBAU_baltic_baseline.py must be changed accordingly
+   
+   physics: a physics database should be stored in location referenced by variable hydroDBroot; the current example apply the HBM circulation model output offline for years 2008-2012. The HBM circulation model output can be obtained from producer (the Danish Met Office, https://www.dmi.dk/). Other physics data can be used, the code must be compiled correspondingly by selecting PHYSICAL_FIELDS_DIR in config.mk
+
+   config.mk: the IBMlib configuration file; should be placed in the IBMlib root folder before compilation. Compilation instructions: see folder IBMlib/doc 
+
+   wind/stokes drift: in the current setup provided by ECMWF ERA5 subset contained in file wave_BS_2008-2012_1h.nc (namess can be changed if done correspondingly in scripts).  ERA5 data must be downloaded directly from ECMWF (https://www.ecmwf.int)

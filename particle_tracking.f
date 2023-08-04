@@ -1547,7 +1547,7 @@ c-----------------------------------------------------------------
       integer,intent(out)                  :: npar   ! generated tracers
 c     ..............................................
       integer, parameter     :: pos_attemps = 10**4  ! max attemps to find a wet point in box
-      logical                :: pos_OK, absspec
+      logical                :: pos_OK, absspec, horizOK, wet
       integer                :: iatt, nwish, maxp_mem, maxp_box,ip
       integer                :: i, forw_back, istat, nend
       real                   :: dr(3), u3(3), abs_time_step, newpos(3)
@@ -1602,7 +1602,9 @@ c
             call random_number(u3) ! uniform derivate, length 3
             newpos = emit_box%SW + dr*u3
 c...........test if there is wet points at this horizontal position
-            if (.not.is_land(newpos)) then
+            horizOK = horizontal_range_check(newpos)
+            wet     = .not.is_land(newpos)
+            if (horizOK.and.wet) then
                 pos_OK = .true.
                 exit  ! no more attempts needed
             endif

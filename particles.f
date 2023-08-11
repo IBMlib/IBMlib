@@ -67,7 +67,7 @@ c     i.e. link to space_stack/state_stack
 c     The spectator construction is rather economic memory wise
 c     -----------------------------------------------
       type particle_ensemble
-      private
+c      private
         type(particle), pointer          :: allpart(:) ! allocation may exceed active particles
         integer                          :: last       ! last active, last==0 for no active
         type(spatial_attributes),pointer :: space_stack(:) ! space data core
@@ -142,9 +142,12 @@ c     .................................................
 c     .................   reexports   .................
 c     .................................................
 
-      public :: emission_box       ! reexport import from particle_tracking.f
-      public :: write_emission_box ! reexport import from particle_tracking.f
-      public :: get_particle_version !reexport from particle state
+      public :: emission_box           ! reexport import from particle_tracking.f
+      public :: emission_box_simple    ! reexport import from particle_tracking.f
+      public :: emission_box_polygon   ! reexport import from particle_tracking.f
+      public :: create_emission_boxes  ! reexport import from particle_tracking.f
+      public :: write_emission_box     ! reexport import from particle_tracking.f
+      public :: get_particle_version   ! reexport from particle state
 
 c     .............................................................     
 c     ................. module data section .................

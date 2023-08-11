@@ -150,7 +150,7 @@ c     .............................................................
 c     ................. module data section .................
 c     .............................................................
 
-      integer, parameter :: verbose = 0
+      integer, parameter,private :: verbose = 0
 
 c...............................................................
       contains
@@ -225,24 +225,38 @@ c
       
 
       
-      subroutine setup_ensemble_from_file(par_ens, tag, boxrefs) 
+      subroutine setup_ensemble_from_file(par_ens, tag, boxrefs, boxtyp) 
 c     ---------------------------------------------------
 c     Make it easy to setup an ensemble par_ens, if it is
 c     associated with a single set of emission boxes
-c     (identified by tag in input file). tag may 
+c     (same type, identified by tag in input file). tag may 
 c     appear multiple times; one emission box is created
 c     for each occurence by create_emission_boxes in 
 c     emission box array boxrefs (allocated in create_emission_boxes).
 c     create_emission_boxes returns a nullified pointer 
 c     boxref, if emission boxes are created
+c     If several types of emission boxes appear in same simulation
+c     they should be created in separate lists (that may be merged)
+c     and this subroutine should be inlined, e.g.
+c
+c        call create_emission_boxes(tag1, box1refs, nmax1, typ1)
+c        call create_emission_boxes(tag2, box2refs, nmax2, typ2)
+c        call setup_ensemble(par_ens, nmax1+nmax2)
+c
+c     The default emission box type is set in create_emission_boxes
 c     ---------------------------------------------------
       type(particle_ensemble), intent(out):: par_ens
       character*(*),intent(in)            :: tag
       type(emission_box), pointer         :: boxrefs(:)
+      integer, intent(in), optional       :: boxtyp   ! emission_box type to look for
 c
       integer  :: nmaxpar
-c     ---------------------------------------------------      
-      call create_emission_boxes(tag, boxrefs, nmaxpar)
+c     ---------------------------------------------------
+      if (present(boxtyp)) then
+         call create_emission_boxes(tag, boxrefs, nmaxpar, boxtyp)               
+      else
+         call create_emission_boxes(tag, boxrefs, nmaxpar)
+      endif
       call setup_ensemble(par_ens, nmaxpar)
 
       end subroutine setup_ensemble_from_file

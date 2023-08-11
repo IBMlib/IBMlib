@@ -27,6 +27,8 @@ c           tracers now, because this module do not know about derived classes
 c           that will be used in practice
 c
 c     ------------------------
+c     Aug 07 2023: changed emission_box into a polytype that allows polygon
+c                  release areas rather than just a bounding box
 c     Jan 27 2009: Backtracking based on local time symmetry
 c                  of advective/diffusive processes added (MPA/ASC)
 c     Jul 11 2009: behavior of emission_box type is being changed, 
@@ -43,7 +45,8 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       use constants
       use geometry
       use random_numbers
-      use output    !Provides data handling classes
+      use output    ! Provides data handling classes
+      use polygons  ! for general tracer release areas in emission_box
       
       implicit none
       private          ! default visibility
@@ -81,7 +84,7 @@ c     -----Vertical precision -----
 
 c     ============  Behavioral configuration ============
 
-      integer :: verbose = 0   ! control output volume of certain subroutines (0=silent)
+      integer,private :: verbose = 0   ! control output volume of certain subroutines (0=silent)
 
 c
 c     Some data sets/interpolators display problems at 
@@ -133,20 +136,34 @@ c     ---------------------------------------
       public ::  spatial_attributes
 
 
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-c.....  Tracer emitter class  ..................................
-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c                 Tracer emission class  
+c
+c     Spatially either a simple lon-lat box or a general polygon (without holes)
+c     Temporally, a specific period with uniform release rate
+c     Backward compartability tested 10 Aug 2023
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       type emission_box 
-      private                                    ! hide internal implementation
-        integer           :: emission_boxID      ! unique ID stamp issued by create_emission_boxes
-        type(time_period) :: emission_interval
-        real              :: SW(3), NE(3)        ! grid coordinates of box corners
-        integer           :: max_emissions       ! cap on number of tracers for this box
-        integer           :: current_emissions   ! number of tracers emitted until now
-        character*999     :: initialization_data ! unparsed data, possibly void
+      private                                       ! hide internal implementation
+        integer              :: emission_boxID      ! unique ID stamp issued by create_emission_boxes
+        type(time_period)    :: emission_interval
+        real                 :: SW(3), NE(3)        ! grid coordinates of box corners; for polygons this is the bounding box
+        integer              :: max_emissions       ! cap on number of tracers for this box
+        integer              :: current_emissions   ! number of tracers emitted until now
+        integer              :: spatial_box_type    ! one of emission_box_*
+        type(lonlat_polygon) :: perimeter           ! only initialized if spatial_box_type == emission_box_polygon 
+        character*999        :: initialization_data ! unparsed data, possibly void - for particle state instantiation
+        
       end type
       public ::  emission_box 
 
+c     defined handles for emission_box%spatial_box_type
+      integer, parameter, public   :: emission_box_simple  = 0  ! simple lon-lat box
+      integer, parameter, public   :: emission_box_polygon = 1  ! general horizontal polygon
+      character(len=32), parameter :: emission_box_types(2) =   ! maps to order above, for debugging
+     +                               (/"simple lon-lat ",
+     +                                 "general polygon"/)
+      
 c     Counter for issuing stamps by create_emission_boxes to emission_box instances  
 c     emission_box_counter applies to next box created (not last)
 c     so that total number created currently is emission_box_counter - 1
@@ -158,8 +175,8 @@ c     so that total number created currently is emission_box_counter - 1
       integer, parameter :: dry_stop   = 0
       integer, parameter :: dry_ignore = 1
         
-      
 
+      
 c.... Define public operator set  ..............................     
 
       
@@ -351,6 +368,8 @@ c
       end subroutine update_tracer_position
 
 
+      
+
       subroutine renormalize_vertical_position(tracattr)
 c-------------------------------------------------------------
 c     For hydrodynamic data with a free surface,
@@ -499,7 +518,8 @@ c     -----------------------------------------
          
       end subroutine add_advection_step
 
-    
+
+      
 
       subroutine add_diffusion_step(tracattr, h, dR)
 c-------------------------------------------------------------------------------
@@ -574,6 +594,7 @@ c
       end subroutine add_diffusion_step
       
 
+      
 
       subroutine add_constrained_step(tracattr, dR, 
      +           surfenc, botenc, shoreenc, domainenc)
@@ -920,10 +941,10 @@ c
          write(*,*) 
       endif
 
-
       end subroutine add_constrained_step
 
 
+      
 
       subroutine multiple_reflection_path(s0, s1, anycross, sref, shit0)  ! COPY2 ->  particle_tracking.f 
 c-------------------------------------------------------------------------
@@ -1078,6 +1099,7 @@ c     ---- uses scope of multiple_reflection_path ----
 
 
 
+      
       subroutine write_tracer_position(tracattr)
 c------------------------------------------------------------
 c     write tracer position to logical unit iunit
@@ -1110,6 +1132,7 @@ c------------------------------------------------------------
 
       end subroutine write_spatial_attributes
 
+      
 
       subroutine delete_spatial_attributes(tracattr)
 c------------------------------------------------------------
@@ -1131,6 +1154,7 @@ c------------------------------------------------------------
       tracattr%mobility(3) = mobz
       end subroutine set_tracer_mobility
 
+      
       subroutine set_tracer_mobility_free(tracattr)
 c------------------------------------------------------------ 
       type(spatial_attributes),intent(inout) :: tracattr      
@@ -1282,13 +1306,13 @@ c
 
 
 
-      subroutine create_emission_boxes(identifier, boxref, nmaxpar) 
+      subroutine create_emission_boxes(tag, boxref, nmaxpar, boxtyp) 
 c---------------------------------------------------
-c     Create emission box list corresponding to identifier
-c     in the simulation file
-c     format:
+c     Create emission box list corresponding to tag in the simulation file
+C      
+c     Format for simple lon-lat box:
 c
-c       identifier = r(15) [bio_init_par]
+c       tag = r(15) [bio_init_par]
 c
 c     where the vector r(15) means:
 c
@@ -1311,8 +1335,8 @@ c     if 0 > z_min, z_max this is interpreted as an absolute release depth
 c     At initialization time it can not be checked that release depth
 c     is above the bottom at all points in the release box - this must be done at
 c     run time.
-c
-c     NEW: bio_init_par is the (optional) remaining part of the line, following
+c    
+c     bio_init_par is the (optional) remaining part of the line, following
 c     the spatio-temporal part r(15). This is just cached in the emission_box
 c     and may later be used in the biological state initialization of the tracer
 c
@@ -1322,33 +1346,35 @@ c     for handling a mixed wet/dry area).
 c     backward simulation: should provide start/end in normal
 c     order, i.e. time(start) first, time(start)<time(end)
 c
-c     Return list of emission boxes in pointer boxref 
-c     (data space allocated here to boxref)
-c     Each box is issued a runtime unique stamp (integer) emission_boxID
+c     Return list of emission boxes in pointer boxref (data space allocated here to boxref)
+c     Each box (whatever type) is issued a runtime unique stamp (integer) emission_boxID
 c     Return nullified pointer boxref, if no sources are created
 c     The maximum number of tracers that may be emitted by
 c     boxes in boxref are summed in nmaxpar 
 c
 c     Nov 18, 2010 (asc): allow partially/fully dry corners in emission box, but issue warning
+c     Aug 08, 2023 (asc): added provision for general release areas, defined as horizontal polygons; new optional argument boxtyp defines this
+c     Aug 10, 2023 (asc): Backward compartability tested 
 c---------------------------------------------------  
-      character*(*),intent(in)    :: identifier
-      type(emission_box), pointer :: boxref(:)
-      integer,intent(out)         :: nmaxpar
-
-      character*999               :: strbuf, the_rest
+      character*(*),intent(in)    :: tag        ! tag to scan for in input file
+      type(emission_box), pointer :: boxref(:)  ! resolved list of emission boxes of requested type
+      integer,intent(out)         :: nmaxpar    ! maximum number of tracers this set of emission boxes can generate
+      integer,intent(in),optional :: boxtyp     ! which box type to scan for (allowed values, see constants emission_box_*)
+      
       integer                     :: nboxes,ihit,ibox
-      integer                     :: i,start(500),nwords ! 500 arbitrary
-      real                        :: r15(15), xyz(3)
+      real                        :: xyz(3)
       logical                     :: absspec, anydry, anyillegal
+      logical                     :: simplebox
       real, parameter             :: epsil    = 1.0e-6
       real, parameter             :: oneplus  = 1 + epsil
       real, parameter             :: oneminus = 1 - epsil
-c--------------------------------------------------- 
-      nmaxpar = 0
-      nboxes  = count_tags(simulation_file, identifier) 
+c--------------------------------------------------------------------------------
 
-      write(*,547) nboxes, trim(adjustl(identifier))
- 547  format("create_emission_boxes:", i4, " boxes for identifier: ",a)
+      nmaxpar = 0
+      nboxes  = count_tags(simulation_file, tag) 
+
+      write(*,547) nboxes, trim(adjustl(tag))
+ 547  format("create_emission_boxes:", i4, " boxes for tag: ",a)
 
       if (nboxes > 0) then
          allocate(boxref(nboxes)) ! no check
@@ -1356,48 +1382,42 @@ c---------------------------------------------------
          nullify(boxref)          ! signal no boxes defined
          return 
       endif
-      ihit = 1
-c     ---------------------------------------------------------------
-c     main loop: read and parse all boxes corresponding to identifier
-c     ---------------------------------------------------------------
-      do ibox = 1, nboxes
-c:old         call read_control_data(simulation_file, identifier, r15, ihit)
-         call read_control_data(simulation_file,identifier,strbuf,ihit)
-         call tokenize(strbuf, start, nwords)
-         if (nwords<15) then 
-            write(*,*) "create_emission_boxes: bad value format for", 
-     +                  identifier 
-            write(*,*) "value=", trim(adjustl(strbuf))
+      
+c     ---- resolve box type to scan for; currently lonlat box or polygon
+      if (present(boxtyp)) then
+         if     (boxtyp == emission_box_simple) then
+            simplebox = .true.
+         elseif (boxtyp == emission_box_polygon) then
+            simplebox = .false.
+         else
+            write(*,*) "create_emission_boxes: boxtyp bad value",boxtyp
             stop
          endif
-         read(strbuf,*) r15   ! the remaining part ignored, if any
-c
-c        .... cache the remaining part of the line in the emission_box
-c        .... by chopping off the 15 first words in the line value
-c
-         if (nwords == 15) then                    ! i.e. no initialization_data
-            boxref(ibox)%initialization_data = ""  ! set an empty string
-         else 
-            ! chop off the 15 first words of strbuf
-            ! I'm nervous about literals in the code
-            boxref(ibox)%initialization_data = strbuf(start(15+1):) 
-         endif
-         
-c        --------- parse spatio-temporal part ---------
-c........time
-c        r15(1:4) start ==   year month day sec_of_day
-c        r15(5:8) end   ==   year month day sec_of_day
-         call set_period(boxref(ibox)%emission_interval, int(r15(1:8)))
+      else
+         simplebox = .true.     ! default if argument is absent
+      endif
 
-c........spatial coordinates
-c        r15(9:11)      ==   lon_min lat_min z_min
-c        r15(12:14)     ==   lon_max lat_max z_max
-c        
-         boxref(ibox)%SW = r15(9:11)
-         boxref(ibox)%NE = r15(12:14)
-         
+      if (simplebox) then
+         write(*,549) "simple lon-lat", trim(adjustl(tag))
+      else
+         write(*,549) "horizontal polygon", trim(adjustl(tag))
+      endif
+ 549  format("create_emission_boxes: scanning for emit box type ", a,
+     +       " with tag ", a)
+      
+c     ---------------------------------------------------------------
+c     main loop: read and parse all boxes corresponding to tag
+c     ---------------------------------------------------------------
+      ihit = 1   ! incremented in read_emission_box_*
+      do ibox = 1, nboxes
+
+         if (simplebox) then
+            call read_emission_box_simple(tag, boxref(ibox), ihit)
+         else
+            call read_emission_box_polygon(tag, boxref(ibox), ihit)
+         endif         
 c
-c........basic check of box consistency
+c........generic basic checks of box consistency (independent of box type)
 c
 c        1) flag whether this is an absolute or relative depth specification
 c           (and put depth specifications in standard order)
@@ -1495,27 +1515,237 @@ c
          endif
 c
 c........initialize internal release counter and emission cap
-c        r15(15)        ==   max_number_of_tracers
 c
-         boxref(ibox)%max_emissions     = nint(r15(15))     
-         boxref(ibox)%current_emissions = 0 
-         nmaxpar = nmaxpar + boxref(ibox)%max_emissions
-
+             
+         nmaxpar = nmaxpar + boxref(ibox)%max_emissions   
          boxref(ibox)%emission_boxID = emission_box_counter
          emission_box_counter = emission_box_counter + 1 
 
-         write(*,*) 
-         write(*,*) "created emission_box ", ibox, ":"
+         write(*,*) "----------------------------------------"
+         write(*,*) "created emission_box ", ibox, "/",nboxes," :"
          call write_emission_box(boxref(ibox))
+         write(*,*)
 c
-         ihit = ihit + 1   ! take next box in control file
       enddo 
 
       end subroutine create_emission_boxes
 
+      
+
+      subroutine read_emission_box_simple(tag, emitbox, ihit) 
+c------------------------------------------------------------------------------------
+c     Read a simple lon-lat emission box definition from simulation_file, starting
+c     from line ihit, and initialize emit_box (except for attribute emission_boxID)
+c     Increment ihit, so it corresponds to next line in input, which should be parsed
+c     Keep contructor private, so only create_emission_boxes accesses
+c     Format for simple lon-lat box:
+c
+c       tag = r(15) [bio_init_par]
+c
+c     where the vector r(15) means:
+c
+c       r(1:4)   time of emission start:             year month day sec_of_day
+c       r(5:8)   time of emission end:               year month day sec_of_day
+c       r(9:11)  south west corner of emission box:  lon_min lat_min z_min
+c       r(12:14) north east corner of emission box:  lon_max lat_max z_max
+c       r(15)    max_number_of_tracers (emitted by this box)
+c     
+c     z_min, z_max controls release depth; if 0 < z_min, z_max < 1 
+c     this is interpreted as a relative emission depth (relative to
+c     current depth at this longitude and latitude).
+c     In this case tracers will be uniformly released in the
+c     interal [(z_min+epsil)*current_depth, (z_max-epsil)*current_depth]
+c     where epsil is a very small number (epsil=1.e-6) so that
+c     z == 0 is just below the surface and
+c     z == 1 is just above the bottom
+c
+c     if 0 > z_min, z_max this is interpreted as an absolute release depth
+c     At initialization time it can not be checked that release depth
+c     is above the bottom at all points in the release box - this must be done at
+c     run time.
+c    
+c     bio_init_par is the (optional) remaining part of the line, following
+c     the spatio-temporal part r(15). This is just cached in the emission_box
+c     and may later be used in the biological state initialization of the tracer
+c
+c     attribute perimeter of emitbox is not initialized
+c     attribute emission_boxID of emitbox is set after this subroutine
+c------------------------------------------------------------------------------------
+      character*(*),intent(in)       :: tag        ! tag to scan for in input file
+      type(emission_box),intent(out) :: emitbox    ! emission box to initialize
+      integer,intent(inout)          :: ihit       ! where to start parsing in input file (stafet variable)
+
+      character*999                  :: strbuf
+      integer                        :: start(500),nwords ! 500 arbitrary
+      real                           :: r15(15)
+c------------------------------------------------------------------------------------
+      emitbox%spatial_box_type = emission_box_simple ! signals perimeter not initialized
+ 
+      call read_control_data(simulation_file,tag,strbuf,ihit)
+      call tokenize(strbuf, start, nwords)
+      if (nwords<15) then 
+         write(*,*) "read_emission_box_simple: bad value for ",tag 
+         write(*,*) "value=", trim(adjustl(strbuf))
+         stop
+         endif
+      read(strbuf,*) r15     ! the remaining part ignored, if any
+c
+c     .... cache the remaining part of the line in the emission_box
+c     .... by chopping off the 15 first words in the line value
+c
+      if (nwords == 15) then    ! i.e. no initialization_data
+         emitbox%initialization_data = "" ! set an empty string
+      else 
+         ! chop off the 15 first words of strbuf
+         ! I'm nervous about literals in the code
+         emitbox%initialization_data = strbuf(start(15+1):) 
+      endif
+c     r15(15)        ==   max_number_of_tracers (this box)         
+      emitbox%max_emissions  = nint(r15(15))
+         
+c     --------- parse spatio-temporal part ---------
+c.....time
+c     r15(1:4) start ==   year month day sec_of_day
+c     r15(5:8) end   ==   year month day sec_of_day
+      call set_period(emitbox%emission_interval, int(r15(1:8)))
+
+c.... spatial coordinates
+c     r15(9:11)      ==   lon_min lat_min z_min
+c     r15(12:14)     ==   lon_max lat_max z_max
+c        
+      emitbox%SW = r15(9:11)
+      emitbox%NE = r15(12:14)
+      emitbox%current_emissions = 0 
+      
+      ihit = ihit + 1        ! next line in control file to parse
+         
+      end subroutine read_emission_box_simple
 
 
 
+      subroutine read_emission_box_polygon(tag, emitbox, ihit) 
+c------------------------------------------------------------------------------------
+c     Read a emission polygon definition from simulation_file, starting
+c     from line ihit, and initialize emit_box (except for attribute emission_boxID)
+c     Increment ihit, so it corresponds to next line in input, which should be parsed
+c     Keep contructor private, so only create_emission_boxes accesses
+      
+c     Format for simple lon-lat box:
+c
+c       tag           = r(15) [bio_init_par]
+c       tag_perimeter = x1 y1 .. xM yM
+      
+c     where the vector r(15) means:
+c
+c       r(1:4)   time of emission start:             year month day sec_of_day
+c       r(5:8)   time of emission end:               year month day sec_of_day
+c       r(9)     upper depth of emit box             z_min (in [0;1] for relative depth, negative for absolute depth in meter)
+c       r(10)    lower depth of emit box             z_max (in [0;1] for relative depth, negative for absolute depth in meter)
+c       r(11)    max_number_of_tracers (emitted by this box)
+c     
+c     z_min, z_max controls release depth; if 0 < z_min, z_max < 1 
+c     this is interpreted as a relative emission depth (relative to
+c     current depth at this longitude and latitude).
+c     In this case tracers will be uniformly released in the
+c     interal [(z_min+epsil)*current_depth, (z_max-epsil)*current_depth]
+c     where epsil is a very small number (epsil=1.e-6) so that
+c     z == 0 is just below the surface and
+c     z == 1 is just above the bottom
+c
+c     if 0 > z_min, z_max this is interpreted as an absolute release depth
+c     At initialization time it can not be checked that release depth
+c     is above the bottom at all points in the release box - this must be done at
+c     run time.
+c    
+c     bio_init_par is the (optional) remaining part of the line, following
+c     the spatio-temporal part r(11). This is just cached in the emission_box
+c     and may later be used in the biological state initialization of the tracer
+c
+c     tag_perimeter (i.e. the actual tag with string "_perimeter" appended) contains horizontal nodes of polygon, given as
+c     pairs in a list like x1 y1 x2 y2 .. xM yM .. for M nodes. At least M=3 nodes (triangle) are expected. Do not repeat
+c     first node (implicit closure of polygoin is implied). First occurence of tag_perimeter after tag is associated
+c     (i.e. intermediated blanks are accepted, but tag-tag_perimeter pairs can not be interlaced). It is not recommended
+c     to state intermediate variables between tag and tag_perimeter, but it is accepted
+c       
+c     attribute emission_boxID of emitbox is set after this subroutine
+c------------------------------------------------------------------------------------
+      character*(*),intent(in)       :: tag        ! tag to scan for in input file
+      type(emission_box),intent(out) :: emitbox    ! emission box to initialize
+      integer,intent(inout)          :: ihit       ! where to start parsing in input file (stafet variable)
+
+      character*999                  :: strbuf, tagperim
+      integer                        :: start(500),nwords ! 500 arbitrary
+      real                           :: r11(11), bbox(4)
+      real, allocatable              :: rbuf(:), nodes(:,:)
+c------------------------------------------------------------------------------------
+      emitbox%spatial_box_type = emission_box_polygon ! signals perimeter not initialized
+      
+      call read_control_data(simulation_file,tag,strbuf,ihit)
+      call tokenize(strbuf, start, nwords)
+      if (nwords<11) then 
+         write(*,*) "read_emission_box_polygon: bad value for ", tag 
+         write(*,*) "value=", trim(adjustl(strbuf))
+         stop
+         endif
+      read(strbuf,*) r11     ! the remaining part ignored, if any
+c
+c     .... cache the remaining part of the line in the emission_box
+c     .... by chopping off the 11 first words in the line value
+c
+      if (nwords == 11) then    ! i.e. no initialization_data
+         emitbox%initialization_data = "" ! set an empty string
+      else 
+         ! chop off the 11 first words of strbuf
+         ! I'm nervous about literals in the code
+         emitbox%initialization_data = strbuf(start(11+1):) 
+      endif
+c     r11(11)        ==   max_number_of_tracers (this box)         
+      emitbox%max_emissions  = nint(r11(11))
+         
+c     
+c.... parse temporal part 
+c     r11(1:4) start ==   year month day sec_of_day
+c     r11(5:8) end   ==   year month day sec_of_day
+      call set_period(emitbox%emission_interval, int(r11(1:8)))
+
+c.... parse vertical coordinates
+c     horizontal part of bounding box taken from polygon
+      
+      emitbox%SW(3) = r11(9)     ! z_min
+      emitbox%NE(3) = r11(10)    ! z_max
+      emitbox%current_emissions = 0 
+      
+      ihit = ihit + 1           ! next line in control file to parse
+
+      tagperim = trim(adjustl(tag))//"_perimeter" ! tag associated perimeter
+      call read_control_data(simulation_file,tagperim,strbuf,ihit)
+      call tokenize(strbuf, start, nwords)
+      if (mod(nwords,2)==1) then
+         write(*,*) "read_emission_box_polygon: perimeter contain ", 
+     +              "odd number of coordinates"
+         stop 492
+      endif
+      allocate( rbuf(nwords)      )
+      allocate( nodes(2,nwords/2) )
+      read(strbuf,*) rbuf
+      nodes = reshape(rbuf, (/2,nwords/2/))
+      call init_lonlat_polygon(emitbox%perimeter,nodes,"emission zone")
+      deallocate( rbuf )
+      deallocate( nodes )
+
+c     pass polygon bounding box to emission box      
+      call get_bounding_box(emitbox%perimeter, bbox)
+      emitbox%SW(1:2) = bbox(1:2)     ! keep z_min
+      emitbox%NE(1:2) = bbox(3:4)     ! keep z_max
+      
+      ihit = ihit + 1        ! next line in control file to parse
+                 
+      end subroutine read_emission_box_polygon
+
+
+      
+
+      
 
       subroutine activate_emission_box(emit_box, 
      +                                 time_dir, parbuf, nstart, npar) 
@@ -1594,7 +1824,8 @@ check that sign change on release delimiter is OK everywhere
 c
 c........First horizontal: make sure tracer is initialized in a wet position
 c        (eventhough basic checks are performed at setup stage of 
-c         release box, box may contain dry areas at release time)
+c        release box, box may contain dry areas at release time)
+c        For polygon release areas, also make sure point is inside         
 c
          iatt   = 1
          pos_OK = .false.
@@ -1604,9 +1835,14 @@ c
 c...........test if there is wet points at this horizontal position
             horizOK = horizontal_range_check(newpos)
             wet     = .not.is_land(newpos)
+            if (emit_box%spatial_box_type == emission_box_polygon) then
+               horizOK = horizOK.and.
+     +              is_inside_polygon(emit_box%perimeter, newpos)
+            endif
+            
             if (horizOK.and.wet) then
                 pos_OK = .true.
-                exit  ! no more attempts needed
+                exit  ! no more attempts needed in do while loop
             endif
             iatt = iatt + 1
          enddo 
@@ -1673,10 +1909,13 @@ c........set tracer state
       end subroutine activate_emission_box
 
 
+      
       subroutine write_emission_box(emit_box)
 c---------------------------------------------------  
       type(emission_box), intent(in) :: emit_box
-c---------------------------------------------------       
+c---------------------------------------------------
+      write(*,*) "emission box of type ",
+     +           emission_box_types(1+emit_box%spatial_box_type) ! offset 1
       call write_time_period(emit_box%emission_interval)
       write(*,*) "emission_boxID      =",emit_box%emission_boxID 
       write(*,*) "SW corner (x,y,z)   =",emit_box%SW
@@ -1684,10 +1923,15 @@ c---------------------------------------------------
       write(*,*) "max_emissions       =",emit_box%max_emissions 
       write(*,*) "current_emissions   =",emit_box%current_emissions
       write(*,*) "initialization_data =", 
-     +            trim(adjustl(emit_box%initialization_data))
+     +     trim(adjustl(emit_box%initialization_data))
+      if (emit_box%spatial_box_type == emission_box_polygon) then
+         write(*,*) "polygon merimeter"
+         call print_lonlat_polygon(emit_box%perimeter, 6)
+      endif
       end subroutine write_emission_box
 
 
+      
       subroutine get_current_emissions(emit_box, nemit, nemax)
 c------------------------------------------------------------- 
       type(emission_box), intent(in) :: emit_box
@@ -1697,6 +1941,7 @@ c-------------------------------------------------------------
       nemax = emit_box%max_emissions
       end subroutine get_current_emissions
 
+      
 
       subroutine get_emission_boxID(emit_box, boxID)
 c------------------------------------------------------------- 

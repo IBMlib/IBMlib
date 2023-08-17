@@ -83,7 +83,7 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
       character, parameter        :: default_separator_token = "="
       character, parameter        :: default_comment_token   = "!"
-      integer, parameter, private :: linelen                 = 256
+      integer, parameter, private :: linelen                 = 2048
 
       type control_file
          character(len=linelen)          :: filename

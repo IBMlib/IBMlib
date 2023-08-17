@@ -5,6 +5,7 @@ c     derived from traits.f
 
 c     * simple multi stage template
 c     * allow settlement in geographical polygons defined in input
+c     * backtracking enabled
 c     -------------------------------------------------------------------------    
 c   
 c     $Rev:  $
@@ -73,7 +74,7 @@ c
 c
 c     --------- epipelagic larval stage  ---------
 c
-      real, parameter  :: larvlength_0   = 12.0   ! hatching length [mm] ref Stenberg 2016
+      real, parameter  :: larvlength_0   = 12.0   ! first-feeding length [mm] ref Stenberg 2016
       real, parameter  :: larvlength_juv = 65.0   ! settle length   [mm] ref Stenberg 2016
       real             :: LenGrate                ! length growth rate [mm/day]      
       real             :: dLenGrate_dT            ! length growth rate T-slope [mm/day/degC]
@@ -86,14 +87,15 @@ c
 c     --------- stage handles  ---------
 c
 c     dead stages  < 0
-c     alive stages >= 0 
-      integer, parameter :: is_dead            = -1 ! undisclosed cause
+c     alive stages >= 0
+      integer, parameter :: is_unhatched       = -2 ! for backtracking
+      integer, parameter :: is_dead            = -1 ! undisclosed cause, includes unborn
       
       integer, parameter :: is_egg             =  0
       integer, parameter :: is_pelagic_larvae  =  1
       integer, parameter :: is_juvenile_larvae =  2 ! searching for settlement
       integer, parameter :: is_settled_larvae  =  3
-
+      integer, parameter :: is_unresolved      =  100 ! just track age
 c
 c     --------- settlement areas  ---------
 c
@@ -107,7 +109,7 @@ c     ===============================================================
       subroutine init_particle_state()  ! module operator
 c     ------------------------------------------------------------------------
 c     ------------------------------------------------------------------------
-      integer           :: ise, nse, ihit, start, nwords
+      integer           :: ise, nse, ihit, start(5000), nwords ! buffer start must be sufficient 
       real, allocatable :: rbuf(:), nodes(:,:)
       character*5000    :: strbuf   ! should contain fairly large polygons
       character*256     :: name
@@ -237,22 +239,59 @@ c
 
 
       subroutine init_state_attributes(state, space, time_dir,             
-     +                                 initdata, emitboxID)
+     +     initdata, emitboxID)
+c     ---------------------------------------------------------
+c     time_dir > 0: (forward) default: newly spawned egg, 
+c     otherwise provide initdata:
+c                e eggdevel
+c                l length
+c                a age
+c     time_dir < 0: (backtrack) no default - initdata must be supplied
 c     ---------------------------------------------------------
       type(state_attributes),intent(out)     :: state
       type(spatial_attributes),intent(inout) :: space
       real,intent(in)                        :: time_dir            
       character*(*),intent(in)               :: initdata
       integer,intent(in)                     :: emitboxID
+      character         :: tag
+      real              :: value
 c     ---------------------------------------------------------
-      state%age                = 0.0
       state%source             = emitboxID
+      state%age_juv_trans      = -1.0
+      state%settlement_habitat = -1
+      state%age                = 0.0
       state%stage              = is_egg
       state%eggdevel           = 0.0
       state%length             = -1.0
-      state%age_juv_trans      = -1.0
-      state%settlement_habitat = -1
-!
+c
+c     same parsing of initdata for forwad/backward, i.e. no split by time_dir
+c
+      if (trim(adjustl(initdata)) /= "") then ! overwrite default above
+         
+         read(initdata,*) tag,value
+       
+         if (tag=='e') then
+            state%eggdevel  = value
+         elseif (tag=='l') then
+            state%stage  = is_pelagic_larvae
+            state%length = value
+         elseif (tag=='a') then
+            state%stage = is_unresolved
+            state%age   = value
+         else
+            write(*,*) "init_state_attributes: invalid initdata = ",
+     +                 initdata
+            stop 744
+         endif
+         
+      elseif (time_dir < 0) then
+         
+         write(*,*) "init_state_attributes: initdata "//
+     +        "must be supplied for backtracking"
+         stop 293
+         
+      endif                     ! initdata != ""
+!     
       call set_shore_BC(space, BC_reflect) 
 
       end subroutine init_state_attributes
@@ -269,6 +308,7 @@ c     ----------------------------------------------------
       subroutine get_active_velocity(state, space, v_active)
 c     --------------------------------------------------------------
 c     Implement simple vertical velocities
+c     Currently same for forward/backward dynamics
 c     egg_buoyancy = 0: additive fixed sinking speed, in addition to turbulent velocity 
 c     egg_buoyancy = 1: additive terminal Stokes velocity, corresponding to constant object density
 c     egg_buoyancy = 2: additive terminal Stokes velocity, corresponding to fixed equivalent salinity      
@@ -339,10 +379,27 @@ c
       end subroutine write_state_attributes
 
 
-
+      
       subroutine update_particle_state(state, space, dt)
 c     --------------------------------------------------------------
-c     This subroutine should integrate state forward for time period dt 
+c     forward/backward fanout
+c     --------------------------------------------------------------
+      type(state_attributes), intent(inout)   :: state
+      type(spatial_attributes), intent(inout) :: space
+      real,intent(in)                         :: dt ! in seconds      
+      if (dt>0) then
+         call update_particle_state_fwd(state, space, dt) 
+      else
+         call update_particle_state_back(state, space, dt)
+      endif
+      end subroutine update_particle_state
+
+
+      
+      
+      subroutine update_particle_state_fwd(state, space, dt)
+c     --------------------------------------------------------------
+c     This subroutine should integrate state FORWARD for time period dt 
 c     Settlement conditions: 
 c        1) settle_period_start < age < settle_period_end => set_tracer_mobility_stop
 c        2) Settlement is a Poisson process with sink_rate
@@ -410,13 +467,73 @@ c           ----  check whether depthmax has been exceeded ----
                endif
             endif
             
+         case default           ! dead/unresolved
+     
+      end select    
+c     ----------------------------------------
+      end subroutine update_particle_state_fwd
+
+
+
+      
+      subroutine update_particle_state_back(state, space, dt)
+c     --------------------------------------------------------------
+c     This subroutine should integrate state BACKWARD for time period dt 
+c     NB: dt < 0
+c     --------------------------------------------------------------
+      type(state_attributes), intent(inout)   :: state
+      type(spatial_attributes), intent(inout) :: space
+      real,intent(in)                         :: dt ! in seconds
+      real                                    :: xyz(3)
+      integer                                 :: status, iset
+      real                                    :: rnum, temp, cwd, t_x_t
+      real                                    :: temp_clipped, dLen
+      real                                    :: tsearch
+      logical                                 :: inhab
+c     --------------------------------------------------------------
+      if (state%stage < 0) return ! do not update age, so age correspond to age of dying
+      
+      state%age      = state%age + dt/86400. ! dt<0
+      call get_tracer_position(space,xyz) ! needed in all cases below
+c
+      select case (state%stage)
+         
+         case (is_egg)             ! update/promote egg
+         
+            call interpolate_temp(xyz,temp,status)
+            temp_clipped   = max(temp,egg_degdays_minT)
+            t_x_t            = (dt/86400)*temp_clipped
+            state%eggdevel = state%eggdevel + t_x_t/egg_degdays
+            if (state%eggdevel < 1) then ! hatch point, freeze
+               state%stage  = is_unhatched
+               call set_tracer_mobility_stop(space)
+            endif
+            
+         case (is_pelagic_larvae) ! update/promote pelagic larvae
+            
+            call interpolate_temp(xyz,temp,status)
+            dLen = (LenGrate + dLenGrate_dT*temp)*dt/86400 ! may become positive
+            dLen = min(0.0, dLen) ! never grow (= shrink backward)
+            state%length = state%length + dLen
+            if (state%length < larvlength_0) then ! go back to egg
+               state%stage     = is_egg
+               state%eggdevel  = 1.0
+            endif
+c           ----  check whether depthmax has been exceeded ----         
+            if (xyz(3)>depthmax) then
+               call interpolate_wdepth(xyz,cwd,status) ! avoid putting larvae below seabed
+               xyz(3) = min(cwd, depthmax)
+               call set_tracer_position(space,xyz)     ! move back to epipelagic layer
+            endif
+            
          case default           ! if dead Elvis already left the building
      
       end select    
 c     ----------------------------------------
-      end subroutine update_particle_state
+      end subroutine update_particle_state_back
 
 
+      
       character*100 function get_particle_version()  
       end function
 

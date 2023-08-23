@@ -552,7 +552,7 @@ c------------------------------------------------------------
       integer, intent(out) :: iset
 c------------------------------------------------------------
       inside_any = .false.
-      if ( associated(settlement_areas) ) then
+      if (.not.associated(settlement_areas) ) then
          iset = -1
          return
       endif

@@ -1,7 +1,9 @@
 c=======================================================================
 c     Generate a connectivity_matrix from a vector of 
-c     state_attributes accepting a method
-c        inquire_settling_success(state, is_settled, frombox, tobox, success)
+c     state_attributes applying a method
+c      
+c     inquire_settling_success(state, is_settled, frombox, tobox, success)
+c
 c     This tool is not concerned with the layout of release/settlement 
 c     habitats, but assumes each form a ordered set of habitats and that 
 c     (frombox, tobox, success) refers to this ordering.
@@ -95,7 +97,7 @@ c        --- basic particle statistics ---
          elseif (survival == 0) then ! set to 0 for dead 
             ndead = ndead + 1
          else
-            nfree = nfree + 1
+            nfree = nfree + 1    ! not settled, not dead
          endif
       enddo   
 c     
@@ -126,6 +128,7 @@ c ----------------------------------------------------------------------
 c     Write basic diagnostics on connectivity matrix to stdout
 c     retention is only defined if source set = destination set
 c     in which case retention is tmat(i,i)
+c     index order: tmat(isrc,idest))
 c ----------------------------------------------------------------------
       real, intent(in)       :: tmat(:,:)
      

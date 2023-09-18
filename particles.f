@@ -147,6 +147,7 @@ c     .................................................
       public :: emission_box_polygon   ! reexport import from particle_tracking.f
       public :: create_emission_boxes  ! reexport import from particle_tracking.f
       public :: write_emission_box     ! reexport import from particle_tracking.f
+      public :: get_current_emissions  ! reexport import from particle_tracking.f
       public :: get_particle_version   ! reexport from particle state
 
 c     .............................................................     
@@ -165,7 +166,6 @@ c     Module start up
 c     ---------------------------------------------------
       call init_particle_tracking()
       call init_particle_state()
-
       end subroutine init_particles
 
 

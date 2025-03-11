@@ -59,6 +59,7 @@ c     nemit(1:nsrc): particles emitted by each source (for normalization)
 c     tmat_prior(1:nsrc) is a background value applied to each tmat(isrc, :)
 c     as finite sampling smoothing. tmat must have been allocaetd prior to
 c     calling this subroutine
+c     no_emit_is_zero = .true. : set transport probability to zero for inactive sources (default)
 c ----------------------------------------------------------------------
       type(state_attributes), intent(in) :: state_stack(:) ! all active
       integer, intent(in)                :: nemit(:)
@@ -68,6 +69,7 @@ c ----------------------------------------------------------------------
       integer :: ist, frombox, tobox, isrc, nsrc, ndest
       real    :: survival, nofac
       integer :: nactive, nfree, nsett, ndead
+      logical, parameter :: no_emit_is_zero = .true.  ! handle for cases, where no particles were emitted
 c     ------------------------------------------------------------------
       nsrc  = size(tmat, 1)
       ndest = size(tmat, 2)
@@ -106,6 +108,9 @@ c
       do isrc = 1, nsrc    
          nofac = nemit(isrc) + ndest*tmat_prior(isrc)
          tmat(isrc,:) = tmat(isrc,:)/nofac
+         if ((nemit(isrc)==0) .and. no_emit_is_zero) then
+            tmat(isrc,:) = 0.   ! set transport probability to zero for inactive sources
+         endif
       enddo
 c     
 c     ------ basic report ------

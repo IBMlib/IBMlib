@@ -165,7 +165,7 @@ c-----------------------------------------------------------------------
             enddo
             if (dp>dpaccept) then
                write(*,*) "ix,iy,iz = ",ix,iy,iz
-               write(*,*) "dp = ", dp, " < dpaccept = ",dpaccept
+               write(*,*) "dp = ", dp, " > dpaccept = ",dpaccept
                stop "SC rho/p iterations not converged"
             endif
 

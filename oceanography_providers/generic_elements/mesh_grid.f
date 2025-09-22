@@ -22,8 +22,9 @@ c
 c     LOG: 
 c     * stripped out time components (deal only with space/data) ASC Feb 16, 2011
 c     * made biogeochemical components optional                  ASC May 2013
-c     * added optional data revision logging, to allow plugins 
-c       to minimize update overhead                              ASC Jun 2013
+c     * added optional data revision logging, to allow plugins to minimize update overhead  ASC Jun 2013
+c     * added new variant of interpolate_wdepth with optional wdepth=0 at shores ASC Sep 2025     
+c       
 c
 c     TODO:
 c       * introduce an "only" list for fields (applied at init time), to reduce memory usage
@@ -89,12 +90,13 @@ c     ---------- diagnostic exports ----------
       
       public :: write_topomask
       
-c     -------------------- module data --------------------  
+c     -------------------- module handles / data --------------------  
 
       integer, parameter :: verbose = 0  ! debugging output control
       real, parameter    :: htol = 1.e-6 ! tolerance for surface/bottom
       real, parameter    :: default_padding = 0.0  ! used, if not specified by user
       integer(kind=selected_int_kind(16)) :: data_revision_tag = -1 ! allow plugins to defer updates (-1 = unset data)
+      logical, parameter  :: dirichlet_coastal_wdepth_BC = .true.   ! if true, wdepth=0 at numerical shoreline in interpolate_wdepth
 c
 c     ------ grid dimensions:   ------
 c     
@@ -716,18 +718,41 @@ c     ------------------------------------------
       end subroutine 
 
 
+      
       subroutine interpolate_wdepth(geo, result, status) 
 c     -------------------------------------------------- 
-c     Do not apply interpolate_cc_2Dgrid_data which uses
-c     wet-point interpolation, but unrestricted interpolation (wdepth=0 at dry points)
-c     (otherwise problems in coastal regions)
+c     Interpolate water depth from 2D grid of depths
+c     Do not apply interpolate_cc_2Dgrid_data which uses wet-point interpolation
+c     This subroutine has two modes, controlled by module switch dirichlet_coastal_wdepth_BC :
+c      
+c       dirichlet_coastal_wdepth_BC = .true. : enforce wdepth goes linearly to zero
+c         toward numerical shore lines
+c         This is done inserting zero clamp points on a subgrid at numerical shore line 
+c      
+c       dirichlet_coastal_wdepth_BC = .false.: use unrestricted interpolation using wdepth=0
+c         at dry points. This implies coastal cliffs along numerical shore line,
+c         where wdepth in general is nonzero
+c      
+c     The interpolation subgrids nodes are indexed as follows:
+c     vc = (2,4)         vcx = (2,7,4)
+c          (1,3)               (6,5,9)
+c                              (1,8,3)
+c     so corners of vcx corresponds to vc. Nodes (5,6,7,8,9) are possible clamp points
+c     If either (1,2,3,4) are dry, 5 is always clamped to zero. For wet x/y directed pairs
+c     of (1,2,3,4) corresponding nodes in (6,7,8,9) are interpolated linearly.    
+c     If all nodes (1,2,3,4) are wet, result is the same irrespoctive setting of
+c     dirichlet_coastal_wdepth_BC. Previous version of interpolate_wdepth corresponded to
+c     dirichlet_coastal_wdepth_BC = .false.
+c      
+c     LOG: 22 Sep 2025: added dirichlet_coastal_wdepth_BC = .true. variant 
 c     -------------------------------------------------- 
       real, intent(in)     :: geo(:) 
       real, intent(out)    :: result
       integer, intent(out) :: status   
 c
       integer           :: ix,iy,ix0,iy0,ix1,iy1
-      real              :: sx,sy,vc(4)    
+      real              :: sx,sy,vc(4),vcsub(9), vcx(4)
+      logical           :: any_dry
 c     ------------------------------------------ 
       if (.not.horizontal_range_check(geo)) then
           result = padval_wdepth
@@ -744,16 +769,65 @@ c     --- delegate normal interior interpolation to interp_2Dbox_data
       ix0 = min(max(ix,    1),nx)  ! cover boundary layers
       ix1 = min(max(ix + 1,1),nx)  ! cover boundary layers
       iy0 = min(max(iy,    1),ny)  ! cover boundary layers
-      iy1 = min(max(iy + 1,1),ny)  ! cover boundary layers
+      iy1 = min(max(iy + 1,1),ny) ! cover boundary layers
+      any_dry = any(wetmask(ix0:ix1, iy0:iy1)==0)
       vc(1) = wdepth(ix0, iy0)
       vc(2) = wdepth(ix0, iy1)
       vc(3) = wdepth(ix1, iy0)
       vc(4) = wdepth(ix1, iy1)
+c      
+      if (dirichlet_coastal_wdepth_BC .and. any_dry) then
+         vcsub      = 0 ! center point 5 of subgrid, always 0 when any corner is dry
+         vcsub(1:4) = vc
+         if (wetmask(ix0,iy0)*wetmask(ix0,iy1) == 1) ! both nodes 1,2 wet -> subnode nonzero
+         
+     +        vcsub(6) = 0.5*(vc(1)+vc(2))
+         
+         if (wetmask(ix0,iy1)*wetmask(ix1,iy1) == 1) ! both nodes 2,4 wet -> subnode nonzero
 
-      call interp_2Dbox_data(sx, sy, vc, 0, result)
-      status = 0
+     +        vcsub(7) = 0.5*(vc(2)+vc(4))
+         
+         if (wetmask(ix0,iy0)*wetmask(ix1,iy0) == 1) ! both nodes 1,3 wet -> subnode nonzero
+         
+     +        vcsub(8) = 0.5*(vc(1)+vc(3))
+         
+         if (wetmask(ix1,iy0)*wetmask(ix1,iy1) == 1) ! both nodes 3,4 wet -> subnode nonzero
+     +        vcsub(9) = 0.5*(vc(3)+vc(4))
+         
+         sx = 2*sx  ! NB: now 0 < sx < 2
+         sy = 2*sy  ! NB: now 0 < sy < 2
+c        
+         if     ((sx <= 1).and.(sy <= 1)) then ! interpolation point in sector 1
+            
+            vcx = (/vcsub(1), vcsub(6), vcsub(8), vcsub(5)/)
+            call interp_2Dbox_data(sx, sy, vcx, 0, result)
+
+         elseif ((sx <= 1).and.(sy  > 1)) then ! interpolation point in sector 2
+            
+            vcx = (/vcsub(6), vcsub(2), vcsub(5), vcsub(7)/)
+            call interp_2Dbox_data(sx, sy-1, vcx, 0, result)
+
+         elseif ((sx  > 1).and.(sy <= 1)) then ! interpolation point in sector 3
+            
+            vcx = (/vcsub(8), vcsub(5), vcsub(3), vcsub(9)/)
+            call interp_2Dbox_data(sx-1, sy, vcx, 0, result)
+
+         elseif ((sx  > 1).and.(sy  > 1)) then ! interpolation point in sector 4
+           
+            vcx = (/vcsub(5), vcsub(7), vcsub(9), vcsub(4)/)
+            call interp_2Dbox_data(sx-1, sy-1, vcx, 0, result)
+
+         else
+            write(*,*) "interpolate_wdepth: unhandled case sx,sy=",sx,sy
+            stop 32          
+         endif
+         
+      else  ! all corners of interpolation rectangle wet and/or no dirichlet BC
+         call interp_2Dbox_data(sx, sy, vc, 0, result)
+         status = 0
+      endif
 c     ------------------------------------------ 
-      end subroutine 
+      end subroutine interpolate_wdepth
 
 
       subroutine interpolate_wind_stress(geo, r2, status)

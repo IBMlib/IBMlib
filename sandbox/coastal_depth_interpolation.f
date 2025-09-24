@@ -277,8 +277,8 @@ c
          
       else  ! all corners of interpolation rectangle wet and/or no dirichlet BC
          call interp_2Dbox_data(sx, sy, vc, 0, result)
-         status = 0
       endif
+      status = 0 ! normal completion
 c     ------------------------------------------ 
       end subroutine interpolate_wdepth
       end module

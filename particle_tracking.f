@@ -1769,6 +1769,7 @@ c                  compartability, so time_step can be used); release
 c                  is now determined from current_time in relation 
 c                  to emission_interval
 c     Oc7 07 2016: allowed gracefull ignoring of dry emission boxes
+c     Sep 26 2025: fixed absspec problem, if depth does not exceed release window
 c----------------------------------------------------------------- 
       type(emission_box),intent(inout)     :: emit_box
       real,intent(in)                      :: time_dir ! >0: forward, <0
@@ -1778,10 +1779,11 @@ c-----------------------------------------------------------------
 c     ..............................................
       integer, parameter     :: pos_attemps = 10**4  ! max attemps to find a wet point in box
       logical                :: pos_OK, absspec, horizOK, wet
+      logical                :: deep_enough
       integer                :: iatt, nwish, maxp_mem, maxp_box,ip
       integer                :: i, forw_back, istat, nend
       real                   :: dr(3), u3(3), abs_time_step, newpos(3)
-      real                   :: curdepth
+      real                   :: curdepth, bottband
       type(clock),pointer    :: current_time
 c---------------------------------------------------   
       if (time_dir>0) then
@@ -1826,7 +1828,9 @@ c........First horizontal: make sure tracer is initialized in a wet position
 c        (eventhough basic checks are performed at setup stage of 
 c        release box, box may contain dry areas at release time)
 c        For polygon release areas, also make sure point is inside         
-c
+c         
+c        24 sep 2025: for absspec == .TRUE. reject horizontal position, if position
+c                     shallower that full vertical vertcal band
          iatt   = 1
          pos_OK = .false.
          do while (iatt < pos_attemps)
@@ -1838,6 +1842,15 @@ c...........test if there is wet points at this horizontal position
             if (emit_box%spatial_box_type == emission_box_polygon) then
                horizOK = horizOK.and.
      +              is_inside_polygon(emit_box%perimeter, newpos)
+            endif
+c            
+c...........for absspec reject horizontal position, if position too shallow
+c                 
+            if (absspec) then
+               call interpolate_wdepth(newpos, curdepth, istat)
+               bottband = -min(emit_box%SW(3),emit_box%NE(3)) ! lower bound of release band; absspec: flip sign
+               deep_enough = curdepth > bottband
+               horizOK = horizOK.and.deep_enough
             endif
             
             if (horizOK.and.wet) then
